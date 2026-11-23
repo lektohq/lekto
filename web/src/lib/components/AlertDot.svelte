@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { TONE_DOT } from '#lib/tones.ts';
 	import { cn } from '#lib/utils.ts';
 
 	// A dot beside a label that something there needs a look (web/DESIGN.md, "Tabs and switches":
@@ -14,9 +15,7 @@
 <span
 	class={cn(
 		'size-2 shrink-0 rounded-full',
-		tone === 'red'
-			? 'bg-destructive'
-			: 'border-[1.5px] border-lane-yellow-foreground bg-lane-yellow',
+		tone === 'red' ? 'bg-destructive' : TONE_DOT.yellow,
 		className
 	)}
 	aria-hidden="true"

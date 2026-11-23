@@ -13,6 +13,16 @@ describe('class merging', () => {
 		expect(cn('text-sm', 'text-meta')).toBe('text-meta');
 	});
 
+	it('keeps the colour of an edge beside the width of a dot (WH-06)', () => {
+		// `border-dot` is a width: it stays beside the edge's colour, and a width replaces it.
+		expect(cn('border-dot', 'border-lane-yellow-foreground bg-lane-yellow')).toBe(
+			'border-dot border-lane-yellow-foreground bg-lane-yellow'
+		);
+		expect(cn('border-dot border-muted-foreground', 'border-2')).toBe(
+			'border-muted-foreground border-2'
+		);
+	});
+
 	it('keeps the primary button light on petrol in every size', () => {
 		for (const size of ['default', 'sm', 'xs', 'lg'] as const) {
 			expect(buttonVariants({ variant: 'default', size })).toContain('text-primary-foreground');

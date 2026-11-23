@@ -2,18 +2,20 @@ import { render, screen, waitFor, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { components } from '#lib/api/schema.ts';
+import { signIn } from '#lib/testing/session.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { scope } from '#lib/scope.svelte.ts';
 import { session } from '#lib/session.svelte.ts';
-import { calls, fakeApi } from '#lib/testing/api.ts';
-import { choose } from '#lib/testing/select.ts';
+import { phone } from '#lib/phone.svelte.ts';
+import { calls, fakeApi, problem } from '#lib/testing/api.ts';
+import { choose, selectedValue } from '#lib/testing/select.ts';
 import Page from './+page.svelte';
 
 type Space = components['schemas']['SpaceOut'];
 type User = components['schemas']['UserOut'];
 
 const USERS: User[] = [
-	{ id: 'u1', username: 'tobi', role: 'user', active: true },
+	{ id: 'u1', username: 'john', role: 'user', active: true },
 	{ id: 'u2', username: 'erika', role: 'user', active: true },
 	{ id: 'u3', username: 'admin', role: 'admin', active: true }
 ] as User[];
@@ -33,31 +35,22 @@ const space = (id: string, changes: Partial<Space>): Space => ({
 const HOUSE = space('house', {
 	name: 'Haushalt',
 	members: [
-		{ user_id: 'u1', role: 'edit', username: 'tobi', active: true },
+		{ user_id: 'u1', role: 'edit', username: 'john', active: true },
 		{ user_id: 'u2', role: 'read', username: 'erika', active: true }
 	]
 });
-const TOBI = space('tobi', {
+const JOHN = space('john', {
 	personal_of: 'u1',
-	members: [{ user_id: 'u1', role: 'edit', username: 'tobi', active: true }]
+	members: [{ user_id: 'u1', role: 'edit', username: 'john', active: true }]
 });
 const ERIKA = space('erika', {
 	personal_of: 'u2',
 	role: 'read',
 	members: [
 		{ user_id: 'u2', role: 'edit', username: 'erika', active: true },
-		{ user_id: 'u1', role: 'read', username: 'tobi', active: true }
+		{ user_id: 'u1', role: 'read', username: 'john', active: true }
 	]
 });
-
-function signIn(id: string, role: User['role'] = 'user') {
-	session.start({
-		user: { id, username: USERS.find((user) => user.id === id)?.username ?? id, role },
-		method: 'password',
-		expires_at: '2026-10-21T12:00:00Z',
-		csrf_token: 'token'
-	} as never);
-}
 
 function start(spaces: Space[]) {
 	const api = fakeApi({
@@ -67,23 +60,23 @@ function start(spaces: Space[]) {
 		'DELETE /api/v1/spaces/house/members/u2': () => HOUSE,
 		'POST /api/v1/spaces': () => HOUSE,
 		'PATCH /api/v1/spaces/house': () => HOUSE,
-		'PATCH /api/v1/spaces/tobi': () => TOBI
+		'PATCH /api/v1/spaces/john': () => JOHN
 	});
 	vi.stubGlobal('fetch', api);
 	render(Page);
 	return api;
 }
 
-beforeEach(() => signIn('u1'));
+beforeEach(() => signIn('user', { id: 'u1', username: 'john' }));
 afterEach(() => {
+	phone.override(null);
 	scope.set(false);
-	vi.unstubAllGlobals();
 	session.clear();
 });
 
 describe('spaces', () => {
 	it('lists the personal space first, then the others with members and role', async () => {
-		start([HOUSE, ERIKA, TOBI]);
+		start([HOUSE, ERIKA, JOHN]);
 		const own = await screen.findByRole('region', { name: m.spaces_own() });
 		const rows = within(own).getAllByRole('listitem');
 		expect(rows.map((row) => row.textContent?.replace(/\s+/g, ' ').trim())).toEqual([
@@ -102,25 +95,25 @@ describe('spaces', () => {
 	});
 
 	it('shows an admin the spaces they are no member of apart, with all users included', async () => {
-		signIn('u3', 'admin');
+		signIn('admin', { id: 'u3', username: 'admin' });
 		scope.set(true);
 		const admins = space('admins', {
 			personal_of: 'u3',
 			members: [{ user_id: 'u3', role: 'edit', username: 'admin', active: true }]
 		});
-		const api = start([HOUSE, TOBI, admins]);
+		const api = start([HOUSE, JOHN, admins]);
 		const others = await screen.findByRole('region', { name: m.spaces_others() });
 		expect(within(others).getAllByRole('listitem')).toHaveLength(2);
 		const lists = calls(api).filter((call) => call.startsWith('GET /api/v1/spaces'));
 		expect(lists.at(-1)).toContain('all_users=true');
 		// An admin chooses the members of another user's personal space.
 		expect(
-			within(others).getByRole('button', { name: m.space_members({ name: 'tobi' }) })
+			within(others).getByRole('button', { name: m.space_members({ name: 'john' }) })
 		).toBeTruthy();
 	});
 
 	it('shows an admin only their own spaces without all users, like everyone', async () => {
-		signIn('u3', 'admin');
+		signIn('admin', { id: 'u3', username: 'admin' });
 		const admins = space('admins', {
 			personal_of: 'u3',
 			members: [{ user_id: 'u3', role: 'edit', username: 'admin', active: true }]
@@ -133,16 +126,16 @@ describe('spaces', () => {
 	});
 
 	it('adds and removes members; the last editor stays', async () => {
-		signIn('u1');
+		signIn('user', { id: 'u1', username: 'john' });
 		const user = userEvent.setup();
-		const api = start([HOUSE, TOBI]);
+		const api = start([HOUSE, JOHN]);
 		await user.click(
 			await screen.findByRole('button', { name: m.space_members({ name: 'Haushalt' }) })
 		);
 		const dialog = await screen.findByRole('dialog');
-		// tobi is the only editor: no role to change, nothing to remove.
+		// john is the only editor: no role to change, nothing to remove.
 		expect(
-			within(dialog).queryByRole('button', { name: m.members_remove({ name: 'tobi' }) })
+			within(dialog).queryByRole('button', { name: m.members_remove({ name: 'john' }) })
 		).toBeNull();
 		await user.click(
 			within(dialog).getByRole('button', { name: m.members_remove({ name: 'erika' }) })
@@ -157,9 +150,38 @@ describe('spaces', () => {
 		const put = api.mock.calls.find(([request]) => request.method === 'PUT')![0];
 		expect(await put.json()).toEqual({ role: 'read' });
 	});
+	it.each([
+		['wider than a phone', false],
+		['on a phone', true]
+	])('shows the stored role again when the API refuses another, %s (WC-06)', async (_, small) => {
+		// The field kept the refused choice, and the same choice again asked for nothing.
+		phone.override(small);
+		const user = userEvent.setup();
+		const api = fakeApi({
+			'GET /api/v1/spaces': () => [HOUSE, JOHN],
+			'GET /api/v1/users': () => USERS,
+			'PUT /api/v1/spaces/house/members/u2': () => problem(422, { detail: 'no' })
+		});
+		vi.stubGlobal('fetch', api);
+		render(Page);
+		await user.click(
+			await screen.findByRole('button', { name: m.space_members({ name: 'Haushalt' }) })
+		);
+		const dialog = await screen.findByRole('dialog');
+		const role = () => within(dialog).getByLabelText(m.members_role_of({ name: 'erika' }));
+		const puts = () => calls(api).filter((call) => call.startsWith('PUT '));
+		expect(selectedValue(role())).toBe('read');
+		await choose(user, role(), 'edit');
+		await waitFor(() => expect(puts()).toHaveLength(1));
+		await waitFor(() => expect(selectedValue(role())).toBe('read'));
+		await waitFor(() => expect((role() as HTMLButtonElement).disabled).toBe(false));
+		await choose(user, role(), 'edit');
+		await waitFor(() => expect(puts()).toHaveLength(2));
+	});
+
 	it('shows what belongs in a space, and creates one with its description', async () => {
-		const user = userEvent.setup({ pointerEventsCheck: 0 });
-		const api = start([{ ...HOUSE, description: 'Wohnung, Nebenkosten' }, TOBI]);
+		const user = userEvent.setup();
+		const api = start([{ ...HOUSE, description: 'Wohnung, Nebenkosten' }, JOHN]);
 		expect(await screen.findByText('Wohnung, Nebenkosten')).toBeTruthy();
 		await user.click(screen.getByRole('button', { name: m.space_new() }));
 		const dialog = await screen.findByRole('dialog');
@@ -175,8 +197,8 @@ describe('spaces', () => {
 	});
 
 	it('describes the personal space without renaming it', async () => {
-		const user = userEvent.setup({ pointerEventsCheck: 0 });
-		const api = start([HOUSE, TOBI]);
+		const user = userEvent.setup();
+		const api = start([HOUSE, JOHN]);
 		await user.click(
 			await screen.findByRole('button', { name: m.space_edit({ name: m.space_personal() }) })
 		);
@@ -184,14 +206,14 @@ describe('spaces', () => {
 		expect(within(dialog).queryByLabelText(m.field_name())).toBeNull();
 		await user.type(within(dialog).getByLabelText(m.space_description()), 'Arbeit');
 		await user.click(within(dialog).getByRole('button', { name: m.save() }));
-		await waitFor(() => expect(calls(api)).toContain('PATCH /api/v1/spaces/tobi'));
+		await waitFor(() => expect(calls(api)).toContain('PATCH /api/v1/spaces/john'));
 		const patch = api.mock.calls.find(([request]) => request.method === 'PATCH')![0];
 		expect(await patch.json()).toEqual({ description: 'Arbeit' });
 	});
 
 	it('renames a shared space with its description, and removes an emptied one', async () => {
-		const user = userEvent.setup({ pointerEventsCheck: 0 });
-		const api = start([{ ...HOUSE, description: 'alt' }, TOBI]);
+		const user = userEvent.setup();
+		const api = start([{ ...HOUSE, description: 'alt' }, JOHN]);
 		await user.click(
 			await screen.findByRole('button', { name: m.space_edit({ name: 'Haushalt' }) })
 		);
@@ -207,9 +229,9 @@ describe('spaces', () => {
 	});
 
 	it('lets a reader leave a space, after asking', async () => {
-		signIn('u2');
+		signIn('user', { id: 'u2', username: 'erika' });
 		// A dialog of an earlier test may still leave the body without pointer events.
-		const user = userEvent.setup({ pointerEventsCheck: 0 });
+		const user = userEvent.setup();
 		const api = start([{ ...HOUSE, role: 'read' }, ERIKA]);
 		// Not their own personal space.
 		expect(
@@ -224,31 +246,48 @@ describe('spaces', () => {
 	});
 
 	it('keeps a deactivated member without a role to change, for removing', async () => {
-		const user = userEvent.setup({ pointerEventsCheck: 0 });
+		const user = userEvent.setup();
 		const gone = {
 			...HOUSE,
 			members: [
-				{ user_id: 'u1', role: 'edit' as const, username: 'tobi', active: true },
-				{ user_id: 'u9', role: 'read' as const, username: 'otto', active: false }
+				{ user_id: 'u1', role: 'edit' as const, username: 'john', active: true },
+				{ user_id: 'u9', role: 'read' as const, username: 'jane', active: false }
 			]
 		};
-		start([gone, TOBI]);
+		start([gone, JOHN]);
 		await user.click(
 			await screen.findByRole('button', { name: m.space_members({ name: 'Haushalt' }) })
 		);
 		const dialog = await screen.findByRole('dialog');
 		expect(within(dialog).getByText(m.user_inactive())).toBeTruthy();
-		expect(within(dialog).queryByLabelText(m.members_role_of({ name: 'otto' }))).toBeNull();
+		expect(within(dialog).queryByLabelText(m.members_role_of({ name: 'jane' }))).toBeNull();
 		expect(
-			within(dialog).getByRole('button', { name: m.members_remove({ name: 'otto' }) })
+			within(dialog).getByRole('button', { name: m.members_remove({ name: 'jane' }) })
 		).toBeTruthy();
 	});
 
 	it('opens the editor by the name of a space one edits, not of one one reads', async () => {
-		start([HOUSE, ERIKA, TOBI]);
+		start([HOUSE, ERIKA, JOHN]);
 		const own = await screen.findByRole('region', { name: m.spaces_own() });
 		await userEvent.click(within(own).getByRole('button', { name: 'Haushalt' }));
 		expect(await screen.findByRole('dialog')).toBeTruthy();
 		expect(within(own).queryByRole('button', { name: 'erika' })).toBeNull();
+	});
+
+	it('offers no editor for the personal space of another one edits along (WH-02)', async () => {
+		// The API lets only its user and admins describe it; "edit" there means the documents.
+		const lent = space('erika', {
+			...ERIKA,
+			role: 'edit',
+			members: [
+				{ user_id: 'u2', role: 'edit', username: 'erika', active: true },
+				{ user_id: 'u1', role: 'edit', username: 'john', active: true }
+			]
+		});
+		start([HOUSE, lent, JOHN]);
+		const own = await screen.findByRole('region', { name: m.spaces_own() });
+		expect(within(own).getByText('erika')).toBeTruthy();
+		expect(within(own).queryByRole('button', { name: 'erika' })).toBeNull();
+		expect(within(own).getByRole('button', { name: 'Haushalt' })).toBeTruthy();
 	});
 });

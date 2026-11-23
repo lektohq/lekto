@@ -9,7 +9,7 @@
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import type { Changes, Headline, HeadlineTone } from '#lib/run-summary.ts';
-	import { DOT, YELLOW_ACTION } from '#lib/step-look.ts';
+	import { TONE_DOT } from '#lib/tones.ts';
 	import type { Counts } from '#lib/steps.ts';
 	import { cn } from '#lib/utils.ts';
 	import * as Card from '#lib/components/ui/card/index.ts';
@@ -53,23 +53,23 @@
 	// The counts in words, the number in bold: only what there is.
 	const tallies = $derived(
 		[
-			{ count: counts.done, label: m.run_count_done(), dot: DOT.green },
-			{ count: counts.uncertain, label: m.run_count_uncertain(), dot: DOT.yellow },
-			{ count: counts.failed, label: m.run_count_failed(), dot: DOT.red },
+			{ count: counts.done, label: m.run_count_done(), dot: TONE_DOT.green },
+			{ count: counts.uncertain, label: m.run_count_uncertain(), dot: TONE_DOT.yellow },
+			{ count: counts.failed, label: m.run_count_failed(), dot: TONE_DOT.red },
 			{
 				count: counts.running,
 				label: counts.running === 1 ? m.run_count_running_one() : m.run_count_running(),
-				dot: 'motion-safe:animate-pulse border-[1.5px] border-lane-running-foreground bg-lane-running'
+				dot: cn('motion-safe:animate-pulse', TONE_DOT.running)
 			},
 			{
 				count: counts.waiting,
 				label: counts.waiting === 1 ? m.run_count_waiting_one() : m.run_count_waiting(),
-				dot: 'border-[1.5px] border-dashed border-muted-foreground'
+				dot: 'border-dot border-dashed border-muted-foreground'
 			},
 			{
 				count: counts.skipped,
 				label: m.run_count_skipped(),
-				dot: 'border-[1.5px] border-dashed border-muted-foreground/50'
+				dot: 'border-dot border-dashed border-muted-foreground/50'
 			},
 			{
 				count: counts.carried,
@@ -77,7 +77,7 @@
 					counts.carriedFrom === null
 						? m.run_count_carried_earlier()
 						: m.run_count_carried({ run: counts.carriedFrom }),
-				dot: 'border-[1.5px] border-border bg-muted'
+				dot: TONE_DOT.muted
 			}
 		].filter((entry) => entry.count > 0)
 	);
@@ -101,7 +101,7 @@
 			{/if}
 		</div>
 		{#if headline.action === 'filing' || headline.action === 'review'}
-			<Button href={reviewHref} class={cn('shrink-0', YELLOW_ACTION)}>
+			<Button href={reviewHref} class="shrink-0">
 				{headline.action === 'filing' ? m.processing_filing_link() : m.run_to_review()}
 			</Button>
 		{:else if headline.action === 'reprocess' && canReprocess}

@@ -6,6 +6,7 @@
 	import { api } from '#lib/api/client.ts';
 	import { unwrap } from '#lib/api/call.ts';
 	import type { components } from '#lib/api/schema.ts';
+	import EmptyNote from '#lib/components/EmptyNote.svelte';
 	import ConfirmDialog from '#lib/components/ConfirmDialog.svelte';
 	import IconButton from '#lib/components/IconButton.svelte';
 	import Loading from '#lib/components/Loading.svelte';
@@ -16,14 +17,17 @@
 	import * as Card from '#lib/components/ui/card/index.ts';
 	import { Switch } from '#lib/components/ui/switch/index.ts';
 	import { describeError, reportError } from '#lib/errors.ts';
-	import { formatDate, getLocale } from '#lib/i18n.ts';
+	import { getLocale, formatMoment } from '#lib/i18n.ts';
+	import { appleDevice } from '#lib/install.svelte.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import {
 		currentSubscription,
 		deviceName,
+		notificationsBlocked,
 		pushSupport,
 		subscribe,
 		unblockSteps,
+		watchPermission,
 		type UnblockStep
 	} from '#lib/push-device.ts';
 	import { session } from '#lib/session.svelte.ts';
@@ -43,7 +47,7 @@
 	let endpoint = $state<string | null>(null);
 	let problem = $state<string | null>(null);
 	let busy = $state(false);
-	let blocked = $state(support === 'ready' && Notification.permission === 'denied');
+	let blocked = $state(support === 'ready' && notificationsBlocked());
 	let removing = $state<Device | null>(null);
 
 	const here = $derived(devices?.find((device) => device.endpoint === endpoint) ?? null);
@@ -56,12 +60,17 @@
 	const shown = $derived(KINDS.filter((item) => !item.admin || session.isAdmin));
 	// Where to allow them again, for this browser (a Dock app has settings of its own).
 	const UNBLOCK: Record<UnblockStep, () => string> = {
+		'ios-app': m.notifications_unblock_ios_app,
+		'android-app': m.notifications_unblock_android_app,
+		'address-bar-tap': m.notifications_unblock_address_bar_tap,
 		'dock-app': m.notifications_unblock_dock_app,
 		safari: m.notifications_unblock_safari,
 		'address-bar': m.notifications_unblock_address_bar,
 		macos: m.notifications_unblock_macos
 	};
 	const unblock = support === 'ready' ? unblockSteps() : [];
+	// The device the hint to install the app first names (only an iPhone or iPad gets it).
+	const device = appleDevice() === 'iPad' ? 'iPad' : 'iPhone';
 
 	async function load() {
 		problem = null;
@@ -76,13 +85,18 @@
 			devices = list;
 			kinds = preferences.kinds;
 			titles = preferences.titles;
-			endpoint = support === 'ready' ? ((await currentSubscription())?.endpoint ?? null) : null;
+			endpoint =
+				support === 'ready' ? ((await currentSubscription(publicKey))?.endpoint ?? null) : null;
 		} catch (failure) {
 			problem = describeError(failure);
 		}
 	}
 
-	onMount(load);
+	onMount(() => {
+		void load();
+		// Allowed again in the settings: the card knows once the person is back, without a reload.
+		return watchPermission(() => (blocked = support === 'ready' && notificationsBlocked()));
+	});
 
 	async function switchOn() {
 		if (busy || !publicKey) return;
@@ -190,10 +204,15 @@
 				<p class="text-muted-foreground">{m.notifications_off_server()}</p>
 			{:else if support === 'install-first'}
 				<Alert.Root variant="tip">
-					<Alert.Title>{m.notifications_install_title()}</Alert.Title>
+					<Alert.Title>{m.notifications_install_title({ device })}</Alert.Title>
 					<Alert.Description>
 						<ol class="list-decimal pl-5">
-							<li>{m.notifications_step_share()}</li>
+							<!-- Safari's "Share" stands at the bottom on an iPhone, at the top on an iPad. -->
+							<li>
+								{device === 'iPad'
+									? m.notifications_step_share_top()
+									: m.notifications_step_share()}
+							</li>
 							<li>{m.notifications_step_home()}</li>
 							<li>{m.notifications_step_open()}</li>
 						</ol>
@@ -203,7 +222,7 @@
 				<p class="text-muted-foreground">{m.notifications_unsupported()}</p>
 			{:else if here}
 				<div class="flex flex-wrap gap-2">
-					<Button variant="outline" aria-disabled={busy} onclick={test}>
+					<Button variant="outline" {busy} onclick={test}>
 						{m.notifications_test()}
 					</Button>
 					<Button variant="ghost" onclick={switchOff}>{m.notifications_switch_off()}</Button>
@@ -214,12 +233,12 @@
 					<Alert.Description>
 						<ol class="list-decimal pl-5">
 							{#each unblock as step (step)}<li>{UNBLOCK[step]()}</li>{/each}
-							<li>{m.notifications_unblock_reload()}</li>
+							<li>{m.notifications_unblock_return()}</li>
 						</ol>
 					</Alert.Description>
 				</Alert.Root>
 			{:else}
-				<Button class="self-start" aria-disabled={busy} onclick={switchOn}>
+				<Button class="self-start" {busy} onclick={switchOn}>
 					{m.notifications_switch_on()}
 				</Button>
 			{/if}
@@ -265,7 +284,7 @@
 		<Card.Header><Card.Title>{m.notifications_devices()}</Card.Title></Card.Header>
 		<Card.Content>
 			{#if devices.length === 0}
-				<p class="text-muted-foreground">{m.notifications_none()}</p>
+				<EmptyNote size="line">{m.notifications_none()}</EmptyNote>
 			{:else}
 				<ul class="divide-y">
 					{#each devices as device (device.id)}
@@ -277,10 +296,7 @@
 										device.endpoint === endpoint ? m.notifications_this_device() : null,
 										device.last_success_at
 											? m.notifications_last({
-													time: formatDate(device.last_success_at, {
-														dateStyle: 'short',
-														timeStyle: 'short'
-													})
+													time: formatMoment(device.last_success_at)
 												})
 											: m.notifications_never()
 									]

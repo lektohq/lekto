@@ -7,11 +7,13 @@
 	import { unwrap } from '#lib/api/call.ts';
 	import type { components } from '#lib/api/schema.ts';
 	import { fieldLabel } from '#lib/describe.ts';
+	import LaneBadge from '#lib/components/LaneBadge.svelte';
+	import EmptyNote from '#lib/components/EmptyNote.svelte';
 	import LoadProblem from '#lib/components/LoadProblem.svelte';
 	import * as Chart from '#lib/components/ui/chart/index.ts';
 	import { formatDuration } from '#lib/duration.ts';
 	import { describeError } from '#lib/errors.ts';
-	import { browserZone, formatNumber, formatPercent, listLocale } from '#lib/i18n.ts';
+	import { browserZone, formatNumber, formatPercent, formatList } from '#lib/i18n.ts';
 	import { latest } from '#lib/latest.ts';
 	import { NODE_LABELS } from '#lib/node-labels.ts';
 	import { m } from '#lib/paraglide/messages.js';
@@ -25,15 +27,15 @@
 	import Chip from '#lib/components/Chip.svelte';
 	import Segmented from '#lib/components/Segmented.svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
-	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import { Separator } from '#lib/components/ui/separator/index.ts';
 	import Loading from '#lib/components/Loading.svelte';
 
 	// The tab "Automation" of the page "System" (Tobi, 24.10.2026): how the documents went
 	// through their first run, what became of them, how long it took, and how people judged what
 	// the automation set at their first decision on a field. For the channels and the period
-	// chosen (by default the web and the API, 12 months: migrated documents bring the metadata
-	// of the source system); the numbers are the whole system's and name no document.
+	// chosen (by default every channel but the migration, 12 months: migrated documents bring
+	// the metadata of the source system); the numbers are the whole system's and name no
+	// document.
 	type Report = components['schemas']['AutomationOut'];
 	type Channel = components['schemas']['Channel'];
 	type Period = components['schemas']['Period'];
@@ -132,23 +134,19 @@
 	const percent = (part: number, whole: number) => formatPercent(whole ? part / whole : 0);
 	const duration = (ms: number | null | undefined) =>
 		ms == null ? '–' : formatDuration(ms / 1000);
-	const list = (items: string[]) =>
-		new Intl.ListFormat(listLocale(), { type: 'conjunction' }).format(items);
+	const list = (items: string[]) => formatList(items);
 
 	const total = $derived(report ? report.lanes.green + report.lanes.yellow + report.lanes.red : 0);
-	const scope = $derived(
-		report
-			? m.automation_first_scope({
-					count: formatNumber(total),
-					channels: list(
-						CHANNELS.filter((item) => report?.channels.includes(item.value)).map((item) =>
-							item.label()
-						)
-					),
-					period: PERIODS.find((item) => item.value === report?.period)?.label() ?? ''
-				})
-			: ''
-	);
+	const scope = $derived.by(() => {
+		if (!report) return '';
+		const channels = list(
+			CHANNELS.filter((item) => report?.channels.includes(item.value)).map((item) => item.label())
+		);
+		const period = PERIODS.find((item) => item.value === report?.period)?.label() ?? '';
+		return total === 1
+			? m.automation_first_scope_one({ channels, period })
+			: m.automation_first_scope({ count: formatNumber(total), channels, period });
+	});
 
 	// What became of the documents of each first lane: their lanes now.
 	const flows = $derived(
@@ -171,12 +169,12 @@
 	);
 
 	function flowText(first: Lane, now: Lane | null, count: number): string {
-		const n = formatNumber(count);
-		if (now === null) return m.automation_flow_running({ count: n });
-		if (now === first && first !== 'green') return m.automation_flow_open({ count: n });
-		if (now === 'green') return m.automation_flow_done({ count: n });
-		if (now === 'yellow') return m.automation_flow_review({ count: n });
-		return m.automation_flow_failed({ count: n });
+		if (now === null) return m.automation_flow_running({ count: formatNumber(count) });
+		if (now === first && first !== 'green')
+			return m.automation_flow_open({ count: formatNumber(count) });
+		if (now === 'green') return m.automation_flow_done({ count: formatNumber(count) });
+		if (now === 'yellow') return m.automation_flow_review({ count: formatNumber(count) });
+		return m.automation_flow_failed({ count: formatNumber(count) });
 	}
 
 	// The months by their first day (unique: a month name alone names two in twenty months),
@@ -289,6 +287,10 @@
 		</div>
 	</div>
 
+	<!-- A failed reload: said above what was read before, which stays (web/DESIGN.md, "States"). -->
+	{#if problem && report}
+		<LoadProblem {problem} onretry={load} />
+	{/if}
 	{#if problem && !report}
 		<LoadProblem {problem} onretry={load} />
 	{:else if !report}
@@ -305,7 +307,7 @@
 					<span class="text-meta text-muted-foreground">{scope}</span>
 				</div>
 				{#if total === 0}
-					<p class="text-muted-foreground">{m.automation_none()}</p>
+					<EmptyNote size="line">{m.automation_none()}</EmptyNote>
 				{:else}
 					<div
 						role="img"
@@ -321,9 +323,9 @@
 						{/each}
 					</div>
 					<div class="grid grid-cols-[repeat(auto-fit,minmax(140px,1fr))] gap-4">
-						{#each LANES as { lane, label } (lane)}
+						{#each LANES as { lane } (lane)}
 							<div class="flex flex-col gap-1">
-								<Badge variant={lane} size="md" class="self-start">{label()}</Badge>
+								<LaneBadge {lane} size="md" class="self-start" />
 								<span class="text-figure tabular-nums">
 									{percent(report.lanes[lane], total)}
 								</span>
@@ -384,7 +386,7 @@
 						{@const caption = flow.parts.map((part) => part.text).join(' · ')}
 						<div class="grid grid-cols-1 items-start gap-x-5 gap-y-2 sm:grid-cols-[170px_1fr]">
 							<div class="flex h-6 items-center gap-2">
-								<Badge variant={flow.lane} size="md">{flow.label()}</Badge>
+								<LaneBadge lane={flow.lane} size="md" />
 								<span class="font-semibold tabular-nums">{formatNumber(flow.count)}</span>
 								<ArrowRight class="size-4 text-muted-foreground" aria-hidden="true" />
 							</div>
@@ -470,11 +472,15 @@
 					untouched: formatNumber(report.untouched)
 				})}
 				{#if early}
-					<span>{m.automation_hits_early({ count: formatNumber(early) })}</span>
+					<span>
+						{early === 1
+							? m.automation_hits_early_one()
+							: m.automation_hits_early({ count: formatNumber(early) })}
+					</span>
 				{/if}
 			</p>
 			{#if !fixed.length && !custom.length}
-				<p class="mt-3 text-muted-foreground">{m.automation_hits_none()}</p>
+				<EmptyNote size="line">{m.automation_hits_none()}</EmptyNote>
 			{:else}
 				<div class="mt-3.5 flex flex-wrap gap-x-[18px] gap-y-2 text-meta text-muted-foreground">
 					{@render swatch('bg-chart-1', m.automation_verdict_taken())}
@@ -497,7 +503,9 @@
 								<span class="font-medium">
 									{fieldLabel(field.field, null)}
 									<span class="text-xs font-normal text-muted-foreground">
-										{m.automation_field_decided({ count: formatNumber(decided(field)) })}
+										{decided(field) === 1
+											? m.automation_field_decided_one()
+											: m.automation_field_decided({ count: formatNumber(decided(field)) })}
 									</span>
 								</span>
 								<span class="font-semibold tabular-nums">
@@ -531,10 +539,16 @@
 									/>
 									{m.automation_custom_fields()}
 									<span class="text-xs font-normal text-muted-foreground">
-										{m.automation_custom_decided({
-											count: formatNumber(decided(customTotal)),
-											fields: formatNumber(custom.length)
-										})}
+										{decided(customTotal) === 1
+											? m.automation_custom_decided_one()
+											: custom.length === 1
+												? m.automation_custom_decided_one_field({
+														count: formatNumber(decided(customTotal))
+													})
+												: m.automation_custom_decided({
+														count: formatNumber(decided(customTotal)),
+														fields: formatNumber(custom.length)
+													})}
 									</span>
 								</button>
 								<span class="font-semibold tabular-nums">

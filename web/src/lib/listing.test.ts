@@ -4,6 +4,7 @@ import {
 	byMonth,
 	filtersCollapsed,
 	monthOf,
+	forgetFilters,
 	rememberFilters,
 	rememberFiltersCollapsed,
 	rememberSort,
@@ -13,6 +14,7 @@ import {
 	sortFieldOf,
 	sortOf
 } from './listing.ts';
+import { withoutStorage } from '#lib/testing/browser.ts';
 
 afterEach(() => localStorage.clear());
 
@@ -56,21 +58,72 @@ describe('the sort of the document view', () => {
 
 describe('the filters the document view remembers', () => {
 	it('keeps the filters as set, and forgets them once none is left', () => {
-		expect(rememberedFilters()).toBeNull();
-		rememberFilters({ ...NO_FILTERS, contacts: ['c1', 'c2'], dateFrom: '2026-01-01' });
-		expect(rememberedFilters()).toEqual({
+		expect(rememberedFilters('u1')).toBeNull();
+		rememberFilters({ ...NO_FILTERS, contacts: ['c1', 'c2'], dateFrom: '2026-01-01' }, 'u1');
+		expect(rememberedFilters('u1')).toEqual({
 			...NO_FILTERS,
 			contacts: ['c1', 'c2'],
 			dateFrom: '2026-01-01'
 		});
-		rememberFilters(NO_FILTERS);
-		expect(rememberedFilters()).toBeNull();
+		rememberFilters(NO_FILTERS, 'u1');
+		expect(rememberedFilters('u1')).toBeNull();
 		expect(localStorage.getItem('lekto.documents.filters')).toBeNull();
 	});
 
 	it('counts what was stored but narrows nothing as none', () => {
-		localStorage.setItem('lekto.documents.filters', 'contact=&date_from=yesterday');
-		expect(rememberedFilters()).toBeNull();
+		localStorage.setItem(
+			'lekto.documents.filters',
+			JSON.stringify({ user: 'u1', filters: 'contact=&date_from=yesterday' })
+		);
+		expect(rememberedFilters('u1')).toBeNull();
+	});
+
+	it('keeps them for the user who set them: another user gets none', () => {
+		rememberFilters({ ...NO_FILTERS, contacts: ['c1'] }, 'u1');
+		expect(rememberedFilters('u2')).toBeNull();
+		expect(rememberedFilters(undefined)).toBeNull();
+		// Still there for their owner.
+		expect(rememberedFilters('u1')).toEqual({ ...NO_FILTERS, contacts: ['c1'] });
+		// Whoever sets filters next takes the place.
+		rememberFilters({ ...NO_FILTERS, tags: ['t1'] }, 'u2');
+		expect(rememberedFilters('u1')).toBeNull();
+	});
+
+	it('reads a value kept twice once: such a filter once broke the list for good', () => {
+		localStorage.setItem(
+			'lekto.documents.filters',
+			JSON.stringify({
+				user: 'u1',
+				filters: 'contact=c1&contact=c1&fact=iban%3Ar%3A&fact=iban%3Ar%3A'
+			})
+		);
+		expect(rememberedFilters('u1')).toEqual({
+			...NO_FILTERS,
+			contacts: ['c1'],
+			facts: ['iban:r:']
+		});
+	});
+
+	it('remembers none without a user', () => {
+		rememberFilters({ ...NO_FILTERS, contacts: ['c1'] }, undefined);
+		expect(localStorage.getItem('lekto.documents.filters')).toBeNull();
+	});
+
+	it("takes filters kept without their user as no one's", () => {
+		// As this browser kept them before they named their user.
+		localStorage.setItem('lekto.documents.filters', 'contact=c1');
+		expect(rememberedFilters('u1')).toBeNull();
+		localStorage.setItem('lekto.documents.filters', JSON.stringify({ filters: 'contact=c1' }));
+		expect(rememberedFilters('u1')).toBeNull();
+		localStorage.setItem('lekto.documents.filters', 'null');
+		expect(rememberedFilters('u1')).toBeNull();
+	});
+
+	it('forgets them on demand', () => {
+		rememberFilters({ ...NO_FILTERS, contacts: ['c1'] }, 'u1');
+		forgetFilters();
+		expect(rememberedFilters('u1')).toBeNull();
+		expect(localStorage.getItem('lekto.documents.filters')).toBeNull();
 	});
 
 	it('remembers the panel collapsed, open at first', () => {
@@ -83,21 +136,12 @@ describe('the filters the document view remembers', () => {
 	});
 
 	it('works without storage: nothing remembered, nothing thrown', () => {
-		const storage = Object.getOwnPropertyDescriptor(globalThis, 'localStorage')!;
-		Object.defineProperty(globalThis, 'localStorage', {
-			configurable: true,
-			get() {
-				throw new Error('blocked');
-			}
-		});
-		try {
-			expect(() => rememberFilters({ ...NO_FILTERS, contacts: ['c1'] })).not.toThrow();
-			expect(rememberedFilters()).toBeNull();
+		withoutStorage(() => {
+			expect(() => rememberFilters({ ...NO_FILTERS, contacts: ['c1'] }, 'u1')).not.toThrow();
+			expect(rememberedFilters('u1')).toBeNull();
 			expect(() => rememberFiltersCollapsed(true)).not.toThrow();
 			expect(filtersCollapsed()).toBe(false);
-		} finally {
-			Object.defineProperty(globalThis, 'localStorage', storage);
-		}
+		});
 	});
 });
 
@@ -111,6 +155,8 @@ describe('the months of the document view', () => {
 		expect(monthOf('-document_date', doc('2026-09-30'))).toBe('2026-09');
 		expect(monthOf('document_date', doc(null))).toBe('');
 		expect(monthOf('-created_at', doc('2026-09-30', '2026-10-01T09:00:00'))).toBe('2026-10');
+		// Half past one at night here, the day before in UTC: the month the date shows.
+		expect(monthOf('-created_at', doc('2026-09-30', '2026-09-30T23:30:00Z'))).toBe('2026-10');
 		expect(monthOf('title', doc('2026-09-30'))).toBeNull();
 		expect(monthOf('relevance', doc('2026-09-30'))).toBeNull();
 	});

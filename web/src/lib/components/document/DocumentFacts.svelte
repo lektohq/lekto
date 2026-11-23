@@ -17,7 +17,9 @@
 	import * as Card from '#lib/components/ui/card/index.ts';
 
 	// The facts of the document as a pane of the document tab: what it shows of its contact
-	// and its codes, counted in the head, on the inner surface below.
+	// and its codes, counted in the head, on the inner surface below. Facts and codes wait for
+	// the text; where the document came from and what it is related with do not hang on it
+	// (a document whose OCR failed never gets one).
 	let {
 		facts = null,
 		documentId,
@@ -77,10 +79,10 @@
 				{onshowcode}
 				{onchanged}
 			/>
-			{#if mail}<div class="mt-3.5"><OriginCard {documentId} /></div>{/if}
-			<div class="mt-3.5"><RelationsCard {documentId} {documentTitle} {lookup} /></div>
 		{:else}
 			<p class="p-2 text-sm text-muted-foreground">{m.facts_pending()}</p>
 		{/if}
+		{#if mail}<div class="mt-3.5"><OriginCard {documentId} /></div>{/if}
+		<div class="mt-3.5"><RelationsCard {documentId} {documentTitle} {lookup} /></div>
 	</div>
 </Card.Root>

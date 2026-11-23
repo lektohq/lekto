@@ -5,7 +5,7 @@
 	import type { HTMLAnchorAttributes, HTMLButtonAttributes } from 'svelte/elements';
 
 	export const buttonVariants = tv({
-		base: "focus-visible:border-ring aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive dark:aria-invalid:border-destructive/50 rounded-xl border border-transparent bg-clip-padding text-sm font-medium aria-invalid:ring-3 active:not-aria-[haspopup]:translate-y-px [&_svg:not([class*='size-'])]:size-4 group/button inline-flex shrink-0 items-center justify-center whitespace-nowrap transition-all select-none disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+		base: "focus-visible:border-ring aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive dark:aria-invalid:border-destructive/50 rounded-xl border border-transparent bg-clip-padding text-sm font-medium aria-invalid:ring-3 active:not-aria-[haspopup]:translate-y-px [&_svg:not([class*='size-'])]:size-4 group/button inline-flex shrink-0 items-center justify-center whitespace-nowrap transition-all select-none disabled:pointer-events-none disabled:opacity-50 aria-disabled:cursor-default aria-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0",
 		variants: {
 			variant: {
 				default: 'bg-primary text-primary-foreground hover:bg-primary/80',
@@ -24,14 +24,12 @@
 				// the default ones grow, the small ones get a larger invisible hit area.
 				default:
 					'h-10 gap-2 px-4 max-sm:h-11 has-data-[icon=inline-end]:pr-3 has-data-[icon=inline-start]:pl-3',
-				xs: "h-6 gap-1 rounded-md px-2 text-xs in-data-[slot=button-group]:rounded-lg has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3",
+				xs: "relative h-6 gap-1 rounded-md px-2 text-xs max-sm:after:absolute max-sm:after:inset-x-0 max-sm:after:-inset-y-2.5 in-data-[slot=button-group]:rounded-lg has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3",
 				sm: "relative h-8 gap-1 rounded-lg px-2.5 text-meta max-sm:after:absolute max-sm:after:inset-x-0 max-sm:after:-inset-y-1.5 in-data-[slot=button-group]:rounded-lg has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3.5",
 				lg: 'h-12 gap-2 px-5 text-md font-semibold has-data-[icon=inline-end]:pr-4 has-data-[icon=inline-start]:pl-4',
 				icon: 'size-10 max-sm:size-11',
-				'icon-xs':
-					"size-6 rounded-md in-data-[slot=button-group]:rounded-lg [&_svg:not([class*='size-'])]:size-3",
-				'icon-sm': 'size-8 rounded-lg in-data-[slot=button-group]:rounded-lg',
-				'icon-lg': 'size-12',
+				'icon-sm':
+					'relative size-8 rounded-lg max-sm:after:absolute max-sm:after:-inset-1.5 in-data-[slot=button-group]:rounded-lg',
 				/** An action of a phone's selection bar of four or more: its icon over its word. */
 				stack: "h-14 flex-col gap-1 px-1 text-xs [&_svg:not([class*='size-'])]:size-4.5",
 				/** A text action inside running text (`link`): no height, no padding. */
@@ -51,6 +49,9 @@
 		WithElementRef<HTMLAnchorAttributes> & {
 			variant?: ButtonVariant;
 			size?: ButtonSize;
+			/** Its action runs: it is held and looks so, but keeps the focus (web/DESIGN.md,
+			 * "Footers"). */
+			busy?: boolean;
 		};
 </script>
 
@@ -63,9 +64,23 @@
 		href = undefined,
 		type = 'button',
 		disabled,
+		busy = false,
+		onclick,
 		children,
 		...restProps
 	}: ButtonProps = $props();
+
+	// While its action runs a button is held with `aria-disabled`, not `disabled`: a disabled
+	// button loses the focus to the page, and after a dialog that follows the keyboard starts at
+	// the top again (WCAG 2.4.3). So the click is swallowed here, the submit of a form with it.
+	function click(event: MouseEvent & { currentTarget: EventTarget & HTMLButtonElement }) {
+		if (busy) {
+			event.preventDefault();
+			event.stopPropagation();
+			return;
+		}
+		(onclick as ((event: MouseEvent) => void) | null | undefined)?.(event);
+	}
 </script>
 
 {#if href}
@@ -74,10 +89,11 @@
 		data-slot="button"
 		data-inline={size === 'inline' || undefined}
 		class={cn(buttonVariants({ variant, size }), className)}
-		href={disabled ? undefined : href}
-		aria-disabled={disabled}
-		role={disabled ? 'link' : undefined}
+		href={disabled || busy ? undefined : href}
+		aria-disabled={disabled || busy}
+		role={disabled || busy ? 'link' : undefined}
 		tabindex={disabled ? -1 : undefined}
+		onclick={onclick as HTMLAnchorAttributes['onclick']}
 		{...restProps}
 	>
 		{@render children?.()}
@@ -90,6 +106,8 @@
 		class={cn(buttonVariants({ variant, size }), className)}
 		{type}
 		{disabled}
+		aria-disabled={busy || undefined}
+		onclick={click}
 		{...restProps}
 	>
 		{@render children?.()}

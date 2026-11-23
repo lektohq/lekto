@@ -5,6 +5,7 @@ import tailwindcss from '@tailwindcss/vite';
 import { svelteTesting } from '@testing-library/svelte/vite';
 import { defineConfig } from 'vitest/config';
 import { BASE } from './src/lib/base.ts';
+import { codeSplitting } from './vite-chunks.js';
 import { pdfjsAssets } from './vite-pdfjs.js';
 import { swaggerAssets } from './vite-swagger.js';
 
@@ -49,6 +50,11 @@ export default defineConfig({
 		// Only under Vitest: browser builds of Svelte, cleanup after every test.
 		svelteTesting()
 	],
+	// The icons the app imports in one chunk (`vite-chunks.js`); the client only, the server build
+	// of SvelteKit keeps its own splitting.
+	environments: {
+		client: { build: { rolldownOptions: { output: { codeSplitting: codeSplitting() } } } }
+	},
 	server: {
 		port: 5173,
 		strictPort: true,
@@ -59,6 +65,13 @@ export default defineConfig({
 		environment: 'jsdom',
 		include: ['src/**/*.test.ts', 'tests/**/*.test.ts'],
 		setupFiles: ['./tests/setup.ts'],
+		// One zone on every machine, and not UTC: east of it and with summer time, a test that
+		// takes the local time for UTC fails everywhere. A test that needs another one stubs it
+		// (`vi.stubEnv('TZ', …)`), and gets this one back.
+		env: { TZ: 'Europe/Berlin' },
+		unstubEnvs: true,
+		// What a test puts in the place of a global (`fetch`, `EventSource`) is gone before the next.
+		unstubGlobals: true,
 		// The colour tests read the palette's tokens from it (`?raw`).
 		css: { include: [/app\.css/] },
 		// Room for several waits of `asyncUtilTimeout` (tests/setup.ts) in one test on a busy runner.

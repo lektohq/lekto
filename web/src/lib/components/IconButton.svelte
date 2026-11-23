@@ -41,12 +41,8 @@
 			children: Snippet;
 		} = $props();
 
-	const look = $derived(
-		cn(
-			size === 'sm' ? 'relative max-sm:after:absolute max-sm:after:-inset-1.5' : 'max-sm:size-11',
-			className
-		)
-	);
+	// The small one's hit area comes with its size (`icon-sm` of `ui/button`).
+	const look = $derived(cn(size === 'sm' ? '' : 'max-sm:size-11', className));
 </script>
 
 {#if tooltip}

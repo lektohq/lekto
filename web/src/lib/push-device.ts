@@ -1,3 +1,6 @@
+import { unwrap } from '#lib/api/call.ts';
+import { api } from '#lib/api/client.ts';
+import { setAppBadge } from '#lib/app-badge.ts';
 import { BASE } from '#lib/base.ts';
 import { appleDevice, isAndroid } from '#lib/install.svelte.ts';
 
@@ -30,10 +33,15 @@ async function registration(): Promise<ServiceWorkerRegistration | null> {
 	return (await navigator.serviceWorker.getRegistration(`${BASE}/`)) ?? null;
 }
 
-/** This browser's subscription, if it has one. */
-export async function currentSubscription(): Promise<PushSubscription | null> {
+/** This browser's subscription, if it has one. With `publicKey` (the server's key now): only
+ * one made with that key. A subscription of an earlier key gets nothing from this server any
+ * more, so the device counts as off (docs/configuration.md, `LEKTO_PUSH_VAPID_PRIVATE_KEY`). */
+export async function currentSubscription(
+	publicKey: string | null = null
+): Promise<PushSubscription | null> {
 	const found = await registration();
-	return found ? await found.pushManager.getSubscription() : null;
+	const held = found ? await found.pushManager.getSubscription() : null;
+	return held && publicKey !== null && !madeWith(held, publicKey) ? null : held;
 }
 
 /** A base64url key as the bytes `applicationServerKey` takes. */
@@ -41,6 +49,15 @@ export function keyBytes(base64url: string): Uint8Array<ArrayBuffer> {
 	const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
 	const raw = atob(base64 + '='.repeat((4 - (base64.length % 4)) % 4));
 	return Uint8Array.from(raw, (char) => char.charCodeAt(0));
+}
+
+/** Whether `subscription` was made with the server key `publicKey`; a browser that does not
+ * tell the key of a subscription is taken at its word. */
+export function madeWith(subscription: PushSubscription, publicKey: string): boolean {
+	const held = subscription.options?.applicationServerKey;
+	if (!held) return true;
+	const [own, wanted] = [new Uint8Array(held), keyBytes(publicKey)];
+	return own.length === wanted.length && own.every((byte, index) => byte === wanted[index]);
 }
 
 /** Ask the person (from a tap: browsers allow it only then) and subscribe; `denied` if they
@@ -51,10 +68,105 @@ export async function subscribe(
 	if ((await Notification.requestPermission()) !== 'granted') return 'denied';
 	const found = await registration();
 	if (!found) return 'unavailable';
+	// The browser refuses a second subscription with another key (`InvalidStateError`): one of
+	// an earlier server key ends first, and the server forgets its device.
+	const held = await found.pushManager.getSubscription();
+	if (held && !madeWith(held, publicKey)) {
+		await forget(held);
+		await held.unsubscribe();
+	}
 	return found.pushManager.subscribe({
 		userVisibleOnly: true,
 		applicationServerKey: keyBytes(publicKey)
 	});
+}
+
+/** How long signing out waits for the device to be given up; the push service may not answer. */
+const LEAVE_WITHIN_MS = 3000;
+
+/** End this browser's subscription and close the notifications it still shows. */
+async function silence(found: ServiceWorkerRegistration, subscription: PushSubscription | null) {
+	await subscription?.unsubscribe().catch(() => false);
+	const shown = await found.getNotifications().catch(() => []);
+	for (const notification of shown) notification.close();
+}
+
+/** The server forgets the device of `subscription`; if it cannot be told, the ended
+ * subscription tells it with the next message it tries to send. Never throws. */
+async function forget(subscription: PushSubscription): Promise<void> {
+	try {
+		const devices = await unwrap(api.GET('/api/v1/push/devices'));
+		const own = devices.find((device) => device.endpoint === subscription.endpoint);
+		if (own) {
+			await unwrap(api.DELETE('/api/v1/push/devices/{id}', { params: { path: { id: own.id } } }));
+		}
+	} catch {
+		// Offline, or the session is gone already.
+	}
+}
+
+async function leave(): Promise<void> {
+	const found = await registration();
+	if (!found) return;
+	const subscription = await found.pushManager.getSubscription();
+	if (subscription) await forget(subscription);
+	await silence(found, subscription);
+}
+
+/**
+ * Give this device up, before the person signs out (the session must still hold): it gets no
+ * more notifications of theirs, shows none any more, and the app's icon loses its number. On a
+ * device others use too, the next person would read the titles of this one's documents
+ * otherwise. Never throws and never holds signing out up for long.
+ */
+export async function leaveDevice(): Promise<void> {
+	let timer: ReturnType<typeof setTimeout> | undefined;
+	const late = new Promise<void>((resolve) => (timer = setTimeout(resolve, LEAVE_WITHIN_MS)));
+	try {
+		await Promise.race([leave(), late]);
+	} catch {
+		// Signing out goes on.
+	} finally {
+		clearTimeout(timer);
+		setAppBadge(null);
+	}
+}
+
+/** The tag of the notification that says what waits (`push.py` of the core). */
+const WAITING_TAG = 'lekto-waiting';
+
+/**
+ * Close the notification "… wait for you" this device still shows: the app is open and nothing
+ * waits any more. The server cannot take it back (a push must show something), so it would
+ * stand until someone taps it. Never throws.
+ */
+export async function closeWaiting(): Promise<void> {
+	try {
+		const found = await registration();
+		const shown = (await found?.getNotifications({ tag: WAITING_TAG })) ?? [];
+		for (const notification of shown) notification.close();
+	} catch {
+		// A browser without notifications: nothing to close.
+	}
+}
+
+/**
+ * End a subscription of this browser that is none of the signed-in user's devices: someone else
+ * switched notifications on here and never signed out (their session ran out), or the server
+ * has forgotten the device. Called once the app starts for a user. Never throws; without an
+ * answer of the API the subscription stays.
+ */
+export async function endForeignSubscription(): Promise<void> {
+	try {
+		const found = await registration();
+		const subscription = await found?.pushManager.getSubscription();
+		if (!found || !subscription) return;
+		const devices = await unwrap(api.GET('/api/v1/push/devices'));
+		if (devices.some((device) => device.endpoint === subscription.endpoint)) return;
+		await silence(found, subscription);
+	} catch {
+		// Not now: the next start tries again.
+	}
 }
 
 function browserName(agent: string): string {
@@ -81,17 +193,43 @@ export function deviceName(): string {
 	return [system, browserName(agent)].filter(Boolean).join(' · ');
 }
 
-/** Where the person allows notifications again after blocking them, for this browser: the app
- * in the Dock has settings of its own, apart from Safari's; macOS asks once more for the app. */
-export type UnblockStep = 'dock-app' | 'safari' | 'address-bar' | 'macos';
+/** Where the person allows notifications again after blocking them, for this device: on an
+ * iPhone or iPad the system's settings of the app (push is only in the app there), on Android
+ * those of the installed app or the browser's address bar, tapped; on a Mac the app in the Dock
+ * has settings of its own, apart from Safari's, and macOS asks once more for the app. */
+export type UnblockStep =
+	'ios-app' | 'android-app' | 'address-bar-tap' | 'dock-app' | 'safari' | 'address-bar' | 'macos';
 
 export function unblockSteps(): UnblockStep[] {
-	const agent = navigator.userAgent;
-	const browser = browserName(agent);
-	const mac = appleDevice() === 'Mac';
+	const apple = appleDevice();
+	if (apple === 'iPhone' || apple === 'iPad') return ['ios-app'];
+	if (isAndroid()) return [installed() ? 'android-app' : 'address-bar-tap'];
 	const steps: UnblockStep[] = [];
-	if (browser === 'Safari') steps.push(installed() ? 'dock-app' : 'safari');
+	if (browserName(navigator.userAgent) === 'Safari')
+		steps.push(installed() ? 'dock-app' : 'safari');
 	else steps.push('address-bar');
-	if (mac) steps.push('macos');
+	if (apple === 'Mac') steps.push('macos');
 	return steps;
+}
+
+/** Whether the person has blocked notifications for this app. */
+export function notificationsBlocked(): boolean {
+	return 'Notification' in window && Notification.permission === 'denied';
+}
+
+/**
+ * Tell `changed` whenever the person may have changed that outside the app: they come back
+ * from the settings (the tab or the app shows again, the window gets the focus). No reload is
+ * needed then, which the installed app has no button for. Returns what ends the watching.
+ */
+export function watchPermission(changed: () => void): () => void {
+	const back = () => {
+		if (document.visibilityState === 'visible') changed();
+	};
+	document.addEventListener('visibilitychange', back);
+	window.addEventListener('focus', back);
+	return () => {
+		document.removeEventListener('visibilitychange', back);
+		window.removeEventListener('focus', back);
+	};
 }

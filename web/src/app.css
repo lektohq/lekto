@@ -109,6 +109,16 @@
 }
 
 /*
+ * The edge of a small mark in a tone (a dot of the timeline, of the counts, of the matrix):
+ * 1.5 px, between the hairline that vanishes at that size and the 2 px that swallow the ground
+ * (web/DESIGN.md, "Colour roles"). The one width outside Tailwind's scale.
+ */
+@utility border-dot {
+	border-style: var(--tw-border-style);
+	border-width: 1.5px;
+}
+
+/*
  * The type scale (web/DESIGN.md, "Typography"): Tailwind's steps plus the in-between ones the UI
  * uses. No other font size is allowed; `tests/design-tokens.test.ts` checks it.
  */
@@ -212,6 +222,11 @@
 	html {
 		@apply bg-background font-sans text-foreground antialiased;
 		scrollbar-gutter: stable;
+		/* What the keyboard reaches is scrolled clear of the bars that stick to the top and the
+		   bottom, not just into view under them (WCAG 2.4.11): the header by default, more
+		   where a page says so (`lib/clear-room.svelte.ts`). */
+		scroll-padding-top: calc(var(--clear-top, 4rem) + 0.75rem);
+		scroll-padding-bottom: calc(var(--clear-bottom, 0px) + 0.75rem);
 	}
 	/* A visible focus everywhere the keyboard lands. */
 	:focus-visible {

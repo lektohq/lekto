@@ -24,8 +24,13 @@ address.
 3. **Quiet paper, one accent.** The ground is warm paper white (dark: deep green-grey). Petrol is
    the one accent: primary actions, links, focus. Lane colours mean state, nothing else.
 4. **State is never colour alone.** A lane, a deadline or a check always shows an icon and a word
-   as well.
-5. **The phone is a first-class screen.** Every page works at 390 px without sideways scrolling.
+   as well. In a contrast theme of the system (`forced-colors`) grounds and shadows are dropped:
+   what tells its state by a ground has an edge that stays (the knob of a switch, the chosen
+   pill of `Segmented`, the dot of a radio), a transparent one where none shows otherwise, and a
+   focus ring keeps the outline for that theme (`focus-visible:outline-hidden`). No system
+   colours are named.
+5. **The phone is a first-class screen.** Every page works at 390 px without sideways scrolling,
+   and reflows down to 320 px (a small phone, or a larger one zoomed in).
    Targets are 44 px. Nothing depends on hover.
 6. **Same thing, same look, same place.** The same action has the same name, the same component
    and the same position on every page.
@@ -60,7 +65,12 @@ A new token needs a value for both modes and that contrast.
 **Lane tones:** a mark of a lane (badge, chip, step of the processing band, counter) has the lane's
 ground, its text in the lane's foreground, and a border in the foreground at low opacity. In light
 mode there are no dark fills. One map, `tones.ts`, turns a lane or tone into these classes. Nobody
-writes the classes by hand.
+writes the classes by hand. A mark without text (a step of the processing band, a rail, a bar) is
+`LANE_MARK`: the ground with the chip's edge, drawn inside. A small mark (a dot of the timeline,
+of the counts, of the matrix, `AlertDot`) is `TONE_DOT`: the ground in a full edge of 1.5 px,
+`border-dot`, since a hairline vanishes at that size and 2 px swallow the ground. That is the one
+width of a border around a box outside Tailwind's scale; an outline without a ground (waiting,
+skipped) takes it too. A stripe too thin for a ground is `LANE_STRIPE`.
 
 Tags have their own palette (twelve colours tuned for both modes, or an own `#rrggbb`). `chipLook()`
 in `lib/chips.ts` draws it. The text follows the contrast.
@@ -99,14 +109,21 @@ The scale is defined in `@theme`. Use these steps only:
 
 | Role                                                     | Class                       | Token                         |
 | -------------------------------------------------------- | --------------------------- | ----------------------------- |
-| Buttons, inputs, selects, text areas, menus, popovers    | `rounded-xl`                | `--radius-xl`                 |
+| Buttons, inputs, selects, text areas                     | `rounded-xl`                | `--radius-xl`                 |
 | Alerts (`ui/alert`)                                      | `rounded-xl`                | `--radius-xl`                 |
+| Small controls and rows, up to 36 px high (see below)    | `rounded-lg`                | `--radius-lg`                 |
 | Cards, dialogs, sheets, panes, empty notes               | `rounded-2xl`               | `--radius-2xl`                |
 | Chips, badges, `Segmented`, switches, avatars            | `rounded-full`              |                               |
 | Small marks inside a component (code thumb, bar segment) | `rounded-md` / `rounded-sm` | `--radius-md` / `--radius-sm` |
 | The checkbox, swatches of a legend                       | `rounded-xs`                | `--radius-xs`                 |
 
-All radii come from `--radius`. `rounded-3xl`, `rounded-4xl` and arbitrary radii are not used.
+`rounded-lg` is the radius of what is small and stands in a row or a grid of its kind (Tobi,
+21.11.2026): a small button (`sm`), a row of a menu, a picker or a list, a small tile (a year
+of the period, a colour, a file, a page of the stream), a day of the calendar; and the surface
+such rows stand on: a menu, a popover, a tooltip, the list of a `Select`.
+
+All radii come from `--radius`. `rounded-3xl`, `rounded-4xl` and arbitrary radii are not used, nor
+any step without a row above (`design-system.test.ts`).
 
 **Borders:** one hairline, `border` in `border-border`. Cards use `border`, not `ring`. Dashed
 borders mean "empty" or "add": `EmptyNote` and the dashed "+ …" chip.
@@ -245,8 +262,8 @@ Chips and badges are pills; a pill is never a button that starts an action.
 On the phone every button is at least 44 px tall (see [Touch targets](#touch-targets)). The
 component handles this. Pages and components do not give a `Button` or `IconButton` a height of
 their own (`h-*`, `size-*`, also through a class constant); a size from the table does it, and
-`design-system.test.ts` refuses one. A button in a row of small things (the inbox's "Gesehen") is
-`sm`.
+`design-system.test.ts` refuses one. A button in a row of small things (the inbox's "Als gesehen
+markieren") is `sm`.
 
 **Icon buttons:** `IconButton` only. It takes a `label` (its tooltip and `aria-label`), a variant
 and a size (`default` 40 px, `sm` 32 px), optionally a shorter `hint` as tooltip. Spread a menu
@@ -336,7 +353,7 @@ divider.
 ### Chips
 
 `Chip` is the one chip: a pill, `md` 32 px (`h-8`) or `sm` 24 px, icon and name, optionally
-removable (`onremove`, a ✕ with a hit area of 44 px on the phone) or toggleable (`pressed`:
+removable (`onremove`, a ✕ with a hit area of 44 px on the phone; it reaches over the end of a name that is only text, never over a name that is a target itself) or toggleable (`pressed`:
 `aria-pressed`; on, the selected look and a bolder name, no check, at the width it has off, so
 that the chips beside it stay: "Steady layout"; only where each toggles on its own, see "Tabs
 and switches"), or a link (`href`, Tobi 09.11.2026): in the look of a toggle, `current` the one
@@ -446,8 +463,10 @@ chosen a line there says how to choose, move and cut. The description under the 
 
 ### Badges
 
-`Badge` (`ui/badge`) shows a state or a short fact. It is never a button. Its tones come from
-`tones.ts`, shared with every lane mark:
+`Badge` (`ui/badge`) shows a state or a short fact. It is never a button. The one exception
+(Tobi, 22.11.2026): "Titelmuster von …" at a rule (`TitlePatternBadge`) opens the dialog of its
+type for an admin, with a hit area of 44 px on a phone. Its tones come from `tones.ts`, shared
+with every lane mark:
 
 | Tone                                | Use                                                                                              |
 | ----------------------------------- | ------------------------------------------------------------------------------------------------ |
@@ -503,9 +522,20 @@ segmented look exists.
 
 `Card` (`ui/card`): `rounded-2xl border bg-card`, sizes `row`, `sm`, `md`, `lg`, `flush` (see
 [Spacing](#spacing-and-layout)); `as` picks the element (`li`, `section`, `article`, `form` …),
-`cardVariants` draws the look on an element that cannot be a `Card`. `Card.Title` renders a heading (`<h2>` by default, `level` to
+`cardVariants` draws the look on an element that cannot be a `Card`. `tone="open"` puts a card on
+the yellow of its lane: what waits for an answer of the person (the open filing question, a
+field to check), and nothing else. Where cards stand in a card (the rule editor: groups of
+conditions, their rows, the actions), all are `sm`: a card inside one of its kind is
+`tone="nested"` (`bg-secondary/40`), a row inside a card `tone="inset"` (the page's ground). `Card.Title` renders a heading (`<h2>` by default, `level` to
 change it) in `text-md`. `Card.Description` is `text-sm text-muted-foreground`. Hand-built
 `div`s with border and radius are not used.
+
+`StatTile` is the one tile of a figure with its word below (the tabs of the system page): a
+`Card` of size `sm` with the figure (`text-figure`; `kind="value"` for a smaller value with its
+unit in `text-lg`, `kind="code"` for a technical name), the word in `text-meta` and an optional
+hint. `tone="quiet"` puts it on the surface (a tile inside a card, a figure of what is over); a
+lane's tone (`green`, `yellow`, `red`) says how the figure stands, with ground, text and edge
+from `tones.ts`. A tab of the system page draws no box of its own.
 
 ### Lists
 
@@ -568,7 +598,9 @@ and filters, not ids, and the bar says so (with words, how far the search reache
 but "Bestätigen" opens a `FormDialog` (deleting: a `ConfirmDialog` naming the count). The
 action runs in the background, owned by the page (`BulkRun`), not by the bar: the bar shows a
 `Progress` with "412 von 1.234 …" in place of its actions; at the end a toast says what it did,
-and where documents were skipped, "Details" opens them with their reasons. The mode stays after
+and where documents were skipped, "Details" opens them with their reasons: in the toast, and in the
+bar (the result and "Details" as a text button in its hint) until the next action starts, since the
+toast goes after a few seconds. The mode stays after
 an action and when the filters change (the choice is let go) until the person ends it.
 
 **A rule's dry run** (`/rules/{id}/apply`, Tobi 02.11.2026): what the rule's current version would
@@ -594,7 +626,12 @@ box that chooses every document without a conflict, how many are chosen, how far
 betroffen", out of the documents the rule's conditions leave, "Anhalten" in `ghost`; stopped:
 "Weiter laden"; at the end the count and those with a conflict), and "Anwenden" (`default`), or,
 while the rule is paused and the reader may switch it on, "Anwenden" (`outline`) and "Aktivieren
-und anwenden" (`default`), held while the dry run loads. Once applied, the bar follows the
+und anwenden" (`default`), held while the dry run loads. One application takes at most as many
+documents as the server allows (`max_documents` of the preview): no more are chosen by
+themselves, the box "all" chooses as many, and with more hits the bar says "Eine Anwendung
+nimmt höchstens 1.000 Dokumente: Wende die übrigen danach in einem weiteren Lauf an."; with
+more chosen by hand it says so in `destructive` and holds both buttons. "Aktivieren und
+anwenden" switches the rule on only once applying is taken. Once applied, the bar follows the
 application in place of all that, and the list stays pale and inert: waiting for the worker with
 a turning `LoaderCircle`, what comes before it (the pipeline's jobs and the other applications,
 from `GET /jobs/summary`) and "Jobs ansehen", or the yellow mark of the page "System" with "Kein
@@ -630,6 +667,13 @@ font-medium`) and below it what they are (`text-xs text-muted-foreground`); `ari
 `aria-controls`. Closed at first; opened, it stays open while the page shows the same thing. The
 rows inside look as elsewhere in the card, indented to the text of the button (`pl-6`). A whole
 card that folds is `FilterSection`.
+
+**The first ones of a long group** (the facts, Tobi 22.11.2026): a group of rows in a card that
+can grow to hundreds (the identifiers and numbers of a long bank statement) shows its first 20.
+Below them a `Button` (`variant="link"`, `size="inline"`, `text-meta`, at least 44 px high on a
+phone) names how many more there are and shows them ("25 weitere zeigen"), then hides them again
+("Weniger zeigen"), as the custom fields of the automation do. Each document starts with the
+first 20.
 
 **Grouped by contact** (`IdentifiersEditor` with `contacts`: the identifiers at contacts, Tobi
 02.11.2026): where the rows of a list belong to different contacts, one line per contact, a
@@ -671,7 +715,8 @@ struck through with `Badge` `muted` "sieht es nicht mehr".
 `tabular-nums`. A count of mistakes is `text-lane-red-foreground` above nought, `muted` at nought;
 a count of what went right may name its whole (`29 von 29`, the whole in `muted`) and has no
 colour of its own: lane colours mean state. On the phone a table keeps to the columns that fit;
-where it is wider, it scrolls inside its card, never the page. A list a person reads item by
+where it is wider, it scrolls inside its card, never the page, in a region with the table's
+name (`label` of `Table.Root`) that the keyboard reaches. A list a person reads item by
 item is a list of rows, not a table. Pagination is `Pagination`, 50 to a page unless the table
 offers other sizes in a small menu beside the count (`outline`, `sm`): the jobs and the
 deliveries of a webhook, the mails of a mailbox and the lists of the master data 25, 50 and 100, 25 at first; the choice is remembered per table in the
@@ -708,7 +753,8 @@ list pages the same way (see [Lists](#lists)).
 - **Sheet from the bottom:** `PhoneSheet`, on `ui/sheet` with `side="bottom"`: a grab handle,
   the title and its close button (an X, "Fertig") fixed on top, 85 % of the screen high (the
   filters as high as they need, up to that: `fit`), what stays at the bottom in `footer`;
-  `text-base`; nothing takes the focus when it opens. Pulled down by the handle or the title it
+  `text-base`; no field takes the focus when it opens (the sheet itself does, so that the
+  keyboard starts inside it and the on-screen keyboard stays away). Pulled down by the handle or the title it
   follows the finger and closes past 96 px or when flicked, else it springs back; the close
   button stays the way for everyone (Tobi, 11.11.2026). The pickers (`PickerShell`,
   `TagPickerDialog`) and the filters use it; its classes are written nowhere else.
@@ -736,7 +782,11 @@ list pages the same way (see [Lists](#lists)).
   without an action of its own but with `ondelete` (something nobody changes, only removes: an
   API token) has a footer on desktop too: deleting at its start, "Fertig" (`default`) at its end.
 - **Dialog footer:** see [Patterns](#footers).
-- **Beam:** the one sheet from the right with content (see [Beam](#beam)).
+- **Beam:** the one sheet from the right with content (see [Beam](#beam)), with one exception
+  (Tobi, 22.11.2026): the template editor (`TemplateEditor`) opens from the right too, beside the
+  form whose field it writes, up to 672 px wide and the whole screen on a phone. Its footer is
+  a dialog's ("Abbrechen" `ghost` before "Übernehmen"), its lists are cards, and it keeps the
+  safe areas free.
 - A dialog title names its object: "„Stromrechnung Oktober“ löschen", never a bare "Löschen".
 
 ### Beam
@@ -746,6 +796,10 @@ claims something from one, a person sees it with one tap. `Beam.svelte`, mounted
 app shell, on `ui/sheet` with `side="right"`: 640 px on a desktop, the whole screen on a phone,
 modal, over a dialog too.
 
+- **Pages are images with names:** in the document view and in the Beam each page is an image
+  named "Seite 1 von 3", and the region of the pages says where their text stands (unseen, for
+  a screen reader): under "Text" in the document view; the Beam, which only shows, points to
+  the document view (`viewer/text-hint.ts`).
 - **It only shows:** the eyebrow "Beam", the title, a line with contact · type · date; then,
   with more than one document, the `Stepper` "‹ › Dokument 2 von 24" (keys ← →); the pages exactly as the
   document view shows them, only in another window (Tobi, 03.11.2026): one component for both,
@@ -762,6 +816,9 @@ modal, over a dialog too.
   "Teil 2 von 3" to page through the parts, and nothing to open. The history entry names the
   parts by a key only; their images stay in memory, so a reload closes it, as the edit is gone
   then too.
+- **No shadow** (Tobi, 05.11.2026): Safari paints the shadow of the sheet solid black beside it
+  once its pages are drawn anew at another zoom, and keeps it so. Its left border and the
+  backdrop set it off. `design-system.test.ts` keeps the shadow away.
 - **Opening it: one way everywhere** (Tobi, 31.10.2026). Wherever Lekto names a document, its
   title opens it in the Beam: the eye (`scan-eye`) before the title, both one button in the
   brand colour, medium weight, one line, cut (`BeamTitle`); a value that stands for documents
@@ -784,7 +841,7 @@ modal, over a dialog too.
   document in the Beam, paging through them all, and the document checked stays where it is. An
   action that shows documents rather than naming one ("Woher gelernt?") has the eye before its
   text.
-- **The eye means only this:** no other action uses `scan-eye` ("Mit dem Bildmodell lesen" has
+- **The eye means only this:** no other action uses `scan-eye` ("Mit dem VLM lesen" has
   `scan-text`). The mark "Im Eingang" is navigation (the inbox's view of the document), not
   viewing. `tests/design-system.test.ts` keeps both: the eye only in `BeamTitle`, before
   "Woher gelernt?" and at the end of a part of "PDF bearbeiten", a link to one document only where
@@ -835,20 +892,20 @@ always `Info`); text and buttons in the body, with `class` for a row (`flex flex
 items-center`). A button in an alert is a `Button` of its variants, never coloured in the alert's
 tone (Tobi, 09.11.2026); its action is the primary one. A note that is no warning passes `role="status"` (it changes) or `role="note"`
 (it stands), since `Alert` is `role="alert"` by default. Not a hint and so no `Alert`: the
-figures of the search check, tiles in the tones of the lanes.
+figures of the search check, `StatTile`s in the tones of the lanes ("Cards").
 
 Toasts (`svelte-sonner`) confirm an action that has finished ("Gespeichert", "3 Dokumente
 eingereiht") or report an error of an action. One toast waits for the person instead: a new
-version of the app ([App](#app)). **A toast never replaces a load error on the page.**
+version of the app ([App](#app)). **A toast never replaces a load error on the page.** A toast
+stays within reach above a dialog or a sheet: it takes the tap (to answer it, to close it), and
+a tap on it is none on the page behind, so the layer stays open (`lib/toasts.ts`).
 
 ### Help and tooltips
 
-- **No shadow** (Tobi, 05.11.2026): Safari paints the shadow of the sheet solid black beside it
-  once its pages are drawn anew at another zoom, and keeps it so. Its left border and the
-  backdrop set it off. `design-system.test.ts` keeps the shadow away.
 - **Help of a field or section:** `InfoTip` or `HintLabel`, an info button beside the label that
-  opens the text; the title of a section or card with help is `SectionTitle` with `tip`. The visible text stays what one needs to read the view. Help text holds at most
-  about 200 characters. Longer explanations belong in the documentation.
+  opens the text; the title of a section or card with help is `SectionTitle` with `tip`. The visible text stays what one needs to read the view. Help text holds
+  about 200 characters; `messages.test.ts` refuses one above 220 (a key ending in `_info` or
+  `_hint`). Longer explanations belong in the documentation.
 - **Tooltip** (`ui/tooltip`): the name of an icon button (through `IconButton`), the names of the
   options of `Segmented`, the inbox mark of a card. A native `title=` attribute is used only for
   text that is cut off (a truncated name, "+3" for the rest of the tags, a type's title pattern
@@ -920,15 +977,18 @@ switch of the scope (Tobi, 28.10.2026). The chips show none.
 
 Every view that loads has these four states. Each looks the same everywhere:
 
-| State        | Component                                                              | Notes                                                                                            |
-| ------------ | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| Loading      | `Skeleton` in the shape of the content, or `Loading` (`role="status"`) | The page header stays                                                                            |
-| Empty        | `EmptyNote` (dashed box, `action` for the way)                         | Says what would be here and how it gets here; a link or button to that action where there is one |
-| Empty, small | `EmptyNote size="sm"`                                                  | Inside a dialog or beside a field: no identifiers yet, nothing assigned                          |
-| Drop files   | `EmptyNote compact` with `icon` and `action`                           | The upload dialog's drop zone; `border-primary` while files are over it                          |
-| Drop here    | `EmptyNote` with `icon`, `border-primary`                              | The inbox while files are dragged over it: where they go (Tobi, 09.11.2026)                      |
-| Error        | `LoadProblem` (`role="alert"`, "Erneut versuchen")                     | On the page, not as a toast. A detail page keeps its header and back link                        |
-| Not found    | `LoadProblem` with the way back                                        | Never a dead end                                                                                 |
+| State             | Component                                                              | Notes                                                                                                                                                                                                                                                                     |
+| ----------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Loading           | `Skeleton` in the shape of the content, or `Loading` (`role="status"`) | The page header stays                                                                                                                                                                                                                                                     |
+| Empty             | `EmptyNote` (dashed box, `action` for the way)                         | Says what would be here and how it gets here; a link or button to that action where there is one                                                                                                                                                                          |
+| Empty, small      | `EmptyNote size="sm"`                                                  | Inside a dialog or beside a field: no identifiers yet, nothing assigned                                                                                                                                                                                                   |
+| Empty, in a panel | `EmptyNote compact`                                                    | An empty list inside a panel or a dialog's body (the open identifiers, the cases of the holders' evaluation, the expected documents): the box, less tall                                                                                                                  |
+| Empty, in a card  | `EmptyNote size="line"`                                                | Inside a dense card, where the box would outweigh what stands beside it (facts, relations, tokens, a card of the system tabs): the words alone as a line, `text-sm`, muted, `py-2`; its `class` only takes the inset or the rule of the rows around it (Tobi, 21.11.2026) |
+| Drop files        | `EmptyNote compact` with `icon` and `action`                           | The upload dialog's drop zone; `border-primary` while files are over it                                                                                                                                                                                                   |
+| Drop here         | `EmptyNote` with `icon`, `border-primary`                              | The inbox while files are dragged over it: where they go (Tobi, 09.11.2026)                                                                                                                                                                                               |
+| Error             | `LoadProblem` (`role="alert"`, "Erneut versuchen")                     | On the page, not as a toast. A detail page keeps its header and back link                                                                                                                                                                                                 |
+| Error, later      | `LoadProblem` above what was read before                               | A reload that fails (another choice, the interval of a tab that refreshes): the old values stay and the problem says they are old                                                                                                                                         |
+| Not found         | `LoadProblem` with the way back                                        | Never a dead end. In the page's own words ("Diese Regel gibt es nicht, oder Du darfst sie nicht sehen."), also for an address without a readable id, and without "Erneut versuchen", as for what the caller may not (403): trying again changes neither (`describeLoad`)  |
 
 Two empty notes carry the owl ([Logo and owl](#logo-and-owl)).
 
@@ -938,7 +998,12 @@ Two empty notes carry the owl ([Logo and owl](#logo-and-owl)).
 
 The same order everywhere, dialogs and page forms alike: right-aligned, **"Abbrechen"** (`ghost`)
 then **the primary action** (`default`). A destructive confirmation puts the destructive button in
-the primary place. While the action runs, both buttons are held (`ConfirmFooter`, `AsyncForm`). On
+the primary place. While the action runs, both buttons are held (`ConfirmFooter`, `AsyncForm`): a
+`Button` with `busy`, which holds it with `aria-disabled` and swallows the click, never `disabled`,
+so that it keeps the focus (a disabled button loses it to the page, and after a dialog that follows
+the keyboard would start at the top again). And
+nothing else closes the dialog either (the X, Escape, a click beside it): the request goes on and
+takes effect all the same. On
 the phone a full-screen editor carries the same two actions in its top bar.
 
 ### Saving and leaving
@@ -949,6 +1014,13 @@ the phone a full-screen editor carries the same two actions in its top bar.
   a tab, the back button, closing the dialog or closing the browser (`beforeNavigate`,
   `beforeunload`). The question is a `ConfirmDialog` with "Verwerfen" and "Weiter bearbeiten":
   `UnsavedGuard`, or `AsyncForm` with `onchanged`.
+- **A dialog with a form** (`FormDialog`, `EditorShell`, the template editor) asks the same
+  question before Escape, a click beside it or its X close it over what was typed
+  (`lib/close-guard.svelte.ts`). Typing counts, in a text field or an area: a tick or a choice is
+  set again in a tap, a search only narrows. "Abbrechen" and the phone's bar close at once: the
+  person said what they want, as "Abbrechen" of a page form does. An editor whose parts save
+  themselves says whether one holds something unsaved (`dirty`); a dialog whose text is nothing
+  to lose (a code) is `guarded={false}`.
 - **A change is the person's own:** what they changed since the form started. What a form
   starts with (the model's suggestions in the inbox) is no change, even where it differs from
   the stored document; leaving loses nothing then.
@@ -1052,7 +1124,9 @@ not see it. So far it holds one section, Mail: its title with an `InfoTip`, "Neu
     line beside it (`role="status"`), and in `muted-foreground` when the server stores no
     keywords of Lekto's own ("Eigene Schlagwörter speichert dieser Server nicht."). A stored mailbox that is not paused has "Jetzt abrufen"
     (`outline`, `RefreshCw`) beside the test; a toast says the fetch is asked for.
-  - **Abruf:** the folders as a `MultiPicker` of what the test found and what is chosen; then
+  - **Abruf:** the folders as a `MultiPicker` of what the test found and what is chosen, at
+    most 20 as the API takes them: with 20 chosen, the other boxes are off and a line under the
+    chips says "Höchstens 20 Ordner." (`muted-foreground`, `text-xs`; Tobi, 22.11.2026); then
     two rows of two: how often ("Wie oft", `Select`) and what a mail without a rule brings in
     (`Select`: "Nichts übernehmen" or "Alles für" a person); which mails and the type of the mail
     text (`SearchSelect`). Which mails is one `Select` (Tobi, 05.11.2026): "Ab Einrichtung
@@ -1152,7 +1226,13 @@ not see it. So far it holds one section, Mail: its title with an `InfoTip`, "Neu
 - Detail pages of the same kind offer the same actions in the same place: header actions (edit,
   primary action). A single destructive action stands there as an `IconButton` (rule, webhook);
   where there are more actions, a "…" menu holds the rest (delete last, in `destructive`).
-- `return-to.svelte.ts` keeps the list's URL and words for the way back.
+- `return-to.svelte.ts` keeps the list's URL and words for the way back, and where one stood.
+- **Back at the place** (`lib/list-place.svelte.ts`): from a document, the back button and the
+  link of the way back both lead to the documents list or the inbox where one stood in it, the
+  inbox with as many documents as "Mehr laden" had brought. The lists load after the page
+  shows, so the page goes to its place itself, once the list stands (the back button: the
+  page's `snapshot`; the link: `page.state.place`). Opened any other way a list starts at its
+  top.
 - **After a jump** (the Beam's "Dokument öffnen", later a dialog's link): the new history entry
   names where it came from (`way-back.ts`, `page.state.from`). The document's `BackLink` then
   reads "Zurück zu {place}" and goes back in the history, one step, as the back button does: to
@@ -1229,6 +1309,12 @@ true })`, read from `page.state` (`lib/words.ts` for the words of the documents)
   button and F5 bring it back; a plain link opens without it.
 - Words go to the API in a body (`POST /documents/search`); never put them into a query.
 - Not in `localStorage` either: that is per browser and outlives the tab.
+- **What the browser keeps belongs to its user.** A history entry and the remembered filters
+  outlive the session, and another person may sign in next. So the words of an entry name their
+  user (`by`) and count for that user only; the remembered filters of the documents are kept with
+  their user, apply for that user only and are removed on signing out. When another user signs in
+  than the tab knew before, the app starts afresh (a full load), so that nothing it holds in
+  memory stays. Preferences without content (sort, layout, a table's size) stay per browser.
 
 ### Selection by link
 
@@ -1286,7 +1372,9 @@ The documents list keeps its tools and the group at hand (Tobi, 11.11.2026):
   filters beside the list stay as they are (`top-20`). Below `xl` the sort and "Lens bearbeiten"
   are icons (their names as tooltips), so that the title of a group keeps room beside the tools.
   While the selection bar stands, it owns the line: the tools scroll away with the title, and the
-  titles stick below the bar.
+  titles stick below the bar. In the document the tools follow the title and the search (Tab and
+  a screen reader go left to right); their holder of no height is placed before the head by
+  `order`, where it sticks.
 - **Below the desktop**: the row of search, filters, sort, "Auswählen" and layout sticks below
   the header (`top-16`, across the page, `bg-background`, a line below once it stands there).
   Scrolling down it steps aside behind the header, scrolling up it comes back
@@ -1305,7 +1393,10 @@ The documents list keeps its tools and the group at hand (Tobi, 11.11.2026):
 Only `motion-safe`: the sliding pill of `Segmented`, the underline of `TabBar`, the row of the
 documents' tools stepping aside ("Sticky heads"), opening sheets and dialogs. Nothing moves on first show. Nothing grows over its neighbours on hover.
 A spinner, a pulse of what runs and a turning chevron are `motion-safe:` too (or stop with
-`motion-reduce:transition-none`); `tests/design-system.test.ts` refuses one without.
+`motion-reduce:transition-none`), and so is the growing or sliding of what opens (a dialog, a
+sheet, a menu, a popover): with reduced motion it only fades. `tests/design-system.test.ts`
+refuses one without. A scroll that code starts (to a place on a page, to a step's details, to the top)
+glides only for who did not ask for less motion: its behavior comes from `lib/motion.ts`.
 
 ## App
 
@@ -1320,15 +1411,26 @@ worker, and Lekto works as a website.
   the owl inside the safe circle, and the favicon itself.
 - **The colour of the bars** (`theme-color`) is the header's ground, `--card`, light or dark as
   the app shows itself: `static/theme.js` before the first paint, `lib/theme-color.ts` after.
-- **What the device keeps:** the service worker (`src/service-worker/`) keeps the files of one
-  version of the app and nothing else. Every request to the API goes to the network; documents,
+- **What the device keeps:** the service worker (`src/service-worker/`) keeps, of one version
+  of the app, what the device has loaded and nothing else: the start page with the files it
+  preloads and `static/` when it installs, the files of a page once that page was opened. It
+  does not fetch every page ahead (thousands of files for each version, and one that fails
+  would fail them all; Tobi, 22.11.2026). Every request to the API goes to the network; documents,
   pages, PDFs, thumbnails and lists never lie on the device (`lib/app-cache.ts`). A page comes
   from the network; without one the kept page starts the app.
 - **Sharing to Lekto (Android):** the installed app stands in the share sheet (`share_target`:
   PDF, images, mails, what "Hochladen" takes). The worker keeps the shared files under a random
-  id, at most an hour; the page `/share` hands them to the upload (into the personal space, as
-  "Hochladen" does) and goes on to the inbox, which shows what came of them. Taken files are gone
-  from the device; a share opened again says that nothing waits any more.
+  id, at most an hour. The page `/share` uploads nothing by itself, since any website can post
+  files to the share target: it lists the files (name, size) in a card and asks, "Verwerfen"
+  (`ghost`) then "Hochladen" (`default`). "Hochladen" hands them to the upload (into the personal
+  space, as "Hochladen" does) and goes on to the inbox, which shows what came of them;
+  "Verwerfen" goes there without. "Hochladen" counts only once the page has been in front for a
+  second (`aria-disabled` and dimmed until then, again whenever the window comes to the front): a
+  website that asks for a double click must not get the second one here. A discarded share is
+  gone at once. An uploaded file leaves the device when its upload has a result (uploaded, a
+  duplicate, skipped); one that failed stays until the share's hour is over, and its row in the
+  inbox's summary leads back to the share with "Erneut versuchen". A share with nothing left
+  says that nothing waits any more.
 - **Installing from the upload:** in the dialog "Hochladen", under the drop area and set off by a
   line, one hint (`text-sm`, muted, with its icon): on Android in the browser, while the browser
   offers the install, "Schneller aus dem Teilen-Menü: App installieren" (a link button that opens
@@ -1363,8 +1465,20 @@ worker, and Lekto works as a website.
 - **A notification** is worded by the service worker in the device's language
   (`lib/push-text.ts`): "3 Dokumente warten auf Dich" with up to three titles, or the name of the
   mailbox or webhook. A tap opens the document if it is one, else the inbox or the page of what
-  it names, in an open window of the app if there is one. The app's icon carries the inbox's
-  count, set by a notification and kept by the open app.
+  it names, in an open window of the app if there is one: the worker asks the app, which goes
+  there through its router (`lib/app-open.ts`), so nothing loads anew, uploads go on and unsaved
+  changes ask as on every way out; only a window that does not answer is loaded at the address.
+  The app's icon carries the count
+  of the person's own inbox, set by a notification and kept by the open app, also for an admin
+  whose counter counts everyone's. Only the open app can lower it: a push has to show something,
+  so none says that nothing waits any more. The app that finds nothing waiting closes the
+  notification that still says so.
+- **Signing out gives the device up:** before the session ends, the app removes this browser's
+  device at the server, ends its subscription, closes the notifications it still shows and
+  clears the icon's number (`leaveDevice`), so that a device others use shows nothing of this
+  person any more; whoever signs in again switches notifications on again. A session that only
+  runs out keeps the device. A subscription that is none of the signed-in user's devices (someone
+  else's, who never signed out) ends when the app starts (`endForeignSubscription`).
 - **A new version:** a toast that stays until it is answered, "Neue Version bereit" with the
   action "Neu laden"; its ✕ puts it off until the app starts again. It is the one toast that
   waits for the person ("Alerts"). A page that already runs the new version (it was reloaded)
@@ -1373,13 +1487,26 @@ worker, and Lekto works as a website.
   the status bar stays opaque, `apple-mobile-web-app-status-bar-style` `default`). The shell
   keeps the side insets free; full-screen editors on the phone, bars stuck to the bottom, sheets
   from below and the menu sheet, fixed buttons and toasts keep theirs
-  (`env(safe-area-inset-*)`, at least the padding they had).
+  (`env(safe-area-inset-*)`, at least the padding they had), also at the sides of a phone held
+  sideways: `ui/sheet` pads the sides a sheet touches and sets its X off the edge, so a sheet
+  adds padding of its own at such a side only by the side (`data-[side=right]:pr-…`).
 - **Offline:** while the device has no connection, the header shows the badge "Offline" beside
   the logo (`Badge`, `muted`, `md`, `wifi-off`). `LoadProblem` says "Keine Verbindung …" in place
   of its problem and tries again by itself once the device is back online. A start without a
-  connection ends on the error page with "Keine Verbindung", which loads again by itself.
+  connection ends on the error page with "Keine Verbindung", which loads again by itself; so
+  does the way to a page this device never opened, whose files it does not have.
   Nothing is written offline: an action fails as it does without the server ("Der Server ist
   nicht erreichbar.").
+- **The server behind a proxy:** while Lekto restarts, a proxy in front answers 502, 503 or 504,
+  or a plain 500 (Traefik, while its service is empty): any 5xx without Lekto's problem details.
+  That is the same as no answer: a page of the app comes from the device then, never the
+  proxy's error page (the installed app has no way back from it), and a call says "Der Server
+  ist nicht erreichbar." The person stays signed in; only the API's 401 ends a session.
+  What could not load then asks again by itself, with the waits of the event stream (5 s,
+  doubled up to a minute, one count for the tab): `LoadProblem` its retry, the error page of a
+  start by loading again, each with "Lekto versucht es von selbst erneut." below the problem.
+  It does not say "restarting": the app cannot know why no answer comes. Any other problem
+  waits for the person.
 
 ## Touch targets
 
@@ -1390,7 +1517,16 @@ worker, and Lekto works as a website.
   than 24 × 24 px.
 - The components implement this (`Button`, `IconButton`, `Chip`, `Segmented`, `TabBar`, `Select`,
   `Switch`, `ChoiceBox`, `InfoTip`, `BackLink`, `InboxMark`, the rows of `ui/dropdown-menu` and
-  `ui/command`). Pages do not add sizes by hand.
+  `ui/command`, the ✕ of `ui/dialog`, `ui/sheet` and a toast). Every small size of `Button`
+  (`xs`, `sm`, `icon-xs`, `icon-sm`) brings its hit area. Pages do not add sizes by hand.
+- **Exceptions** (Tobi, 22.11.2026), each marked `data-small-target` in the markup, which the
+  layout spec skips and `design-system.test.ts` allows only here:
+  - The segments of the processing band (`ProcessingBand`): 32 px tall on a phone, the stripes
+    beside them 3 px, and as narrow as their share of the run. The band is the overview; the
+    step card below each segment does the same and is a finger tall.
+  - The months of a year in the period filter (`PeriodFacet`): twelve bars in one row, 26 px wide
+    on a phone and 20 px wider, 48 px tall. One row shows the year at a glance; two rows of six
+    would be a finger wide and lose that.
 
 ## Accessibility baseline
 
@@ -1415,20 +1551,33 @@ Every text a user reads is in `messages/en.json` and `messages/de.json` (`no-raw
 - Short sentences, active voice, no jargon a user does not know. Technical reasons from the API
   are translated (`x-reasons`).
 - Buttons are verbs or verb phrases ("Als gesehen markieren", not "Gesehen").
+  A button that opens the menu or the dialog of a thing bears the thing's name: "Tags", "Kontakt",
+  "Typ", "Mehr", "Details", "Wartung", "Release Notes", "Prompt".
   The one form of a noun: the action that creates in the head of a page or list is "Neue/r/s X"
   ("Neue Regel", "Neuer Webhook", "Neues Postfach"; Tobi, 09.11.2026); elsewhere "Anlegen".
 
 ### Words
 
-| Concept                              | German              | English              |
-| ------------------------------------ | ------------------- | -------------------- |
-| Save a form                          | Speichern           | Save                 |
-| Leave without saving                 | Abbrechen           | Cancel               |
-| Discard unsaved changes              | Verwerfen           | Discard              |
-| Enabled / disabled (rules, webhooks) | Aktiv / Pausiert    | Active / Paused      |
-| Enabled / disabled (users)           | Aktiv / Deaktiviert | Active / Deactivated |
-| Create                               | Anlegen             | Create               |
-| Delete                               | Löschen             | Delete               |
+| Concept                                         | German              | English              |
+| ----------------------------------------------- | ------------------- | -------------------- |
+| Save a form                                     | Speichern           | Save                 |
+| Leave without saving                            | Abbrechen           | Cancel               |
+| Discard unsaved changes                         | Verwerfen           | Discard              |
+| Enabled / disabled (rules, webhooks, mailboxes) | Aktiv / Pausiert    | Active / Paused      |
+| Enabled / disabled (users)                      | Aktiv / Deaktiviert | Active / Deactivated |
+| Create                                          | Anlegen             | Create               |
+| Delete                                          | Löschen             | Delete               |
+
+One thing has one name (Tobi, 21.11.2026; `messages-tone.test.ts` keeps the other words out):
+
+| Thing                                | German                      | Not                         |
+| ------------------------------------ | --------------------------- | --------------------------- |
+| A webhook that does not deliver      | pausiert                    | ausgeschaltet, abgeschaltet |
+| The model that reads the page images | VLM                         | Bildmodell                  |
+| What a rule or a webhook fills in    | Template                    | Vorlage                     |
+| An API token                         | das Token                   | der Token                   |
+| The second step of a sign-in         | zweiter Faktor              | Zwei-Faktor-Anmeldung       |
+| The channels a document comes in by  | Web, API, Migration, E-Mail | Web-Oberfläche, Mail        |
 
 ### Glossary
 
@@ -1487,8 +1636,11 @@ document says where from before how it came: "Aus „…“ (dort Fassung 1) · 
 
 Dates and numbers follow the UI language (`Intl`): `26.10.2026`, `123,45 €` in German. Durations
 are short and do not wrap ("4,2s", "1m 3s"). Every format comes from `lib/i18n.ts`, one way each:
-`formatMoment` (medium in lines, `short` in table rows), `formatPercent`, `listLocale` for lists,
-`browserZone`, `quoted` for a quoted name („…“, “…”); no component reads a locale or a time zone
+`formatMoment` (medium in lines, `short` in table rows; with seconds only in a log whose entries
+lie seconds apart: the start of a run, the attempts of a delivery), `formatTime` for a time alone in such a log, `formatPercent`, `formatList` for lists ("A, B und C"; never `join(', ')` or an `Intl.ListFormat` of one's own),
+`browserZone`, `quoted` for a quoted name („…“, “…”). A number a message counts with (`count`,
+`total`, `done`, `least`, `most`, `min`, `max`, `seconds`, `mails`) is written
+`formatNumber(…)` where the message is called ("12.345 Mails"), never raw or as `String(…)`; no component reads a locale or a time zone
 of its own, and no quotation mark stands in code.
 
 Identifiers stand as they are printed wherever they are shown: an IBAN in groups of four
@@ -1502,29 +1654,33 @@ has the user, and a `name` the API sends for a user follows the same rule (`User
 choice among users adds the username where it differs (`userChoice`: "Jane Doe (erika)").
 
 A decision a person made through an API token (a script, an assistant over MCP) names the token
-after them, as it was named then: "Tobi über Token „Claude“", "Bestätigt von Dir über Token
+after them, as it was named then: "John über Token „Claude“", "Bestätigt von Dir über Token
 „Claude“" (`viaToken`). It stands wherever the person stands: under done in the inbox and in the
 log of a document; an entry outside processing (a change, a move, a rule applied) names who set
-it off ("von Tobi über Token „Claude“"). Guard: `src/lib/via-token.test.ts`.
+it off ("von John über Token „Claude“"). Guard: `src/lib/via-token.test.ts`.
 
 ## Exceptions
 
 Allowed outside the token rules, each for a stated reason:
 
-| Where                                                                   | What                                   | Why                                                                                 |
-| ----------------------------------------------------------------------- | -------------------------------------- | ----------------------------------------------------------------------------------- |
-| `PageViewer`, `DocumentThumb`, `CodeThumb`, `ContactAvatar`, `TotpCard` | `bg-white`                             | Paper, logos and the QR code are drawn for white                                    |
-| Overlays of `ui/dialog`, `ui/alert-dialog`, `ui/sheet`                  | `bg-black/*`                           | The dimmed page behind a dialog, as shadcn draws it                                 |
-| The sign-in page, the error page                                        | a font size beyond the scale           | The wordmark scales with its font size                                              |
-| The sign-in page                                                        | taller fields                          | Alone on the page; the code to type in large digits                                 |
-| `DocumentFiles`                                                         | `hsl()` from data                      | The fingerprint colour comes from the file's hash                                   |
-| `PageViewer`, `ProcessingBand`, charts                                  | `style=` with computed sizes           | Sizes come from data (zoom, durations, bars)                                        |
-| `lib/templates/codemirror.ts`                                           | its own theme                          | The editor sits in a shadow root that the page's styles do not reach                |
-| `.lc-tooltip-*` in `app.css`                                            | LayerChart override                    | The library's tooltip ground is otherwise transparent                               |
-| `ui/*`                                                                  | shadcn internals (`data-[…]` variants) | Primitives; their look follows this document                                        |
-| `FilterSection`, `Lenses`, `SelectionBar`                               | `Card size="flush"` with side padding  | Their rows or buttons pad themselves top and bottom; only the sides are the frame's |
+| Where                                                                                                                                                                                                        | What                                                 | Why                                                                                                                                                                                           |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `PageViewer`, `DocumentThumb`, `CodeThumb`, `ContactAvatar`, `TotpCard`                                                                                                                                      | `bg-white`                                           | Paper, logos and the QR code are drawn for white                                                                                                                                              |
+| Overlays of `ui/dialog`, `ui/alert-dialog`, `ui/sheet`                                                                                                                                                       | `bg-black/*`                                         | The dimmed page behind a dialog, as shadcn draws it                                                                                                                                           |
+| The sign-in page, the error page                                                                                                                                                                             | a font size beyond the scale                         | The wordmark scales with its font size                                                                                                                                                        |
+| The sign-in page                                                                                                                                                                                             | taller fields                                        | Alone on the page; the code to type in large digits                                                                                                                                           |
+| `DocumentFiles`                                                                                                                                                                                              | `hsl()` from data                                    | The fingerprint colour comes from the file's hash                                                                                                                                             |
+| `ColorPicker`, `lib/colors.ts`, `lib/theme-color.ts`                                                                                                                                                         | a colour as a value                                  | A tag's own colour is data: the picker starts at one, and its contrast is computed against the themes' grounds; the browser's bars take no token (`tests/app.test.ts` holds them to `--card`) |
+| `PageViewer`, `PageImages`, `CodeThumb`, `ProcessingBand`, `ProcessingGraph`, `StepDetails`, `DocumentFiles`, `PeriodFacet`, `StreamView`, `AutomationTab`, `ClassifierTab`, `SearchTab`, the documents page | `style=` and `style:` with computed sizes and places | They come from data (zoom, durations, bars, columns) or are measured (the sticky bars of the list)                                                                                            |
+| `ColorPicker`, `TagsPanel`, `TagPickerList`, `DocumentFiles`, the documents page                                                                                                                             | `style=` that sets a custom property                 | A value from data that a class reads (`--depth`, `--steps`, `--chip-bg` from a token)                                                                                                         |
+| `lib/templates/codemirror.ts`                                                                                                                                                                                | its own theme                                        | The editor sits in a shadow root that the page's styles do not reach                                                                                                                          |
+| `.lc-tooltip-*` in `app.css`                                                                                                                                                                                 | LayerChart override                                  | The library's tooltip ground is otherwise transparent                                                                                                                                         |
+| `ui/*`                                                                                                                                                                                                       | shadcn internals (`data-[…]` variants)               | Primitives; their look follows this document                                                                                                                                                  |
+| `FilterSection`, `Lenses`, `SelectionBar`                                                                                                                                                                    | `Card size="flush"` with side padding                | Their rows or buttons pad themselves top and bottom; only the sides are the frame's                                                                                                           |
 
-A new exception needs a row here and its entry in `tests/design-system.test.ts` (`EXCEPTIONS`).
+A new exception needs a row here and, where a guard test would refuse it, its entry in
+`tests/design-system.test.ts` (`EXCEPTIONS`). The theme of CodeMirror and the override of
+LayerChart stand here without one: no rule reaches into a shadow root or `app.css`.
 
 ## Enforcement
 
@@ -1551,7 +1707,8 @@ A new exception needs a row here and its entry in `tests/design-system.test.ts` 
     radius and padding) only as `Alert` ("Alerts"); a button in an alert in its variant, never in the
     alert's tone ("Alerts"); formats only through `lib/i18n.ts` ("Formats"); no native `title` on a field, a cell or a code ("Help and tooltips"); no own padding on a
     `flush` card outside the exceptions ("Spacing and layout"); the owl (`Mascot`, `EmptyNote` with `mascot`) only at its
-    places ("Logo and owl"); a dashed box of muted words only as `EmptyNote` ("States"); a lone
+    places ("Logo and owl"); a dashed box of muted words, and a paragraph of muted words for a card or list with nothing in it, only as `EmptyNote` ("States"); an inline
+    style and a colour as a value only in the files of "Exceptions"; a lone
     radio only in `ChoiceCard` ("Checkboxes, radios, switches"); a pill of a chip only as `Chip`
     or `TagChip` ("Chips"); the phone's editor bar only in `PhoneEditorBar` ("Dialogs, sheets,
     editors"); every action of a selection bar with its icon ("Lists"); spins, pulses and
@@ -1577,11 +1734,18 @@ A new exception needs a row here and its entry in `tests/design-system.test.ts` 
 
   Their lists of exceptions may only shrink.
 
-- **Layout spec** (Playwright, `tests/e2e/layout.spec.ts`): every area at 390, 1024 and 1440 px.
+- **Layout spec** (Playwright, `tests/e2e/layout.spec.ts`): every area at 320, 390, 1024 and 1440 px.
   No horizontal overflow, 44 px targets on the phone and 24 px wider (a larger invisible hit area
-  counts), no console error.
+  counts), no console error. It creates what the pages show (a contact, a type with a title
+  pattern, a tag, a rule, a webhook, a paused mailbox, a document) and deletes it again, visits
+  their pages too, and opens one of each frame: the navigation sheet and the filter sheet of the
+  phone, a dialog, a form dialog, an editor, a question, a menu. A new frame gets its entry in
+  `FRAMES`, a new page in `PATHS`. CI runs it for every pull request that touches `web/` (Tobi,
+  21.11.2026).
 - **Living style guide:** `/dev/components` (development builds) shows every component in every
-  variant and size, in light and dark. A new component or variant is added there first.
+  variant and size, in light and dark. A new component or variant is added there first. A
+  guard holds it: a component this document names stands on the page, or in the guard's list of
+  parts of one feature that need that feature's data; the list may only shrink.
 - **Review:** every pull request that touches `web/` confirms it follows this document (the
   checklist of `.github/pull_request_template.md`); a deviation needs a change of this document
   in the same pull request.

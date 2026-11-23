@@ -4,7 +4,6 @@
 	import Check from '@lucide/svelte/icons/check';
 	import Copy from '@lucide/svelte/icons/copy';
 	import { api } from '#lib/api/client.ts';
-	import type { components } from '#lib/api/schema.ts';
 	import { unwrap } from '#lib/api/call.ts';
 	import IconButton from '#lib/components/IconButton.svelte';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
@@ -16,7 +15,7 @@
 	import type { AppleDevice } from '#lib/install.svelte.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import { lektoAddress, SHORTCUT_NAME } from '#lib/shortcut.ts';
-	import { tokenChanges, tokensChanged } from '#lib/tokens.svelte.ts';
+	import { tokens, tokensChanged } from '#lib/tokens.svelte.ts';
 
 	// The shortcut "An Lekto senden" (web/DESIGN.md, "App"), on iPhone, iPad and Mac only: setting
 	// it up creates a token that may only upload and shows it with Lekto's address, in the order
@@ -24,27 +23,19 @@
 	// `link`: the server's (`LEKTO_SHORTCUT_URL`); the card stands only where there is one.
 	let { device, link }: { device: AppleDevice; link: string } = $props();
 
-	type Token = components['schemas']['TokenOut'];
-
-	let tokens = $state<Token[] | null>(null);
 	let busy = $state(false);
 	let token = $state<string | null>(null);
 	let copied = $state<'token' | 'address' | null>(null);
 	const address = lektoAddress(window.location.origin);
-	const ready = $derived(tokens?.some((item) => item.scope === 'upload') ?? false);
+	// Not known (not read, or the read failed) reads as not set up: the card offers it.
+	const ready = $derived(tokens.hasUploadToken ?? false);
 	const ways = [
 		{ title: m.shortcut_way_phone(), path: m.shortcut_share_path({ name: SHORTCUT_NAME }) },
 		{ title: m.shortcut_way_mac(), path: m.shortcut_share_path({ name: SHORTCUT_NAME }) },
 		{ title: m.shortcut_way_finder(), path: m.shortcut_finder_path({ name: SHORTCUT_NAME }) }
 	];
 
-	$effect(() => {
-		void tokenChanges.version;
-		api.GET('/api/v1/auth/tokens').then(
-			(answer) => (tokens = answer.data ?? null),
-			() => (tokens = null)
-		);
-	});
+	$effect(() => void tokens.load());
 
 	async function setUp() {
 		if (busy) return;
@@ -94,19 +85,15 @@
 				{/each}
 			</ul>
 		{/if}
-		<Button
-			variant={ready ? 'outline' : 'default'}
-			class="self-start"
-			aria-disabled={busy}
-			onclick={setUp}
-		>
+		<Button variant={ready ? 'outline' : 'default'} class="self-start" {busy} onclick={setUp}>
 			{ready ? m.shortcut_another() : m.shortcut_set_up()}
 		</Button>
 	</Card.Content>
 </Card.Root>
 
 <Dialog.Root bind:open={() => token !== null, (open) => !open && (token = null)}>
-	<Dialog.Content size="md">
+	<!-- The token is shown once: a click beside the dialog does not close it. -->
+	<Dialog.Content size="md" interactOutsideBehavior="ignore">
 		<Dialog.Header>
 			<Dialog.Title>{m.shortcut_dialog_title()}</Dialog.Title>
 			<Dialog.Description>{m.shortcut_dialog_text({ name: SHORTCUT_NAME })}</Dialog.Description>

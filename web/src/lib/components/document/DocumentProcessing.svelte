@@ -2,6 +2,7 @@
 	import { onMount, tick, untrack } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
+	import { scrollBehavior } from '#lib/motion.ts';
 	import { api } from '#lib/api/client.ts';
 	import { unwrap } from '#lib/api/call.ts';
 	import type { components } from '#lib/api/schema.ts';
@@ -273,7 +274,7 @@
 		await tick();
 		window.document
 			.getElementById(wide ? 'step-details' : `step-details-${node}`)
-			?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+			?.scrollIntoView?.({ block: 'nearest', behavior: scrollBehavior() });
 	}
 
 	const tokens = $derived(runTokens(entries ?? [], shownRun));

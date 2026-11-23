@@ -23,6 +23,7 @@
 		granularity = 'day',
 		disabled = false,
 		invalid = false,
+		describedby,
 		class: className,
 		onchange
 	}: {
@@ -35,6 +36,8 @@
 		granularity?: 'day' | 'minute';
 		disabled?: boolean;
 		invalid?: boolean;
+		/** The id of what says more about it: the error below it. */
+		describedby?: string;
 		class?: string;
 		onchange?: (value: string) => void;
 	} = $props();
@@ -57,6 +60,20 @@
 	}
 
 	const locale = regionalLocale(getLocale());
+
+	// bits-ui names the parts of the field and the buttons of the calendar in English, whatever
+	// the locale, and lays its own names over those passed to it ("day, ", "Empty", "Previous").
+	// So the field draws these elements itself (`child`) and names them after the library's
+	// attributes. What it announces after a choice ("Selected Date: …") has no option.
+	const PARTS: Record<string, () => string> = {
+		day: m.date_part_day,
+		month: m.date_part_month,
+		year: m.date_part_year,
+		hour: m.date_part_hour,
+		minute: m.date_part_minute
+	};
+	/** The library's word for a part nobody has typed yet. */
+	const EMPTY = 'Empty';
 
 	// bits-ui (2.19 to 2.20.6) pads a segment with a zero when the focus leaves it and marks it as
 	// being typed then; a day picked in the calendar afterwards shows that segment's old digits
@@ -85,6 +102,7 @@
 	minValue={toDate(min)}
 	maxValue={toDate(max)}
 	{disabled}
+	calendarLabel={label}
 	weekdayFormat="short"
 	fixedWeeks
 >
@@ -92,6 +110,7 @@
 		{id}
 		aria-label={label}
 		aria-invalid={invalid || undefined}
+		aria-describedby={describedby}
 		class={cn(
 			FIELD,
 			FIELD_HEIGHT,
@@ -102,14 +121,24 @@
 	>
 		{#snippet children({ segments })}
 			{#each segments as { part, value: text }, index (index)}
-				<DatePicker.Segment
-					{part}
-					class={cn(
-						'rounded-xs px-0.5 tabular-nums outline-none focus:bg-primary/15 focus:text-foreground aria-[valuetext=Empty]:text-muted-foreground',
-						part === 'literal' && 'px-0 text-muted-foreground'
-					)}
-				>
-					{text}
+				<DatePicker.Segment {part}>
+					{#snippet child({ props })}
+						{@const empty = props['aria-valuetext'] === EMPTY}
+						<span
+							{...props}
+							aria-label={PARTS[part]?.() ?? (props['aria-label'] as string | undefined)}
+							aria-valuetext={empty
+								? m.date_part_empty()
+								: (props['aria-valuetext'] as string | undefined)}
+							class={cn(
+								'rounded-xs px-0.5 tabular-nums outline-none focus:bg-primary/15 focus:text-foreground',
+								empty && 'text-muted-foreground',
+								part === 'literal' && 'px-0 text-muted-foreground'
+							)}
+						>
+							{text}
+						</span>
+					{/snippet}
 				</DatePicker.Segment>
 			{/each}
 			<DatePicker.Trigger
@@ -129,18 +158,28 @@
 			<DatePicker.Calendar>
 				{#snippet children({ months, weekdays })}
 					<DatePicker.Header class="flex items-center justify-between gap-2 pb-2">
-						<DatePicker.PrevButton
-							class="grid size-8 place-items-center rounded-lg hover:bg-secondary max-sm:size-11"
-							aria-label={m.date_previous_month()}
-						>
-							<ChevronLeft class="size-4" aria-hidden="true" />
+						<DatePicker.PrevButton>
+							{#snippet child({ props })}
+								<button
+									{...props}
+									class="grid size-8 place-items-center rounded-lg hover:bg-secondary max-sm:size-11"
+									aria-label={m.date_previous_month()}
+								>
+									<ChevronLeft class="size-4" aria-hidden="true" />
+								</button>
+							{/snippet}
 						</DatePicker.PrevButton>
 						<DatePicker.Heading class="text-sm font-medium" />
-						<DatePicker.NextButton
-							class="grid size-8 place-items-center rounded-lg hover:bg-secondary max-sm:size-11"
-							aria-label={m.date_next_month()}
-						>
-							<ChevronRight class="size-4" aria-hidden="true" />
+						<DatePicker.NextButton>
+							{#snippet child({ props })}
+								<button
+									{...props}
+									class="grid size-8 place-items-center rounded-lg hover:bg-secondary max-sm:size-11"
+									aria-label={m.date_next_month()}
+								>
+									<ChevronRight class="size-4" aria-hidden="true" />
+								</button>
+							{/snippet}
 						</DatePicker.NextButton>
 					</DatePicker.Header>
 					{#each months as month (month.value.toString())}

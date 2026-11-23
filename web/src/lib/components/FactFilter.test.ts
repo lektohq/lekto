@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { m } from '#lib/paraglide/messages.js';
-import { fakeApi } from '#lib/testing/api.ts';
+import { fakeApi, problem } from '#lib/testing/api.ts';
 import { choose } from '#lib/testing/select.ts';
 import FactFilter from './FactFilter.svelte';
 
@@ -16,10 +16,7 @@ describe('FactFilter', () => {
 					const body = await request.json();
 					asked.push(body);
 					if (body.value === 'kaputt') {
-						return new Response(
-							JSON.stringify({ title: 'Unprocessable', status: 422, detail: 'not one' }),
-							{ status: 422, headers: { 'content-type': 'application/problem+json' } }
-						);
+						return problem(422, { detail: 'not one' });
 					}
 					return { kind: body.kind, value: 'R1001', ref: 'UjEwMDE' };
 				}
@@ -46,6 +43,9 @@ describe('FactFilter', () => {
 		await user.type(value, 'kaputt');
 		await user.click(add);
 		expect(await screen.findByText('not one')).toBeTruthy();
+		// The error belongs to the field: who lands on it hears why (WB-13).
+		const said = globalThis.document.getElementById(value.getAttribute('aria-describedby') ?? '');
+		expect(said?.textContent).toContain('not one');
 		expect(onchange).not.toHaveBeenCalled();
 		await user.clear(value);
 		await user.type(value, 'R-1001');
@@ -63,6 +63,6 @@ describe('FactFilter', () => {
 		expect(onchange).toHaveBeenLastCalledWith([]);
 		// A person's kinds are for admins only.
 		const kinds = screen.getByRole('combobox', { name: m.facts_add_kind() });
-		await expect(choose(user, kinds, 'tax_id')).rejects.toThrow();
+		await expect(choose(user, kinds, 'tax_id')).rejects.toThrow('no option tax_id');
 	});
 });

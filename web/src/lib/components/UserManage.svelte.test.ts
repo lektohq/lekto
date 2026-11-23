@@ -1,19 +1,21 @@
-import { render, screen } from '@testing-library/svelte';
+import { render, screen, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { m } from '#lib/paraglide/messages.js';
+import { signIn } from '#lib/testing/session.ts';
 import { phone } from '#lib/phone.svelte.ts';
 import { session } from '#lib/session.svelte.ts';
 import UserManage from './UserManage.svelte';
-import { fakeApi, json } from '#lib/testing/api.ts';
+import { type Routes, fakeApi, masterData, problem } from '#lib/testing/api.ts';
+import { choose, selectedValue } from '#lib/testing/select.ts';
 
-vi.mock('$app/navigation', () => ({ beforeNavigate: vi.fn(), goto: vi.fn() }));
+vi.mock('$app/navigation', () => import('#lib/testing/navigation.ts'));
 
-let fetchMock = fakeApi();
+let fetchMock: ReturnType<typeof fakeApi>;
 
 const account = {
-	id: 'bob',
-	username: 'bob',
+	id: 'john',
+	username: 'john',
 	role: 'user',
 	active: true,
 	created_at: '2026-10-01T12:00:00Z',
@@ -23,8 +25,8 @@ const account = {
 };
 
 const profile = {
-	user_id: 'bob',
-	display_name: 'Bob',
+	user_id: 'john',
+	display_name: 'John',
 	aliases: [],
 	birth_date: null,
 	email: null,
@@ -34,38 +36,56 @@ const profile = {
 	]
 };
 
-beforeEach(() => {
-	session.start({
-		user: { id: 'erika', username: 'erika', role: 'admin' },
-		method: 'password',
-		expires_at: '2026-10-14T12:00:00Z',
-		csrf_token: 'token'
-	});
-	fetchMock = fakeApi();
-	fetchMock.mockImplementation(async (request) => {
-		const path = new URL(request.url).pathname;
-		if (request.method === 'PATCH') {
-			return json({ ...profile, ...(await request.json()) });
-		}
-		if (path.endsWith('/users/bob')) return json(account);
-		if (path.endsWith('/profile')) return json(profile);
-		if (path.endsWith('/contacts')) return json([{ id: 'c1', name: 'Insurer', topic_ids: [] }]);
-		return json([]);
+/** The API of the dialog for john: account and profile, saving either, the questions of
+ * removal; `more` before these. */
+function serve(more: Routes = {}) {
+	fetchMock = fakeApi({
+		...masterData({ contacts: [{ id: 'c1', name: 'Insurer', topic_ids: [] }] }),
+		'GET /api/v1/users/john': () => account,
+		'GET /api/v1/users/john/profile': () => profile,
+		'PATCH /api/v1/users/john': async (request) => ({ ...account, ...(await request.json()) }),
+		'PATCH /api/v1/users/john/profile': async (request) => ({
+			...profile,
+			...(await request.json())
+		}),
+		'GET /api/v1/users/john/removal': () => ({ blocking_spaces: [] }),
+		...more
 	});
 	vi.stubGlobal('fetch', fetchMock);
+}
+
+beforeEach(() => {
+	signIn('admin', { id: 'erika', username: 'erika' });
+	serve();
 });
 
 afterEach(() => {
 	phone.override(null);
 	session.clear();
-	vi.unstubAllGlobals();
 });
 
 describe('UserManage', () => {
+	it('shows the stored role again when the API refuses another (WC-06)', async () => {
+		const user = userEvent.setup();
+		const patches: unknown[] = [];
+		serve({
+			'PATCH /api/v1/users/john': async (request) => {
+				patches.push(await request.json());
+				return problem(422, { detail: 'no' });
+			}
+		});
+		render(UserManage, { open: true, userId: 'john', onchanged: vi.fn() });
+		const role = async () => (await screen.findByLabelText(m.user_role())) as HTMLElement;
+		expect(selectedValue(await role())).toBe('user');
+		await choose(user, await role(), 'admin');
+		await vi.waitFor(() => expect(patches).toEqual([{ role: 'admin' }]));
+		await vi.waitFor(async () => expect(selectedValue(await role())).toBe('user'));
+	});
+
 	it('shows the account in parts, each keeping what was typed', async () => {
 		const user = userEvent.setup();
-		render(UserManage, { open: true, userId: 'bob', onchanged: vi.fn() });
-		await screen.findByRole('group', { name: 'bob' });
+		render(UserManage, { open: true, userId: 'john', onchanged: vi.fn() });
+		await screen.findByRole('group', { name: 'john' });
 		expect(screen.getByLabelText(m.user_role())).toBeTruthy();
 		const count = await screen.findByRole('button', { name: new RegExp(m.profile_numbers()) });
 		expect(count.textContent).toContain('1');
@@ -73,21 +93,21 @@ describe('UserManage', () => {
 		await user.click(screen.getByRole('button', { name: new RegExp(`^${m.profile_title()}`) }));
 		const name = screen.getByLabelText(m.profile_display_name()) as HTMLInputElement;
 		await user.clear(name);
-		await user.type(name, 'Bob Example');
+		await user.type(name, 'John Example');
 		await user.click(count);
 		// Hidden, not gone: back on the profile, the name typed is still there.
 		expect(name.closest('.hidden')).not.toBeNull();
 		await user.click(screen.getByRole('button', { name: new RegExp(`^${m.profile_title()}`) }));
 		expect(name.closest('.hidden')).toBeNull();
-		expect(name.value).toBe('Bob Example');
+		expect(name.value).toBe('John Example');
 	});
 
 	it('is a whole screen on a phone, as every editor, closed with "Fertig"', async () => {
 		phone.override(true);
 		const user = userEvent.setup();
-		const props = $state({ open: true, userId: 'bob', onchanged: vi.fn() });
+		const props = $state({ open: true, userId: 'john', onchanged: vi.fn() });
 		render(UserManage, props);
-		await screen.findByRole('group', { name: 'bob' });
+		await screen.findByRole('group', { name: 'john' });
 		const dialog = screen.getByRole('dialog');
 		expect(dialog.className).toContain('h-dvh');
 		// Each part saves itself: no form around them, no "Speichern" in the bar.
@@ -97,5 +117,36 @@ describe('UserManage', () => {
 		expect(bar.querySelector('button[type="submit"]')).toBeNull();
 		await user.click(screen.getByRole('button', { name: m.picker_done() }));
 		expect(props.open).toBe(false);
+	});
+
+	it('names the user in each question, and answers with the verb (WC-10)', async () => {
+		const user = userEvent.setup();
+		serve({
+			'GET /api/v1/users/john': () => ({
+				...account,
+				totp_enabled: true,
+				linked_accounts: [{ issuer: 'i' }]
+			})
+		});
+		render(UserManage, { open: true, userId: 'john', onchanged: vi.fn() });
+		await user.click(await screen.findByRole('button', { name: m.user_totp_remove() }));
+		const factor = await screen.findByRole('alertdialog', {
+			name: m.user_totp_remove_of({ name: 'john' })
+		});
+		expect(within(factor).getByRole('button', { name: m.user_totp_remove_do() })).toBeTruthy();
+		await user.click(within(factor).getByRole('button', { name: m.cancel() }));
+		await user.click(screen.getByRole('button', { name: m.user_oidc_remove() }));
+		const link = await screen.findByRole('alertdialog', {
+			name: m.user_oidc_remove_of({ name: 'john' })
+		});
+		expect(within(link).getByRole('button', { name: m.user_oidc_remove_do() })).toBeTruthy();
+		await user.click(within(link).getByRole('button', { name: m.cancel() }));
+		await user.click(screen.getByRole('button', { name: m.user_delete() }));
+		const gone = await screen.findByRole('alertdialog', {
+			name: m.user_delete_named({ name: 'john' })
+		});
+		expect(
+			within(gone).getByRole('button', { name: m.user_delete_named({ name: 'john' }) })
+		).toBeTruthy();
 	});
 });

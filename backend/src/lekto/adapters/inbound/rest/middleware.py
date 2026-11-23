@@ -7,6 +7,7 @@ from collections.abc import Collection, Mapping, Sequence
 
 from starlette.datastructures import MutableHeaders
 from starlette.exceptions import HTTPException
+from starlette.middleware.gzip import DEFAULT_EXCLUDED_CONTENT_TYPES, GZipMiddleware
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from lekto.adapters.inbound.rest.problems import PRIVATE_HEADERS, problem
@@ -128,3 +129,39 @@ class NoStore:
             await send(message)
 
         await self._app(scope, receive, marked)
+
+
+FILES = ("application/pdf", "application/octet-stream", "image/*", "message/rfc822")
+"""The media types of the files Lekto sends as they are (a document's original, its archive
+PDF, a page, a logo): they are compressed already or large, and gzip would only cost time."""
+
+COMPRESS_FROM = 1024
+"""Bytes from which an answer is compressed; a smaller one fits a packet either way."""
+
+
+class Compress:
+    """gzip for the answers that shrink: the files of the web UI and the JSON of the API, for a
+    client that accepts it. Neither Lekto nor the proxy examples compressed anything, so a
+    first load of the web UI fetched three times the bytes it needs.
+
+    Not compressed: the paths in `plain` (the sign-in and the session, whose answers carry the
+    CSRF token: a secret and something an attacker could have reflected must not share a
+    compressed answer, BREACH), the files Lekto sends as they are (`FILES`), event streams and
+    partial answers (Starlette's own exclusions), and anything below `COMPRESS_FROM`."""
+
+    def __init__(self, app: ASGIApp, *, plain: Sequence[str]) -> None:
+        self._app = app
+        self._plain = tuple(plain)
+        # Level 6 (zlib's default): close to the smallest, at a fraction of the time of 9.
+        self._gzip = GZipMiddleware(
+            app,
+            minimum_size=COMPRESS_FROM,
+            compresslevel=6,
+            exclude_content_types=(*DEFAULT_EXCLUDED_CONTENT_TYPES, *FILES),
+        )
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] == "http" and not scope["path"].startswith(self._plain):
+            await self._gzip(scope, receive, send)
+        else:
+            await self._app(scope, receive, send)

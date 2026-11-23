@@ -1,10 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { m } from '#lib/paraglide/messages.js';
+import { getLocale, setLocale } from '#lib/paraglide/runtime.js';
+import { signIn } from '#lib/testing/session.ts';
 import { scope } from '#lib/scope.svelte.ts';
 import { session } from '#lib/session.svelte.ts';
 import { summaryOf } from '#lib/testing/documents.ts';
 import { badgeLabel, badgeText, badgeTone, inbox } from './inbox.svelte.ts';
-import { calls, fakeApi } from '#lib/testing/api.ts';
+import { calls, fakeApi, json } from '#lib/testing/api.ts';
 
 const summary = summaryOf;
 
@@ -38,6 +40,16 @@ describe('inbox badge', () => {
 		);
 	});
 
+	it('writes its numbers as the language does (WG-06)', () => {
+		const before = getLocale();
+		setLocale('de', { reload: false });
+		try {
+			expect(badgeLabel(summary({ new: 12345 }))).toBe('12.345 im Posteingang, 12.345 neu');
+		} finally {
+			setLocale(before, { reload: false });
+		}
+	});
+
 	it('cuts a long number short', () => {
 		expect(badgeText(7)).toBe('7');
 		expect(badgeText(99)).toBe('99');
@@ -49,12 +61,7 @@ describe('inbox summary', () => {
 	let api = fakeApi();
 
 	beforeEach(() => {
-		session.start({
-			user: { id: 'admin', username: 'admin', role: 'admin' },
-			method: 'password',
-			expires_at: '2026-10-18T12:00:00Z',
-			csrf_token: 'token'
-		});
+		signIn('admin', { id: 'admin', username: 'admin' });
 		api = fakeApi({ 'GET /api/v1/inbox/summary': () => summary({ review: 1 }) });
 		vi.stubGlobal('fetch', api);
 	});
@@ -63,7 +70,6 @@ describe('inbox summary', () => {
 		inbox.stop();
 		scope.set(false);
 		session.clear();
-		vi.unstubAllGlobals();
 	});
 
 	it('is fetched for the scope chosen', async () => {
@@ -74,12 +80,39 @@ describe('inbox summary', () => {
 		expect(inbox.summary?.worst_lane).toBe('yellow');
 	});
 
+	it('counts the caller’s own inbox for the app’s icon, whatever the scope (WM-05)', async () => {
+		// The counter may count everyone's; the icon carries what a notification sets.
+		api = fakeApi({}, (_, url) =>
+			url.pathname === '/api/v1/inbox/summary'
+				? json(summary(url.searchParams.has('all_users') ? { review: 7 } : { review: 2 }))
+				: json({})
+		);
+		vi.stubGlobal('fetch', api);
+		scope.set(true);
+		await inbox.refresh();
+		expect(inbox.open).toBe(7);
+		expect(inbox.own).toBe(2);
+		expect(calls(api)).toEqual([
+			'GET /api/v1/inbox/summary?all_users=true',
+			'GET /api/v1/inbox/summary'
+		]);
+
+		// The caller's own scope: one request, the same number.
+		scope.set(false);
+		api.mockClear();
+		await inbox.refresh();
+		expect(inbox.own).toBe(2);
+		expect(calls(api)).toEqual(['GET /api/v1/inbox/summary']);
+	});
+
 	it('keeps the last summary while the server cannot be reached', async () => {
 		await inbox.refresh();
 		expect(inbox.open).toBe(1);
 		api.mockRejectedValue(new TypeError('Failed to fetch'));
 		await expect(inbox.refresh()).resolves.toBeUndefined();
 		expect(inbox.open).toBe(1);
+		// It remembers why, for who has nothing to show without it (the overview's tile, WE-08).
+		expect(inbox.failure).toBeInstanceOf(TypeError);
 	});
 
 	it('is fetched again when the window comes back into view', async () => {

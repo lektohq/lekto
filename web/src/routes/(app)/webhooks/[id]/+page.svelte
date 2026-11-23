@@ -21,8 +21,8 @@
 	import BeamTitle from '#lib/components/BeamTitle.svelte';
 	import Segmented from '#lib/components/Segmented.svelte';
 	import Select from '#lib/components/Select.svelte';
-	import { describeError } from '#lib/errors.ts';
-	import { formatDate, formatNumber } from '#lib/i18n.ts';
+	import { describeLoad, type LoadFailure } from '#lib/errors.ts';
+	import { formatDate, formatNumber, formatMoment } from '#lib/i18n.ts';
 	import { rememberedPageSize } from '#lib/page-size.ts';
 	import { SummaryPager } from '#lib/summary-pager.svelte.ts';
 	import LogCard from '#lib/components/LogCard.svelte';
@@ -51,7 +51,7 @@
 	// with its document as far as the viewer may read it.
 	const id = $derived(page.params.id ?? '');
 	let webhook = $state<Webhook | null>(null);
-	let problem = $state<string | null>(null);
+	let failure = $state<LoadFailure | null>(null);
 	let removing = $state(false);
 	let renewing = $state(false);
 	let secret = $state<string | null>(null);
@@ -132,7 +132,7 @@
 
 	/** Load the webhook; whether it is there. */
 	async function load(wanted: string): Promise<boolean> {
-		problem = null;
+		failure = null;
 		try {
 			const hook = await unwrap(
 				api.GET('/api/v1/webhooks/{id}', { params: { path: { id: wanted } } })
@@ -140,7 +140,7 @@
 			if (wanted === id) webhook = hook;
 			return wanted === id;
 		} catch (error) {
-			if (wanted === id) problem = describeError(error);
+			if (wanted === id) failure = describeLoad(error, m.webhook_not_found);
 			return false;
 		}
 	}
@@ -161,10 +161,16 @@
 			eventType = '';
 			log.summary = null;
 		});
+		open(wanted);
+	});
+
+	/** The webhook, then its log: when the page opens and when one tries again after a problem
+	 * (the log was never asked for then). */
+	function open(wanted: string) {
 		void load(wanted).then((found) => {
 			if (found) untrack(() => void log.reset());
 		});
-	});
+	}
 
 	async function test() {
 		busy = true;
@@ -228,7 +234,7 @@
 					<Pencil aria-hidden="true" />
 					{m.edit_do()}
 				</a>
-				<Button variant="outline" disabled={busy} onclick={test}>
+				<Button variant="outline" {busy} onclick={test}>
 					<Send aria-hidden="true" />
 					{m.webhook_test()}
 				</Button>
@@ -267,15 +273,15 @@
 				<span class="font-mono text-sm break-all text-muted-foreground">{webhook.url}</span>
 				{#if switchedOffFailing(webhook)}
 					<span class="text-sm text-destructive">
-						{m.webhook_failing({ count: webhook.failed_streak })}
+						{m.webhook_failing({ count: formatNumber(webhook.failed_streak) })}
 					</span>
 				{/if}
 			{/if}
 		{/snippet}
 	</PageHeader>
 
-	{#if problem}
-		<LoadProblem {problem} onretry={() => void load(id)} />
+	{#if failure}
+		<LoadProblem problem={failure.text} onretry={failure.final ? undefined : () => open(id)} />
 	{:else if !webhook}
 		<Loading />
 	{/if}
@@ -322,7 +328,7 @@
 			{#snippet row(delivery)}
 				<Table.Row class={cn(delivery.error && 'border-b-0')}>
 					<Table.Cell class="pl-0 text-muted-foreground tabular-nums">
-						{formatDate(delivery.started_at, { dateStyle: 'short', timeStyle: 'medium' })}
+						{formatMoment(delivery.started_at, 'short', true)}
 					</Table.Cell>
 					<Table.Cell>
 						<span class="font-medium">{eventLabel(delivery.event_type)}</span>
@@ -358,10 +364,7 @@
 						{#if delivery.next_attempt_at}
 							<span class="block text-xs text-muted-foreground">
 								{m.delivery_next({
-									time: formatDate(delivery.next_attempt_at, {
-										timeStyle: 'short',
-										dateStyle: 'short'
-									})
+									time: formatMoment(delivery.next_attempt_at, 'short')
 								})}
 							</span>
 						{/if}

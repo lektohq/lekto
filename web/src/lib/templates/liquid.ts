@@ -89,6 +89,24 @@ export const FILTERS: readonly { name: string; insert: string }[] = [
 	{ name: 'round', insert: 'round: 2' }
 ];
 
+/** Writes a value as JSON: for the body of a webhook, where every value is written with it
+ * (docs/templates.md, "Webhook bodies"), and nowhere else. */
+const JSON_FILTER = { name: 'json', insert: 'json' };
+
+/** The filters to offer in a template of this purpose. */
+export function filtersFor(
+	purpose: 'rule' | 'webhook'
+): readonly { name: string; insert: string }[] {
+	return purpose === 'webhook' ? [JSON_FILTER, ...FILTERS] : FILTERS;
+}
+
+/** The filters offered as chips in the editor of a template of this purpose. */
+export function filterChipsFor(purpose: 'rule' | 'webhook'): { name: string; insert: string }[] {
+	const offered = filtersFor(purpose);
+	const names = purpose === 'webhook' ? [JSON_FILTER.name, ...FILTER_CHIPS] : FILTER_CHIPS;
+	return names.map((name) => offered.find((filter) => filter.name === name)!);
+}
+
 /** The filters offered as chips in the editor. */
 export const FILTER_CHIPS = [
 	'date',

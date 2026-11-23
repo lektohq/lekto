@@ -1,21 +1,22 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fakeApi } from '#lib/testing/api.ts';
+import { describe, expect, it, vi } from 'vitest';
+import { fakeApi, json } from '#lib/testing/api.ts';
 import type { ApiDefinition } from '#lib/rules/model.ts';
 import { changeSwitchedOff, createSwitchedOff, GLOBAL } from './save.ts';
 
 const definition = {
-	name: 'Telekom',
+	name: 'Muster Telefon',
 	priority: 100,
 	triggers: ['document_processed'],
 	conditions: { all: [] },
 	actions: []
 } as unknown as ApiDefinition;
-const rule = { id: 'r1', enabled: true, name: 'Telekom' };
-
-afterEach(() => vi.unstubAllGlobals());
+const rule = { id: 'r1', enabled: true, name: 'Muster Telefon' };
 
 function stub() {
-	const fetch = fakeApi({}, () => ({ ...rule, enabled: false }));
+	const fetch = fakeApi({
+		'POST /api/v1/rules': () => json({ ...rule, enabled: false }, 201),
+		'PUT /api/v1/rules/r1': () => ({ ...rule, enabled: false })
+	});
 	vi.stubGlobal('fetch', fetch);
 	return fetch;
 }
@@ -36,7 +37,7 @@ describe('saving a rule switched off', () => {
 		const [only, ...more] = await sent(fetch);
 		expect(more).toEqual([]);
 		expect(only.call).toBe('POST /api/v1/rules');
-		expect(only.body).toMatchObject({ scope: 'global', name: 'Telekom', enabled: false });
+		expect(only.body).toMatchObject({ scope: 'global', name: 'Muster Telefon', enabled: false });
 	});
 
 	it('saves a change switched off in one request', async () => {

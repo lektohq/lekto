@@ -1,4 +1,5 @@
 <script lang="ts">
+	import EmptyNote from '#lib/components/EmptyNote.svelte';
 	import * as Alert from '#lib/components/ui/alert/index.ts';
 	import FileText from '@lucide/svelte/icons/file-text';
 	import Globe from '@lucide/svelte/icons/globe';
@@ -65,7 +66,7 @@
 	import { m } from '#lib/paraglide/messages.js';
 	import { labelled, reasonsText } from '#lib/reasons.ts';
 	import { phone } from '#lib/phone.svelte.ts';
-	import { quoted } from '#lib/i18n.ts';
+	import { quoted, formatNumber } from '#lib/i18n.ts';
 	import { fieldId, initialValue, isRuleField, readAnew, type ReviewValue } from '#lib/review.ts';
 	import { session } from '#lib/session.svelte.ts';
 	import { suggestedSpace, unseenBy, unseenHere } from '#lib/space-suggestion.ts';
@@ -102,6 +103,7 @@
 		factCounts = null,
 		factsHref = '',
 		onmove,
+		onleave,
 		end
 	}: {
 		document: Document;
@@ -127,6 +129,9 @@
 		factsHref?: string;
 		/** "Move" in the filing box: the move dialog of the document's head. */
 		onmove?: () => void;
+		/** Saved, and the rules filed it out of the caller's reach: the page leaves the way the
+		 * person came (web/DESIGN.md, "Navigation between list and detail"). */
+		onleave?: () => void;
 		/** At the end of the head: the pane's switch. */
 		end?: Snippet;
 	} = $props();
@@ -530,7 +535,8 @@
 			else {
 				// The rules filed the document where the caller can no longer read it.
 				toast.info(m.document_moved_away());
-				await goto(`${BASE}/documents`);
+				if (onleave) onleave();
+				else await goto(`${BASE}/documents`);
 			}
 		} catch (error) {
 			preview = null;
@@ -647,7 +653,9 @@
 			{#if reviewing && undecided > 0}
 				<Badge variant="yellow">
 					<TriangleAlert aria-hidden="true" strokeWidth={2.2} />
-					{undecided === 1 ? m.review_undecided_one() : m.review_undecided({ count: undecided })}
+					{undecided === 1
+						? m.review_undecided_one()
+						: m.review_undecided({ count: formatNumber(undecided) })}
 				</Badge>
 			{/if}
 		</PaneHead>
@@ -674,7 +682,7 @@
 						<p>{reasonsText(failedNode.reasons, failedNode.reason, labelled(lookup))}</p>
 					{/if}
 					{#if editable}
-						<Button type="button" variant="outline" disabled={busy} onclick={retry}>
+						<Button type="button" variant="outline" {busy} onclick={retry}>
 							<RotateCcw aria-hidden="true" />
 							{m.retry_node()}
 						</Button>
@@ -985,7 +993,7 @@
 		{/if}
 
 		{#if reviewing && decisions.length === 0 && !failedNode && ruleNotes.length === 0 && nodeNotes.length === 0 && !hasSpace}
-			<p class="px-1 text-sm text-muted-foreground">{m.review_nothing_open()}</p>
+			<EmptyNote size="line" class="px-1">{m.review_nothing_open()}</EmptyNote>
 		{/if}
 	</div>
 
@@ -1016,10 +1024,10 @@
 				</p>
 			{/if}
 			<div class="flex justify-end gap-2">
-				<Button type="button" variant="ghost" disabled={busy} onclick={reset}>
+				<Button type="button" variant="ghost" {busy} onclick={reset}>
 					{m.review_reset()}
 				</Button>
-				<Button type="submit" disabled={busy || blocked || (filing !== null && spaceTarget === '')}
+				<Button type="submit" {busy} disabled={blocked || (filing !== null && spaceTarget === '')}
 					>{m.review_confirm()}</Button
 				>
 			</div>

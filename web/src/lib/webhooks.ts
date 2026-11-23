@@ -1,12 +1,14 @@
 // What the webhook pages share: sending a test delivery and telling how it went, and the names
 // of the events a webhook reports or logs.
 import { toast } from 'svelte-sonner';
+import { formatNumber } from '#lib/i18n.ts';
 import { api } from '#lib/api/client.ts';
 import { unwrap } from '#lib/api/call.ts';
 import { reportError } from '#lib/errors.ts';
 import { WEBHOOK_EVENT_TYPES, type WebhookEventType } from '#lib/events.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import type { components } from '#lib/api/schema.ts';
+import { own } from '#lib/utils.ts';
 
 /** What the API takes of a webhook (`tests/api-limits.test.ts` holds them to `openapi.json`). */
 export const WEBHOOK_LIMITS = {
@@ -63,7 +65,8 @@ const LOGGED_LABELS: Record<string, () => string> = {
 
 /** The name of an event in the log of a webhook; an unknown one as it is. */
 export function eventLabel(type: string): string {
-	const label = EVENT_LABELS[type as WebhookEventType] ?? LOGGED_LABELS[type];
+	// Only the tables' own entries: `toString` is no event (WT3-04).
+	const label = own<() => string>(EVENT_LABELS, type) ?? own(LOGGED_LABELS, type);
 	return label ? label() : type;
 }
 
@@ -96,11 +99,11 @@ export const EVENT_VOLUME: Record<WebhookEventType, Volume> = {
 /** How often an event comes for one document, in words: "1×", "2–7×", "≈ 13× per run". */
 export function volumeText(type: WebhookEventType): string {
 	const { least, most, run } = EVENT_VOLUME[type];
-	if (run) return m.webhook_volume_run({ count: least });
-	if (least === most) return m.webhook_volume_times({ count: least });
+	if (run) return m.webhook_volume_run({ count: formatNumber(least) });
+	if (least === most) return m.webhook_volume_times({ count: formatNumber(least) });
 	if (most <= 1)
 		return type === 'document.deleted' ? m.webhook_volume_at_most_once() : m.webhook_volume_rare();
-	return m.webhook_volume_range({ least, most });
+	return m.webhook_volume_range({ least: formatNumber(least), most: formatNumber(most) });
 }
 
 /** How loud an event is for one document, for `VolumeMeter`: 1 at most once, 2 a few times,

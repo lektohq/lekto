@@ -39,6 +39,14 @@
 	let problem = $state<string | null>(null);
 	let busy = $state(false);
 	let password = $state('');
+	// What a part of the profile holds unsaved: the dialog asks before it closes over it.
+	const unsaved = $state({ person: false, numbers: false });
+	$effect(() => {
+		if (open) {
+			unsaved.person = false;
+			unsaved.numbers = false;
+		}
+	});
 	let revoke = $state(false);
 	let resetError = $state<string | null>(null);
 	let confirm = $state<'totp' | 'oidc' | null>(null);
@@ -113,8 +121,11 @@
 		}
 	}
 
-	const setRole = (role: string) =>
-		run(
+	// The role as chosen while it is being saved; refused, the field shows the stored one again.
+	let roleChoice = $state<string | null>(null);
+	const setRole = (role: string) => {
+		roleChoice = role;
+		return run(
 			() =>
 				unwrap(
 					api.PATCH('/api/v1/users/{id}', {
@@ -123,7 +134,8 @@
 					})
 				),
 			m.user_saved()
-		);
+		).finally(() => (roleChoice = null));
+	};
 
 	const setActive = (active: boolean) =>
 		run(
@@ -174,6 +186,7 @@
 	shortTitle={m.user_tab_account()}
 	tabs={account && !problem ? parts : undefined}
 	class={TALL}
+	dirty={unsaved.person || unsaved.numbers}
 >
 	{#if problem}
 		<LoadProblem {problem} onretry={() => load()} />
@@ -183,18 +196,17 @@
 				<Field.Label for="user-role">{m.user_role()}</Field.Label>
 				<Select
 					id="user-role"
-					value={account.role ?? 'user'}
+					bind:value={() => roleChoice ?? account?.role ?? 'user', (next) => void setRole(next)}
 					disabled={busy}
 					options={[
 						{ value: 'user', label: m.role_user() },
 						{ value: 'admin', label: m.role_admin() }
 					]}
-					onchange={setRole}
 				/>
 			</Field.Field>
 			<div class="flex items-center justify-between gap-3">
 				<span>{account.active ? m.user_active() : m.user_inactive()}</span>
-				<Button variant="outline" disabled={busy} onclick={() => setActive(!account!.active)}>
+				<Button variant="outline" {busy} onclick={() => setActive(!account!.active)}>
 					{account.active ? m.user_deactivate() : m.user_activate()}
 				</Button>
 			</div>
@@ -208,14 +220,15 @@
 							autocomplete="new-password"
 							bind:value={password}
 							aria-invalid={resetError ? true : undefined}
+							aria-describedby={resetError ? 'user-password-error' : undefined}
 						/>
-						{#if resetError}<Field.Error>{resetError}</Field.Error>{:else}
+						{#if resetError}<Field.Error id="user-password-error">{resetError}</Field.Error>{:else}
 							<Field.Description>{m.password_rules()}</Field.Description>
 						{/if}
 					</Field.Field>
 					<Choice bind:checked={revoke}>{m.user_revoke_tokens()}</Choice>
 					<div>
-						<Button type="submit" disabled={busy || password === ''}
+						<Button type="submit" {busy} disabled={password === ''}
 							>{m.user_password_reset()}</Button
 						>
 					</div>
@@ -229,17 +242,17 @@
 				</p>
 				<div class="flex flex-wrap gap-2">
 					{#if account.totp_enabled && !own}
-						<Button variant="outline" disabled={busy} onclick={() => (confirm = 'totp')}>
+						<Button variant="outline" {busy} onclick={() => (confirm = 'totp')}>
 							{m.user_totp_remove()}
 						</Button>
 					{/if}
 					{#if account.linked_accounts.length > 0}
-						<Button variant="outline" disabled={busy} onclick={() => (confirm = 'oidc')}>
+						<Button variant="outline" {busy} onclick={() => (confirm = 'oidc')}>
 							{m.user_oidc_remove()}
 						</Button>
 					{/if}
 					{#if !own}
-						<Button variant="destructive" disabled={busy} onclick={() => (deleting = true)}>
+						<Button variant="destructive" {busy} onclick={() => (deleting = true)}>
 							{m.user_delete()}
 						</Button>
 					{/if}
@@ -252,10 +265,22 @@
 			{/if}
 		{:else if profile}
 			<div class={[part !== 'profile' && 'hidden']}>
-				<ProfileForm data={profile} userId={account.id} part="person" onsaved={profileSaved} />
+				<ProfileForm
+					data={profile}
+					userId={account.id}
+					part="person"
+					onsaved={profileSaved}
+					ondirty={(dirty) => (unsaved.person = dirty)}
+				/>
 			</div>
 			<div class={[part !== 'identifiers' && 'hidden']}>
-				<ProfileForm data={profile} userId={account.id} part="numbers" onsaved={profileSaved} />
+				<ProfileForm
+					data={profile}
+					userId={account.id}
+					part="numbers"
+					onsaved={profileSaved}
+					ondirty={(dirty) => (unsaved.numbers = dirty)}
+				/>
 			</div>
 		{:else if part !== 'account'}
 			<Loading class="text-sm" />
@@ -267,9 +292,11 @@
 
 <ConfirmDialog
 	bind:open={() => confirm !== null, (value) => !value && (confirm = null)}
-	title={confirm === 'totp' ? m.user_totp_remove() : m.user_oidc_remove()}
+	title={confirm === 'totp'
+		? m.user_totp_remove_of({ name: account ? userLabel(account) : '' })
+		: m.user_oidc_remove_of({ name: account ? userLabel(account) : '' })}
 	description={confirm === 'totp' ? m.user_totp_remove_confirm() : m.user_oidc_remove_confirm()}
-	confirmLabel={m.confirm_yes()}
+	confirmLabel={confirm === 'totp' ? m.user_totp_remove_do() : m.user_oidc_remove_do()}
 	onconfirm={confirmed}
 />
 

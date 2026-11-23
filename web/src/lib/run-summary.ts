@@ -3,6 +3,7 @@
  * (it runs, stops before filing, failed, went through), what would help next, and what changed
  * since the run before.
  */
+import { formatNumber } from '#lib/i18n.ts';
 import type { components } from '#lib/api/schema.ts';
 import { describeValue, fieldLabel } from '#lib/describe.ts';
 import { choiceTitle, filingKind, type Viewer } from '#lib/filing.ts';
@@ -254,7 +255,7 @@ export function changesOf(
 				JSON.stringify(old.get(field)) !== JSON.stringify(fresh.get(field))
 		).length;
 		if (changed === 1) items.push(m.run_change_fields_one());
-		else if (changed > 1) items.push(m.run_change_fields({ count: String(changed) }));
+		else if (changed > 1) items.push(m.run_change_fields({ count: formatNumber(changed) }));
 	}
 	const pdfa = (entry: LogEntry | undefined) => object(entry?.output).pdfa;
 	if (then.ocr !== now.ocr && typeof pdfa(then.ocr) === 'boolean') {

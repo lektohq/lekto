@@ -3,12 +3,12 @@ import { createRawSnippet } from 'svelte';
 import { describe, expect, it } from 'vitest';
 import type { components } from '#lib/api/schema.ts';
 import { formatDate } from '#lib/i18n.ts';
-import type { Lookup } from '#lib/masterdata.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { listedOf } from '#lib/testing/documents.ts';
 import DocumentCard from './DocumentCard.svelte';
 import DocumentRow from './DocumentRow.svelte';
 import InboxMark from './InboxMark.svelte';
+import { lookupOf } from '#lib/testing/master-data.ts';
 
 type Listed = components['schemas']['ListedDocument'];
 
@@ -46,8 +46,8 @@ describe('the archive', () => {
 	});
 
 	it('shows the contact in the head, the chips on the first page, then title, type and date', () => {
-		const lookup = {
-			contacts: [{ id: 'c1', name: 'Stadtwerke Süd', group_ids: ['g1'] }],
+		const lookup = lookupOf({
+			contacts: [{ id: 'c1', name: 'Stadtwerke Muster', group_ids: ['g1'] }],
 			documentTypes: [{ id: 'k1', name: 'Rechnung', group_ids: [], icon: 'receipt' }],
 			tags: [
 				{ id: 't1', name: 'zu bezahlen', path: ['zu bezahlen'], scope: 'document', shown: true },
@@ -56,7 +56,7 @@ describe('the archive', () => {
 			fields: [],
 			spaces: [],
 			users: []
-		} as unknown as Lookup;
+		});
 		const { container } = render(DocumentCard, {
 			document: listed({
 				contact_id: 'c1',
@@ -69,8 +69,8 @@ describe('the archive', () => {
 		});
 		const link = screen.getByRole('link', { name: /Stromrechnung/ });
 		const [head, page, text] = [...link.children];
-		expect(within(head as HTMLElement).getByText('Stadtwerke Süd')).toBeTruthy();
-		expect(head.getAttribute('title')).toBe('Stadtwerke Süd');
+		expect(within(head as HTMLElement).getByText('Stadtwerke Muster')).toBeTruthy();
+		expect(head.getAttribute('title')).toBe('Stadtwerke Muster');
 		// Only the page count stands on the page, as glass; the tag and the contact's group stand
 		// below the title (web/DESIGN.md, "Document card").
 		const count = within(page as HTMLElement).getByText(m.doc_pages_short({ count: 2 }));

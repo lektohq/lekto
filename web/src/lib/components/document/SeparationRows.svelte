@@ -3,7 +3,7 @@
 	import { unwrap } from '#lib/api/call.ts';
 	import { openBeam } from '#lib/beam.svelte.ts';
 	import BeamTitle from '#lib/components/BeamTitle.svelte';
-	import { formatNumber, listLocale, quoted } from '#lib/i18n.ts';
+	import { formatNumber, formatList, quoted } from '#lib/i18n.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import { partNumber, type Separation } from '#lib/separation.ts';
 
@@ -35,8 +35,7 @@
 		};
 	});
 
-	const and = (items: string[]) =>
-		new Intl.ListFormat(listLocale(), { type: 'conjunction' }).format(items);
+	const and = (items: string[]) => formatList(items);
 
 	/** The sheets found, each with the format of its code. */
 	function sheetsFound(found: Extract<Separation, { kind: 'looked' }>): string {

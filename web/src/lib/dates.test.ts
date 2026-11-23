@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
 	isIsoDay,
 	isoDayLocal,
@@ -8,11 +8,6 @@ import {
 	pad2,
 	utcDay
 } from './dates.ts';
-
-const zone = process.env.TZ;
-afterEach(() => {
-	process.env.TZ = zone;
-});
 
 describe('days', () => {
 	it('recognises a day', () => {
@@ -27,7 +22,7 @@ describe('days', () => {
 	});
 
 	it('keeps the calendar day west of Greenwich', () => {
-		process.env.TZ = 'America/New_York';
+		vi.stubEnv('TZ', 'America/New_York');
 		const day = localDay('2026-10-01');
 		expect([day.getFullYear(), day.getMonth(), day.getDate()]).toEqual([2026, 9, 1]);
 		expect(isoDayLocal(day)).toBe('2026-10-01');

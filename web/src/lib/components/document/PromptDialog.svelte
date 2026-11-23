@@ -58,7 +58,7 @@
 		if (of.request === 'facts') {
 			return same.length > 1 ? m.prompt_facts_attempt({ number }) : m.prompt_facts();
 		}
-		if (same.length > 1) return m.prompt_attempt({ number, total: same.length });
+		if (same.length > 1) return m.prompt_attempt({ number, total: formatNumber(same.length) });
 		return m.prompt_proposal();
 	}
 	const callOptions = $derived(

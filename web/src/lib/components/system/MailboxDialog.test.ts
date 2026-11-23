@@ -1,48 +1,29 @@
-import { render, screen } from '@testing-library/svelte';
+import { render, screen, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ConnectionTest, Mailbox } from '#lib/mailboxes.ts';
+import { formatNumber } from '#lib/i18n.ts';
+import { LIMITS, type ConnectionTest } from '#lib/mailboxes.ts';
+import { signIn } from '#lib/testing/session.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { session } from '#lib/session.svelte.ts';
 import MailboxDialog from './MailboxDialog.svelte';
-import { fakeApi, json } from '#lib/testing/api.ts';
+import {
+	fakeApi,
+	json,
+	problem,
+	recording,
+	type Route,
+	type Routes,
+	type Sent
+} from '#lib/testing/api.ts';
+import { mailboxOf } from '#lib/testing/system.ts';
 
-let fetchMock = fakeApi();
-const sent: { method: string; path: string; body: unknown }[] = [];
+let fetchMock: ReturnType<typeof fakeApi>;
+const sent: Sent[] = [];
 /** The routes that fail for a test, by path. */
 const failing = new Set<string>();
 
-const STORED: Mailbox = {
-	id: 'm1',
-	name: 'Haushalt',
-	host: 'imap.example.test',
-	port: 993,
-	security: 'tls',
-	username: 'haushalt@example.test',
-	folders: ['INBOX'],
-	interval_minutes: 5,
-	start: 'since_setup',
-	since: null,
-	fallback: 'nothing',
-	fallback_user_id: null,
-	body_type_id: null,
-	enabled: true,
-	status: {
-		last_attempt_at: null,
-		last_success_at: null,
-		error: null,
-		mails: 0,
-		documents: 0,
-		skipped_at: null,
-		skipped: null,
-		step_failed_at: null,
-		step_failed: null,
-		keywords: [],
-		own_keywords: null
-	},
-	created_at: '2026-11-04T10:00:00Z',
-	updated_at: '2026-11-04T10:00:00Z'
-};
+const STORED = mailboxOf();
 
 const FOUND: ConnectionTest = {
 	ok: true,
@@ -53,35 +34,36 @@ const FOUND: ConnectionTest = {
 };
 
 beforeEach(() => {
-	session.start({
-		user: { id: 'erika', username: 'erika', role: 'admin' },
-		method: 'password',
-		expires_at: '2026-11-06T12:00:00Z',
-		csrf_token: 'token'
-	});
+	signIn('admin', { id: 'erika', username: 'erika' });
 	sent.length = 0;
 	failing.clear();
-	fetchMock = fakeApi();
-	fetchMock.mockImplementation(async (request) => {
-		const path = new URL(request.url).pathname;
-		const body = request.method === 'GET' ? null : await request.json().catch(() => null);
-		sent.push({ method: request.method, path, body });
-		if (failing.has(path)) return json({ detail: 'down' }, 500);
-		if (path === '/api/v1/users')
-			return json([{ id: 'erika', username: 'erika', display_name: 'Erika', active: true }]);
-		if (path === '/api/v1/document-types') return json([]);
-		if (path === '/api/v1/mailboxes/test') return json(FOUND);
-		if (request.method === 'POST' && path === '/api/v1/mailboxes') return json(STORED, 201);
-		return json(STORED);
-	});
+	// What `failing` names fails; each request is kept in `sent`.
+	const or =
+		(route: Route): Route =>
+		(request, url) =>
+			failing.has(url.pathname)
+				? problem(500, { detail: 'an unexpected error occurred' })
+				: route(request, url);
+	const routes: Routes = {
+		'GET /api/v1/users': () => [
+			{ id: 'erika', username: 'erika', display_name: 'Erika', active: true }
+		],
+		'GET /api/v1/document-types': () => [],
+		'POST /api/v1/mailboxes/test': () => FOUND,
+		'POST /api/v1/mailboxes': () => json(STORED, 201),
+		[`PATCH /api/v1/mailboxes/${STORED.id}`]: () => STORED
+	};
+	fetchMock = fakeApi(
+		recording(
+			Object.fromEntries(Object.entries(routes).map(([key, route]) => [key, or(route)])),
+			sent
+		)
+	);
 	vi.stubGlobal('fetch', fetchMock);
 });
 
 afterEach(() => {
 	session.clear();
-	vi.unstubAllGlobals();
-	// bits-ui frees the page a moment after a dialog closed; the next test must not wait for it.
-	window.document.body.style.pointerEvents = '';
 });
 
 const testButton = () => screen.getByRole('button', { name: m.mail_test() }) as HTMLButtonElement;
@@ -199,9 +181,64 @@ describe('MailboxDialog', () => {
 		render(MailboxDialog, { open: true, mailbox: STORED, onsaved: vi.fn() });
 		const problem = await screen.findByRole('alert');
 		expect(problem.textContent).toContain(m.retry());
+		// In the part "Abruf", where the people and types are chosen: hidden while "Verbindung"
+		// shows, there once "Abruf" is pressed.
+		expect(problem.closest('.hidden')).not.toBeNull();
+		await user.click(screen.getByText(m.mailbox_part_fetch()).closest('button')!);
+		expect(problem.closest('.hidden')).toBeNull();
+		expect(problem.parentElement!.textContent).toContain(m.mail_folders());
 		failing.clear();
 		await user.click(screen.getByRole('button', { name: m.retry() }));
 		await vi.waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
 		expect(sent.filter((call) => call.path === '/api/v1/users')).toHaveLength(2);
+	});
+
+	it('takes at most the folders the API does, and says so (WT2-08)', async () => {
+		const user = userEvent.setup();
+		const many = Array.from({ length: LIMITS.folders }, (_, n) => `Ordner ${n + 1}`);
+		render(MailboxDialog, {
+			open: true,
+			mailbox: mailboxOf({ folders: many }),
+			onsaved: vi.fn()
+		});
+		await user.click(screen.getByText(m.mailbox_part_fetch()).closest('button')!);
+		await user.click(testButton());
+		// The test found two folders more (FOUND); with 20 chosen, they cannot be chosen.
+		const inbox = within((await screen.findByText(m.mail_folder_inbox())).closest('label')!);
+		expect((inbox.getByRole('checkbox') as HTMLInputElement).disabled).toBe(true);
+		expect(
+			screen.getByText(m.mail_folders_max({ max: formatNumber(LIMITS.folders) }))
+		).toBeTruthy();
+	});
+
+	it('keeps what is typed when the page reads the same mailbox anew', async () => {
+		const user = userEvent.setup();
+		const { rerender } = render(MailboxDialog, { open: true, mailbox: STORED, onsaved: vi.fn() });
+		const name = (await screen.findByLabelText(m.field_name())) as HTMLInputElement;
+		await user.clear(name);
+		await user.type(name, 'Neuer Name');
+		await user.type(screen.getByLabelText(m.mail_password()), 'new-secret');
+		const loads = () => sent.filter((call) => call.path === '/api/v1/users').length;
+		const before = loads();
+
+		// After a fetch or a reconnect of the event stream: the same mailbox, a new object.
+		await rerender({ mailbox: { ...STORED } });
+
+		expect((screen.getByLabelText(m.field_name()) as HTMLInputElement).value).toBe('Neuer Name');
+		expect((screen.getByLabelText(m.mail_password()) as HTMLInputElement).value).toBe('new-secret');
+		// And its choices are not loaded once more.
+		expect(loads()).toBe(before);
+	});
+
+	it('starts anew for another mailbox', async () => {
+		const { rerender } = render(MailboxDialog, { open: true, mailbox: STORED, onsaved: vi.fn() });
+		const name = (await screen.findByLabelText(m.field_name())) as HTMLInputElement;
+		expect(name.value).toBe(STORED.name);
+		await rerender({ mailbox: { ...STORED, id: 'another', name: 'Zweites Postfach' } });
+		await vi.waitFor(() =>
+			expect((screen.getByLabelText(m.field_name()) as HTMLInputElement).value).toBe(
+				'Zweites Postfach'
+			)
+		);
 	});
 });

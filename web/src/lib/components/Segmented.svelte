@@ -20,6 +20,7 @@
 	import AlertDot from '#lib/components/AlertDot.svelte';
 	import SteadyText from '#lib/components/SteadyText.svelte';
 	import { slidingPill } from '#lib/sliding-pill.ts';
+	import { centre, sideways, SIDEWAYS_FADE } from '#lib/sideways.ts';
 	import { cn } from '#lib/utils.ts';
 	import * as Tooltip from '#lib/components/ui/tooltip/index.ts';
 	import { mergeProps } from 'bits-ui';
@@ -65,31 +66,10 @@
 	const roomy = $derived(names === 'wide' || names === '@xl' || names === '@3xl');
 
 	let room = $state<HTMLElement | null>(null);
-	/** Which edges have more behind them. */
-	let more = $state<{ start: boolean; end: boolean }>({ start: false, end: false });
-
-	function measure() {
-		if (!room) return;
-		const end = room.scrollWidth - room.clientWidth - room.scrollLeft;
-		more = { start: room.scrollLeft > 1, end: end > 1 };
-	}
-
 	$effect(() => {
 		void value;
 		void options;
-		const chosen = room?.querySelector<HTMLElement>('[aria-pressed="true"]');
-		if (!room || !chosen) return;
-		const left = chosen.offsetLeft - (room.clientWidth - chosen.offsetWidth) / 2;
-		room.scrollLeft = Math.max(0, left);
-		measure();
-	});
-
-	$effect(() => {
-		if (!room) return;
-		const sizes = new ResizeObserver(measure);
-		sizes.observe(room);
-		for (const child of room.children) sizes.observe(child);
-		return () => sizes.disconnect();
+		centre(room, '[aria-pressed="true"]');
 	});
 
 	function choose(next: string) {
@@ -108,9 +88,11 @@
 		aria-label={names === 'hidden' ? option.label : undefined}
 		disabled={option.disabled}
 		class={cn(
-			'relative inline-flex items-center justify-center rounded-full whitespace-nowrap transition-colors disabled:opacity-50',
+			// As wide as a finger on a phone, as it is tall there: also where a narrow place hides
+			// the names and leaves the icons.
+			'relative inline-flex items-center justify-center rounded-full whitespace-nowrap transition-colors disabled:opacity-50 max-sm:min-w-11',
 			size === 'sm' ? 'h-7 gap-1.5 px-2.5 text-xs' : 'h-8 gap-2 px-3 text-sm',
-			names === 'hidden' && (size === 'sm' ? 'w-7 px-0 max-sm:w-10' : 'w-8 px-0 max-sm:w-11'),
+			names === 'hidden' && (size === 'sm' ? 'w-7 px-0 max-sm:w-11' : 'w-8 px-0 max-sm:w-11'),
 			// A finger's tap on a phone: 44 pixels high, the bar keeps its look.
 			size === 'sm'
 				? 'max-sm:after:absolute max-sm:after:inset-x-0 max-sm:after:-inset-y-2'
@@ -140,15 +122,11 @@
      bar, so that it does not cut them. -->
 <div
 	bind:this={room}
-	onscroll={measure}
-	data-more-start={more.start || undefined}
-	data-more-end={more.end || undefined}
+	{@attach sideways}
 	class={cn(
 		'w-fit max-w-full [scrollbar-width:none] overflow-x-auto',
 		size === 'sm' ? 'max-sm:-my-1.5 max-sm:py-1.5' : 'max-sm:-my-0.5 max-sm:py-0.5',
-		'data-more-end:[mask-image:linear-gradient(to_right,black_85%,transparent)]',
-		'data-more-start:[mask-image:linear-gradient(to_left,black_85%,transparent)]',
-		'data-more-start:data-more-end:[mask-image:linear-gradient(to_right,transparent,black_15%,black_85%,transparent)]',
+		SIDEWAYS_FADE,
 		className
 	)}
 >
@@ -167,7 +145,7 @@
 			data-pill
 			hidden
 			aria-hidden="true"
-			class="pointer-events-none absolute top-0 left-0 rounded-full bg-card shadow-sm data-moving:motion-safe:transition-[transform,width,height] data-moving:motion-safe:duration-300 data-moving:motion-safe:ease-out"
+			class="pointer-events-none absolute top-0 left-0 rounded-full border border-transparent bg-card shadow-sm data-moving:motion-safe:transition-[transform,width,height] data-moving:motion-safe:duration-300 data-moving:motion-safe:ease-out"
 		></span>
 		{#each options as option (option.value)}
 			{@const tip =

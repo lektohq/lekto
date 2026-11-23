@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import css from '../src/app.css?raw';
 import html from '../src/app.html?raw';
 import themeScript from '../static/theme.js?raw';
+import workerSource from '../src/service-worker/index.ts?raw';
 import manifestText from '../static/manifest.webmanifest?raw';
 import {
 	appFiles,
@@ -15,7 +16,8 @@ import {
 	sharedKey,
 	sharePath,
 	shellPaths,
-	strategy
+	strategy,
+	unreachable
 } from '#lib/app-cache.ts';
 import { BASE } from '#lib/base.ts';
 import { ACCEPT, skipReason } from '#lib/intake.ts';
@@ -134,6 +136,28 @@ function pngSize(dataUrl: string): [number, number] {
 	return [view.getUint32(16), view.getUint32(20)];
 }
 
+describe('a page while Lekto restarts behind a proxy', () => {
+	// WM-01: the proxy's error page has no way back in the installed app; the worker serves the
+	// app's own page instead, as it does without a connection.
+	it('takes the answers of a proxy for a server that is not there', () => {
+		expect([502, 503, 504].map((status) => unreachable(status))).toEqual([true, true, true]);
+	});
+
+	it('passes every other answer on', () => {
+		expect([200, 304, 401, 403, 404].map((status) => unreachable(status))).toEqual(
+			Array(5).fill(false)
+		);
+	});
+
+	it("takes any other 5xx that is no JSON for the proxy, Lekto's own for Lekto's", () => {
+		// Traefik answers a plain "Internal Server Error" while its service is empty.
+		expect(unreachable(500, 'text/plain; charset=utf-8')).toBe(true);
+		expect(unreachable(500, null)).toBe(true);
+		expect(unreachable(500, 'application/problem+json')).toBe(false);
+		expect(unreachable(404, 'text/plain')).toBe(false);
+	});
+});
+
 describe('the manifest', () => {
 	const manifest = JSON.parse(manifestText) as {
 		id: string;
@@ -191,15 +215,62 @@ describe('the colour of the bars', () => {
 	});
 });
 
+describe('the start without browser storage', () => {
+	/** `theme.js` run in a window whose storage is the given property, as the browser has it. */
+	function start(storage: PropertyDescriptor): Window {
+		const window = { matchMedia: () => ({ matches: false }) } as unknown as Window;
+		Object.defineProperty(window, 'localStorage', { ...storage, configurable: true });
+		const document = {
+			documentElement: { classList: { toggle: () => true }, style: {} },
+			querySelector: () => null
+		};
+		new Function('window', 'document', themeScript)(window, document);
+		return window;
+	}
+
+	const BLOCKED = {
+		get() {
+			throw new DOMException('The operation is insecure.', 'SecurityError');
+		}
+	};
+
+	// mode-watcher and Paraglide read it unguarded: without one, the page stayed white (WK-01).
+	it.each([
+		['blocked site data', BLOCKED],
+		['no DOM storage', { value: null }]
+	])('finds one in memory with %s', (_, storage) => {
+		const { localStorage } = start(storage);
+		expect(localStorage.getItem('mode-watcher-mode')).toBeNull();
+		localStorage.setItem('PARAGLIDE_LOCALE', 'de');
+		localStorage.setItem('mode-watcher-mode', 'dark');
+		expect(localStorage.getItem('PARAGLIDE_LOCALE')).toBe('de');
+		expect([localStorage.length, localStorage.key(1), localStorage.key(2)]).toEqual([
+			2,
+			'mode-watcher-mode',
+			null
+		]);
+		localStorage.removeItem('PARAGLIDE_LOCALE');
+		expect(localStorage.getItem('PARAGLIDE_LOCALE')).toBeNull();
+		localStorage.clear();
+		expect(localStorage.length).toBe(0);
+	});
+
+	it("keeps the browser's own storage", () => {
+		const own = { getItem: () => 'light' };
+		expect(start({ value: own }).localStorage).toBe(own);
+	});
+});
+
 describe('the safe areas of the installed app', () => {
 	it('reaches under the notch and the home indicator', () => {
 		expect(html).toContain('viewport-fit=cover');
 	});
 
 	// A surface that covers the whole phone screen or stands at its bottom edge keeps the insets
-	// free: full-screen editors, bars stuck to the bottom, sheets from below, fixed buttons.
+	// free: full-screen editors, bars stuck to the bottom, sheets from below, fixed buttons, and
+	// a sheet from the right, which is the whole screen on a phone (the Beam, the template editor).
 	const EDGE =
-		/\bh-dvh max-h-dvh\b|\bsticky bottom-0\b|\bfixed\b[^'"]*\bbottom-|data-\[side=bottom\]:inset-x-0/;
+		/\bh-dvh max-h-dvh\b|\bsticky bottom-0\b|\bfixed\b[^'"]*\bbottom-|data-\[side=bottom\]:inset-x-0|data-\[side=right\]:w-full/;
 
 	it.each(Object.entries(sources).filter(([, source]) => EDGE.test(source)))(
 		'%s keeps the safe area free',
@@ -207,6 +278,74 @@ describe('the safe areas of the installed app', () => {
 			expect(source).toContain('env(safe-area-inset-');
 		}
 	);
+});
+
+describe('the safe areas beside the notch, a phone held sideways (WM-07)', () => {
+	const sheet = sources['/src/lib/components/ui/sheet/sheet-content.svelte'];
+
+	it('keeps a sheet clear of the sides it touches', () => {
+		// From below (and from the top) both sides, from the right the right, from the left the
+		// left; its X stands off the right edge with it.
+		for (const padding of [
+			'data-[side=bottom]:pl-[env(safe-area-inset-left)]',
+			'data-[side=bottom]:pr-[env(safe-area-inset-right)]',
+			'data-[side=top]:pl-[env(safe-area-inset-left)]',
+			'data-[side=top]:pr-[env(safe-area-inset-right)]',
+			'data-[side=right]:pr-[env(safe-area-inset-right)]',
+			'data-[side=left]:pl-[env(safe-area-inset-left)]'
+		])
+			expect(sheet).toContain(padding);
+		expect(sheet).toContain('right-[calc(0.75rem+env(safe-area-inset-right))]');
+	});
+
+	it('gives a sheet its own padding at a side only by the side, which else loses to the sheet’s', () => {
+		// `pr-4` on a sheet from the right would lose to `data-[side=right]:pr-[env(…)]`: no
+		// padding at all on a phone held upright.
+		const plain =
+			/<Sheet\.Content\b[^>]*\bside="right"[^>]*class="[^"]*(?<![\w\]:-])p[rx]?-(?:\d|\[)/;
+		expect(
+			Object.entries(sources)
+				.filter(([, source]) => plain.test(source))
+				.map(([path]) => path)
+		).toEqual(['/src/lib/components/AppShell.svelte']);
+		// The menu's sheet pads all round (`p-4`) and says its right side by the side.
+		expect(sources['/src/lib/components/AppShell.svelte']).toContain(
+			'data-[side=right]:pr-[max(1rem,env(safe-area-inset-right))]'
+		);
+	});
+
+	it('keeps the way to the top and the toasts clear of the right edge', () => {
+		expect(sources['/src/lib/components/ToTop.svelte']).toContain(
+			'right-[max(1.75rem,calc(env(safe-area-inset-right)+0.75rem))]'
+		);
+		const layout = sources['/src/routes/+layout.svelte'];
+		expect(layout).toMatch(/\boffset=\{\{[^}]*env\(safe-area-inset-right\)[^}]*\}\}/);
+		expect(layout).toMatch(/\bmobileOffset=\{\{[^}]*env\(safe-area-inset-right\)[^}]*\}\}/);
+	});
+});
+
+describe('the number on the app’s icon (WM-05)', () => {
+	it('is the caller’s own inbox, and the stale notification goes with it', () => {
+		const layout = sources['/src/routes/(app)/+layout.svelte'];
+		expect(layout).toContain('setAppBadge(inbox.own)');
+		expect(layout).not.toMatch(/setAppBadge\(inbox\.summary/);
+		expect(layout).toMatch(/inbox\.own === 0\) void closeWaiting\(\)/);
+	});
+});
+
+describe('a tap on a notification (WM-04)', () => {
+	it('asks the open app to go there before any address is loaded', () => {
+		// `navigate()` starts the app anew: only for a window that did not answer.
+		const asks = workerSource.indexOf('await askToOpen(app, url)');
+		const loads = workerSource.indexOf('app.navigate(url)');
+		expect(asks).toBeGreaterThan(-1);
+		expect(loads).toBeGreaterThan(asks);
+		expect(workerSource.match(/\.navigate\(/g)).toHaveLength(1);
+	});
+
+	it('is heard by the app from its start', () => {
+		expect(sources['/src/routes/+layout.svelte']).toMatch(/answerOpen\(BASE, /);
+	});
 });
 
 describe('sharing with the installed app', () => {

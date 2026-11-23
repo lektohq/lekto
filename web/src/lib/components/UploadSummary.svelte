@@ -3,6 +3,7 @@
 	import Copy from '@lucide/svelte/icons/copy';
 	import Upload from '@lucide/svelte/icons/upload';
 	import X from '@lucide/svelte/icons/x';
+	import { formatNumber } from '#lib/i18n.ts';
 	import { openBeam } from '#lib/beam.svelte.ts';
 	import BeamTitle from '#lib/components/BeamTitle.svelte';
 	import { Progress } from '#lib/components/ui/progress/index.ts';
@@ -11,6 +12,7 @@
 	import { uploads } from '#lib/upload.svelte.ts';
 	import * as Card from '#lib/components/ui/card/index.ts';
 	import IconButton from '#lib/components/IconButton.svelte';
+	import { Button } from '#lib/components/ui/button/index.ts';
 
 	// What came of the uploads, until dismissed (in this browser only): "12 uploaded,
 	// 1 duplicate, 3 skipped", the progress while files are on their way, and each duplicate
@@ -19,12 +21,13 @@
 	const counts = $derived(uploads.counts);
 	const line = $derived(
 		[
-			m.upload_summary_uploaded({ count: counts.uploaded }),
+			m.upload_summary_uploaded({ count: formatNumber(counts.uploaded) }),
 			counts.duplicates === 1
 				? m.upload_summary_duplicate()
-				: counts.duplicates > 1 && m.upload_summary_duplicates({ count: counts.duplicates }),
-			counts.skipped > 0 && m.upload_summary_skipped({ count: counts.skipped }),
-			counts.failed > 0 && m.upload_summary_failed({ count: counts.failed })
+				: counts.duplicates > 1 &&
+					m.upload_summary_duplicates({ count: formatNumber(counts.duplicates) }),
+			counts.skipped > 0 && m.upload_summary_skipped({ count: formatNumber(counts.skipped) }),
+			counts.failed > 0 && m.upload_summary_failed({ count: formatNumber(counts.failed) })
 		]
 			.filter(Boolean)
 			.join(', ')
@@ -51,7 +54,10 @@
 				{#if uploads.active}
 					<Progress value={counts.done} max={counts.total} aria-label={m.upload_title()} />
 					<p class="text-sm text-muted-foreground">
-						{m.upload_running({ done: counts.done, total: counts.total })}
+						{m.upload_running({
+							done: formatNumber(counts.done),
+							total: formatNumber(counts.total)
+						})}
 					</p>
 				{/if}
 			</div>
@@ -96,6 +102,10 @@
 								<CircleAlert class="size-3.5 shrink-0" aria-hidden="true" />
 								{item.message}
 							</span>
+							{#if item.again}
+								<!-- A shared file still lies on the device: back to its share. -->
+								<Button variant="link" size="inline" href={item.again}>{m.retry()}</Button>
+							{/if}
 						{/if}
 					</li>
 				{/each}

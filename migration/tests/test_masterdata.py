@@ -58,7 +58,7 @@ def test_an_empty_lekto_needs_everything_of_the_first_plan() -> None:
     world = World()
     actions = actions_of(world)
     users = by(actions, "user")
-    assert set(users) == {"tobias", "erika", "bob", "gone"}
+    assert set(users) == {"johndoe", "erika", "bob", "gone"}
     assert {a.status for a in users.values()} == {CREATE}
     assert users["gone"].data.get("deactivate") is True
     assert set(by(actions, "contact")) == {"ACME Energy", "Unused"}
@@ -71,11 +71,11 @@ def test_an_empty_lekto_needs_everything_of_the_first_plan() -> None:
     assert fields["ASN"].data == {"data_type": "number"}
     spaces = by(actions, "space")
     assert set(spaces) == {
-        "Geteilt: bob (lesen), erika (bearbeiten), tobias (bearbeiten)",
-        "Geteilt: gone (lesen), tobias (bearbeiten)",  # deactivated in Paperless, still a member
+        "Geteilt: bob (lesen), erika (bearbeiten), johndoe (bearbeiten)",
+        "Geteilt: gone (lesen), johndoe (bearbeiten)",  # deactivated in Paperless, still a member
     }
-    space = spaces["Geteilt: bob (lesen), erika (bearbeiten), tobias (bearbeiten)"]
-    assert space.data["members"] == [("bob", "read"), ("erika", "edit"), ("tobias", "edit")]
+    space = spaces["Geteilt: bob (lesen), erika (bearbeiten), johndoe (bearbeiten)"]
+    assert space.data["members"] == [("bob", "read"), ("erika", "edit"), ("johndoe", "edit")]
     assert space.data["after"] == space.data["members"]
     assert space.status == CREATE and space.source == "the permissions in Paperless"
     assert space.notes == []  # its members are those Paperless lets see the document
@@ -136,7 +136,7 @@ async def test_prepare_creates_it_and_then_nothing_is_open() -> None:
     assert {users[m["user_id"]]: m["role"] for m in space["members"]} == {
         "erika": "edit",
         "bob": "read",
-        "tobias": "edit",
+        "johndoe": "edit",
     }
     world.directory = await Directory.of(
         Lekto("http://lekto", fake_lekto.TOKEN, transport=lekto.transport())
@@ -152,10 +152,10 @@ def test_a_space_the_plan_names_is_made_with_the_uploaders_as_editors() -> None:
         "[{to: contact, name: ACME Energy}, {to: space, name: Energie}]",
     )
     space = by(actions_of(world), "space")["Energie"]
-    assert space.status == CREATE  # documents of tobias and erika
-    assert space.data["members"] == [("erika", "edit"), ("tobias", "edit")]
+    assert space.status == CREATE  # documents of johndoe and erika
+    assert space.data["members"] == [("erika", "edit"), ("johndoe", "edit")]
     # Paperless kept their documents apart; the report says that this space does not.
-    assert space.notes == ["erika and tobias see each other's documents in 'Energie'"]
+    assert space.notes == ["erika and johndoe see each other's documents in 'Energie'"]
 
 
 def test_an_existing_space_the_plan_names_gets_its_uploaders_and_keeps_its_members() -> None:
@@ -165,7 +165,7 @@ def test_an_existing_space_the_plan_names_gets_its_uploaders_and_keeps_its_membe
         "ACME Energy",
         "[{to: contact, name: ACME Energy}, {to: space, name: Energie}]",
     )
-    for id, name in (("u1", "tobias"), ("u2", "erika"), ("u3", "bob")):
+    for id, name in (("u1", "johndoe"), ("u2", "erika"), ("u3", "bob")):
         world.directory.add("user", {"id": id, "username": name, "active": True})
     world.directory.spaces.append(
         {
@@ -178,10 +178,10 @@ def test_an_existing_space_the_plan_names_gets_its_uploaders_and_keeps_its_membe
     space = by(actions_of(world), "space")["Energie"]
     # Every uploader edits it, to see their own documents in every lane; bob stays.
     assert (space.status, space.data["id"]) == (UPDATE, "s1")
-    assert space.data["members"] == [("erika", "edit"), ("tobias", "edit")]
-    assert space.data["after"] == [("bob", "edit"), ("erika", "edit"), ("tobias", "edit")]
-    assert space.notes[0] == "gains access: erika (read → edit), tobias (edit)"
-    assert "erika and tobias see each other's documents in 'Energie'" in space.notes
+    assert space.data["members"] == [("erika", "edit"), ("johndoe", "edit")]
+    assert space.data["after"] == [("bob", "edit"), ("erika", "edit"), ("johndoe", "edit")]
+    assert space.notes[0] == "gains access: erika (read → edit), johndoe (edit)"
+    assert "erika and johndoe see each other's documents in 'Energie'" in space.notes
     assert any(n.startswith("bob sees documents of erika") for n in space.notes)
     # Once the uploaders are in, nothing is left to do.
     world.directory.spaces[-1]["members"] += [
@@ -193,10 +193,10 @@ def test_an_existing_space_the_plan_names_gets_its_uploaders_and_keeps_its_membe
 
 def test_a_space_an_earlier_prepare_made_gets_only_uploaders_again() -> None:
     world = World()
-    for id, name in (("u1", "tobias"), ("u2", "erika"), ("u3", "bob")):
+    for id, name in (("u1", "johndoe"), ("u2", "erika"), ("u3", "bob")):
         world.directory.add("user", {"id": id, "username": name, "active": True})
-    name = "Geteilt: bob (lesen), erika (bearbeiten), tobias (bearbeiten)"
-    # An editor took bob and tobias (who writes in Paperless) out since; erika uploads.
+    name = "Geteilt: bob (lesen), erika (bearbeiten), johndoe (bearbeiten)"
+    # An editor took bob and johndoe (who writes in Paperless) out since; erika uploads.
     world.directory.spaces.append(
         {
             "id": "s1",
@@ -211,7 +211,7 @@ def test_a_space_an_earlier_prepare_made_gets_only_uploaders_again() -> None:
     infos = field_infos(plan, world.directory, snapshot)
     fresh = by(needs(plan, world.directory, snapshot, world.all(), infos), "space")[name]
     assert fresh.status == UPDATE  # the migration has not touched it: Paperless' members
-    assert fresh.data["members"] == [("bob", "read"), ("tobias", "edit")]
+    assert fresh.data["members"] == [("bob", "read"), ("johndoe", "edit")]
     made = needs(plan, world.directory, snapshot, world.all(), infos, recorded=frozenset({"s1"}))
     assert by(made, "space")[name].status == EXISTS  # the uploader erika is in; they stay out
 
@@ -221,7 +221,7 @@ async def test_a_space_of_members_gets_who_is_missing_and_keeps_more() -> None:
     await prepared(world, lekto)
     space = next(s for s in lekto.spaces.values() if s["name"].startswith("Geteilt"))
     users = {u["username"]: u["id"] for u in lekto.users.values()}
-    # Someone let bob edit and took tobias out since.
+    # Someone let bob edit and took johndoe out since.
     space["members"] = [
         {"user_id": users["erika"], "role": "edit"},
         {"user_id": users["bob"], "role": "edit"},
@@ -235,7 +235,7 @@ async def test_a_space_of_members_gets_who_is_missing_and_keeps_more() -> None:
     assert {m["user_id"]: m["role"] for m in space["members"]} == {
         users["erika"]: "edit",
         users["bob"]: "edit",
-        users["tobias"]: "edit",
+        users["johndoe"]: "edit",
     }
 
 
@@ -319,13 +319,13 @@ async def test_resolved_documents_carry_lekto_ids() -> None:
     erika = next(u["id"] for u in lekto.users.values() if u["username"] == "erika")
     assert (shared.space_id, shared.uploader_id) == (space["id"], erika)
     assert resolve(expected[14], directory).uploader_id == fake_lekto.ADMIN["id"]
-    assert resolve(expected[10], directory).space_id is None  # tobias' personal space
+    assert resolve(expected[10], directory).space_id is None  # johndoe's personal space
 
 
 def test_names_that_do_not_resolve_are_missing() -> None:
     world = World()
     ten = resolve(world.all()[0], world.directory)
-    assert "user 'tobias'" in ten.missing and "contact 'ACME Energy'" in ten.missing
+    assert "user 'johndoe'" in ten.missing and "contact 'ACME Energy'" in ten.missing
 
 
 def test_a_document_takes_as_many_reasons_for_a_review_as_lekto_does() -> None:
@@ -354,8 +354,8 @@ async def test_users_get_their_names_and_e_mail_from_paperless() -> None:
     assert lekto.profiles[str(erika["id"])]["email"] == "erika@mail.example"
     bob = directory.find("user", "bob")
     assert bob is not None and lekto.users[str(bob["id"])]["display_name"] == "Bob"
-    tobias = directory.find("user", "tobias")
-    assert tobias is not None and not lekto.users[str(tobias["id"])].get("display_name")
+    johndoe = directory.find("user", "johndoe")
+    assert johndoe is not None and not lekto.users[str(johndoe["id"])].get("display_name")
 
     # Again: nothing changes for users who have a name.
     again, _ = await prepared(World(), lekto)

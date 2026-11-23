@@ -1,33 +1,15 @@
 import { describe, expect, it, vi } from 'vitest';
 import { events } from './events.svelte.ts';
+import { FakeEventSource } from '#lib/testing/events.ts';
 
-class FakeSource {
-	static last: FakeSource;
-	onopen: (() => void) | null = null;
-	onerror: (() => void) | null = null;
-	readyState = 1;
-	closed = false;
-	listeners = new Map<string, (message: { data: string }) => void>();
-	constructor(readonly url: string) {
-		FakeSource.last = this;
-	}
-	addEventListener(type: string, handler: (message: { data: string }) => void) {
-		this.listeners.set(type, handler);
-	}
-	close() {
-		this.closed = true;
-		this.readyState = 2;
-	}
-}
-
-events.useFactory((url) => new FakeSource(url) as unknown as EventSource);
+events.useFactory((url) => new FakeEventSource(url) as unknown as EventSource);
 
 describe('event stream', () => {
 	it('passes events on and reloads after a break', () => {
 		const seen: string[] = [];
 		const stop = events.subscribe((event) => seen.push(event.type));
 		events.start(() => {});
-		const source = FakeSource.last;
+		const source = FakeEventSource.last;
 		expect(source.url).toBe('/api/v1/events');
 		source.onopen?.();
 		source.listeners.get('document.filed')?.({
@@ -53,15 +35,11 @@ describe('event stream', () => {
 		const stopDocuments = events.subscribe((event) => documents.push(event.type));
 		const stop = events.on('classifier.trained', (event) => trained.push(event.number));
 		events.start(() => {});
-		FakeSource.last.listeners.get('classifier.trained')?.({
-			data: JSON.stringify({ type: 'classifier.trained', id: 'e1', occurred_at: '', number: 3 })
-		});
+		FakeEventSource.last.send('classifier.trained', { number: 3 });
 		expect(trained).toEqual([3]);
 		expect(documents).toEqual([]);
 		stop();
-		FakeSource.last.listeners.get('classifier.trained')?.({
-			data: JSON.stringify({ type: 'classifier.trained', id: 'e2', occurred_at: '', number: 4 })
-		});
+		FakeEventSource.last.send('classifier.trained', { number: 4 });
 		expect(trained).toEqual([3]);
 		stopDocuments();
 		events.stop();
@@ -70,7 +48,7 @@ describe('event stream', () => {
 	it('reports a stream the browser gave up on', () => {
 		const closed = vi.fn();
 		events.start(closed);
-		const source = FakeSource.last;
+		const source = FakeEventSource.last;
 		source.readyState = 2;
 		source.onerror?.();
 		expect(closed).toHaveBeenCalledOnce();
@@ -79,23 +57,41 @@ describe('event stream', () => {
 
 	it('counts the first stream after a sign-out as no reconnect', () => {
 		events.start(() => {});
-		FakeSource.last.onopen?.();
+		FakeEventSource.last.onopen?.();
 		const before = events.generation;
 		events.stop(); // sign-out
 		events.start(() => {}); // sign-in
-		FakeSource.last.onopen?.();
+		FakeEventSource.last.onopen?.();
 		expect(events.generation).toBe(before);
 		events.stop();
 	});
 
 	it('reloads after a stream the server closed was started again', () => {
 		events.start(() => {});
-		FakeSource.last.onopen?.();
+		FakeEventSource.last.onopen?.();
 		const before = events.generation;
-		FakeSource.last.readyState = 2;
-		FakeSource.last.onerror?.(); // the API restarted: 502 from the proxy, the browser gave up
+		FakeEventSource.last.readyState = 2;
+		FakeEventSource.last.onerror?.(); // the API restarted: 502 from the proxy, the browser gave up
 		events.start(() => {});
-		FakeSource.last.onopen?.();
+		FakeEventSource.last.onopen?.();
+		expect(events.generation).toBe(before + 1);
+		events.stop();
+	});
+
+	it('lets go of the stream of a hidden tab and counts its return as a reconnect (WP-02)', () => {
+		const closed = vi.fn();
+		events.start(closed);
+		const first = FakeEventSource.last;
+		first.onopen?.();
+		const before = events.generation;
+		events.pause();
+		expect(first.readyState).toBe(2); // the connection is free for another tab
+		expect(events.connected).toBe(false);
+		expect(closed).not.toHaveBeenCalled(); // no failure: nothing asks the session
+		events.start(closed);
+		expect(FakeEventSource.last).not.toBe(first);
+		FakeEventSource.last.onopen?.();
+		// Shown again: the pages read anew what they missed.
 		expect(events.generation).toBe(before + 1);
 		events.stop();
 	});

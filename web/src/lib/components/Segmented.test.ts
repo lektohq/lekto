@@ -53,9 +53,24 @@ describe('Segmented', () => {
 		const list = screen.getByRole('button', { name: 'List' });
 		// On hover a tooltip says it (web/DESIGN.md: no native title on a button).
 		expect(list.hasAttribute('title')).toBe(false);
-		expect(
-			list.getAttribute('data-tooltip-trigger') ?? list.getAttribute('data-state')
-		).not.toBeNull();
+		expect(list.hasAttribute('data-tooltip-trigger')).toBe(true);
 		expect(list.textContent?.trim()).toBe('');
+	});
+
+	it('is as wide as a finger on a phone, with its icon alone too (WC-07)', () => {
+		const { unmount } = render(Segmented, {
+			label: 'Layout',
+			value: 'list',
+			options: OPTIONS,
+			names: 'hidden',
+			size: 'sm'
+		});
+		const small = screen.getByRole('button', { name: 'List' }).className.split(' ');
+		expect(small).toEqual(expect.arrayContaining(['max-sm:w-11', 'max-sm:min-w-11']));
+		expect(small).not.toContain('max-sm:w-10');
+		unmount();
+		// Where a narrow place hides the names, the width is not set: the least is.
+		render(Segmented, { label: 'Layout', value: 'list', options: OPTIONS, names: '@xl' });
+		expect(screen.getByRole('button', { name: 'List' }).className).toContain('max-sm:min-w-11');
 	});
 });

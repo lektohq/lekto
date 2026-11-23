@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { components } from '#lib/api/schema.ts';
 import { m } from '#lib/paraglide/messages.js';
 import PromptDialog from './PromptDialog.svelte';
@@ -15,11 +15,6 @@ const call = (system: string): Call =>
 		model: 'qwen3:8b',
 		usage: { prompt_tokens: 12, completion_tokens: 3 }
 	}) as unknown as Call;
-
-afterEach(() => {
-	// bits-ui frees the page a moment after a dialog closed; the next test must not wait for it.
-	window.document.body.style.pointerEvents = '';
-});
 
 describe('PromptDialog', () => {
 	it('starts another prompt at its first attempt', async () => {

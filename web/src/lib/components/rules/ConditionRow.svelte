@@ -4,12 +4,8 @@
 	import X from '@lucide/svelte/icons/x';
 	import MultiPicker from '#lib/components/MultiPicker.svelte';
 	import SearchSelect from '#lib/components/SearchSelect.svelte';
-	import {
-		flagOptions,
-		importanceOptions,
-		keywordOptions,
-		typedKeyword
-	} from '#lib/mail-traits.ts';
+	import TagPicker from '#lib/components/TagPicker.svelte';
+	import MailValueInput from '#lib/components/rules/MailValueInput.svelte';
 	import DateInput from '#lib/components/DateInput.svelte';
 	import Select from '#lib/components/Select.svelte';
 	import { namedOptions, withChoice } from '#lib/components/rules/options.ts';
@@ -21,8 +17,8 @@
 	import { IDENTIFIER_KINDS, NUMBER_KINDS, PERSON_KINDS, labelOfKind } from '#lib/identifiers.ts';
 	import type { Lookup } from '#lib/masterdata.svelte.ts';
 	import { m } from '#lib/paraglide/messages.js';
+	import { own } from '#lib/utils.ts';
 	import { CHANNEL_LABELS, fieldLabel, mailPartLabel, operatorLabel } from '#lib/rules/describe.ts';
-	import { tagOptions } from '#lib/tags.ts';
 	import { Choice } from '#lib/components/ui/choice/index.ts';
 	import {
 		CHANNELS,
@@ -32,6 +28,8 @@
 		MAIL_SUBJECT,
 		STEP_CONDITION_FIELDS,
 		TAG_FIELDS,
+		isTagField,
+		LIMITS,
 		changeField,
 		changeConditionField,
 		changeOperator,
@@ -52,6 +50,7 @@
 		lookup,
 		error,
 		steps = null,
+		name,
 		onremove,
 		onup,
 		ondown,
@@ -62,6 +61,8 @@
 		error?: string;
 		steps?: readonly string[] | null;
 		onunreadable?: (unreadable: boolean) => void;
+		/** Which condition of its group it is ("Bedingung 2"). */
+		name?: string;
 		onremove: () => void;
 		onup?: () => void;
 		ondown?: () => void;
@@ -135,14 +136,36 @@
 		if (typeof value === 'number') return 'number';
 		return ordered ? 'date' : 'text';
 	});
+	// What stands in the number field, as typed: the value is its number, or none while the
+	// field is empty or holds only a sign (which the check refuses), never a 0 nobody typed.
+	let typed = $state<string | null>(null);
 	function setKind(next: string) {
+		typed = null;
 		if (next === 'true' || next === 'false') condition.value = next === 'true';
 		else if (next === 'number') condition.value = 0;
 		else condition.value = '';
 	}
 	function stepInput(text: string) {
-		condition.value = kind === 'number' ? Number(text.replace(',', '.')) : text;
+		if (kind !== 'number') {
+			condition.value = text;
+			return;
+		}
+		typed = text;
+		const number = text.trim().replace(',', '.');
+		condition.value = number === '' ? NaN : Number(number);
 	}
+	const shownNumber = $derived(
+		typed ??
+			(typeof condition.value === 'number' && Number.isFinite(condition.value)
+				? String(condition.value)
+				: '')
+	);
+	/** The fields of a mail's marks, and which mark each is. */
+	const MAIL_TRAITS: Record<string, 'importance' | 'flag' | 'keyword'> = {
+		mail_importance: 'importance',
+		mail_flag: 'flag',
+		mail_keyword: 'keyword'
+	};
 	const operatorOptions = $derived(
 		operators.map((op) => ({
 			value: op,
@@ -157,9 +180,13 @@
 			? m.picker_title_contact()
 			: condition.field === 'document_type' || condition.field === 'relation'
 				? m.picker_title_type()
-				: condition.field === 'mail_keyword'
-					? m.mail_keyword_title()
-					: null
+				: null
+	);
+	/** What a mail was marked with has its own input, the one a mail rule has too. */
+	const trait = $derived(own(MAIL_TRAITS, condition.field) ?? null);
+	/** A document rule has no mailbox: the keywords of every mailbox. */
+	const keywords = $derived(
+		[...new Set((lookup.mailboxes ?? []).flatMap((entry) => entry.keywords))].sort()
 	);
 	/** The choices of an id field or the channel. */
 	const choices = $derived.by(() => {
@@ -169,25 +196,10 @@
 			case 'document_type':
 			case 'relation':
 				return lookup.documentTypes.map((entry) => ({ value: entry.id, label: entry.name }));
-			case 'tags':
-			case 'contact_group':
-			case 'document_type_group':
-				return tagOptions(lookup.tags, TAG_FIELDS[condition.field]);
-			case 'topic':
-				return tagOptions(lookup.tags, 'topic');
 			case 'channel':
 				return CHANNELS.map((channel) => ({ value: channel, label: CHANNEL_LABELS[channel]() }));
 			case 'mail_mailbox':
 				return (lookup.mailboxes ?? []).map((entry) => ({ value: entry.id, label: entry.name }));
-			case 'mail_importance':
-				return importanceOptions();
-			case 'mail_flag':
-				return flagOptions();
-			case 'mail_keyword':
-				return keywordOptions(
-					[...new Set((lookup.mailboxes ?? []).flatMap((entry) => entry.keywords))].sort(),
-					single
-				);
 			case 'field':
 				return field?.data_type === 'choice'
 					? field.choices.map((choice) => ({ value: choice, label: choice }))
@@ -197,6 +209,20 @@
 		}
 	});
 	const single = $derived(typeof condition.value === 'string' ? condition.value : '');
+	/** The scope of the tags a condition on tags, groups or the topic chooses from. */
+	const tagScope = $derived(
+		condition.field === 'topic'
+			? ('topic' as const)
+			: isTagField(condition.field)
+				? TAG_FIELDS[condition.field]
+				: null
+	);
+	const TAG_TITLES = {
+		document: m.field_tags,
+		contact: m.master_contact_groups,
+		document_type: m.master_type_groups,
+		topic: m.picker_title_topic
+	};
 	const list = $derived(Array.isArray(condition.value) ? condition.value.map(String) : []);
 	const textual = $derived(
 		condition.field === 'text' || condition.op === 'contains' || condition.op === 'matches'
@@ -205,7 +231,7 @@
 	const invalid = $derived(Boolean(error));
 </script>
 
-<RuleRow key={condition.key} {error} moves {onup} {ondown} {onremove}>
+<RuleRow key={condition.key} {name} {error} moves {onup} {ondown} {onremove}>
 	<Select
 		aria-label={m.rule_condition_subject()}
 		value={mail ? MAIL_SUBJECT : condition.field}
@@ -228,6 +254,7 @@
 			aria-invalid={invalid || undefined}
 			placeholder={steps?.length ? `${steps[0]}.` : ''}
 			value={condition.path ?? ''}
+			maxlength={LIMITS.path}
 			oninput={(event) => (condition.path = event.currentTarget.value.trim())}
 			class="w-full font-mono sm:w-44"
 		/>
@@ -272,6 +299,20 @@
 	<div class="min-w-0 flex-1 basis-56">
 		{#if takesNoValue(condition.op)}
 			<span class="sr-only">{m.rule_no_value()}</span>
+		{:else if tagScope}
+			<!-- Tags of every kind and a topic are chosen in the tag picker, as in the actions
+			     (web/DESIGN.md, "Fields"): one, or several for "ist eines von". -->
+			<TagPicker
+				id="condition-{condition.key}"
+				label={valueLabel}
+				title={TAG_TITLES[tagScope]()}
+				scope={tagScope}
+				tags={lookup.tags}
+				selected={condition.op === 'in' ? list : single ? [single] : []}
+				onchange={(next) => (condition.value = condition.op === 'in' ? next : (next[0] ?? ''))}
+				single={condition.op !== 'in'}
+				creating={false}
+			/>
 		{:else if condition.op === 'in' && choices}
 			<MultiPicker
 				label={valueLabel}
@@ -310,6 +351,15 @@
 					{m.rule_add_value()}
 				</Button>
 			</div>
+		{:else if trait}
+			<MailValueInput
+				{trait}
+				label={valueLabel}
+				{invalid}
+				value={single}
+				{keywords}
+				onchange={(next) => (condition.value = next)}
+			/>
 		{:else if choices && searched}
 			<!-- One of many by searching, as everywhere a contact or document type is chosen. -->
 			<SearchSelect
@@ -319,8 +369,6 @@
 				value={single}
 				options={choices}
 				placeholder={m.rule_choose()}
-				create={condition.field === 'mail_keyword' ? typedKeyword : undefined}
-				createLabel={condition.field === 'mail_keyword' ? m.mail_keyword_use : undefined}
 				onchange={(next) => (condition.value = next)}
 			/>
 		{:else if choices && condition.field !== 'field'}
@@ -355,7 +403,7 @@
 						type={kind === 'number' ? 'number' : 'text'}
 						aria-label={valueLabel}
 						aria-invalid={invalid || undefined}
-						value={typeof condition.value === 'number' ? String(condition.value) : single}
+						value={kind === 'number' ? shownNumber : single}
 						oninput={(event) => stepInput(event.currentTarget.value)}
 					/>
 				{/if}

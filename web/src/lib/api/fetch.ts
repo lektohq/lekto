@@ -37,12 +37,16 @@ function isSignIn(url: string): boolean {
 	return SIGN_IN_PATHS.includes(path);
 }
 
+/** The reason the API gives for a change without the session's current token. */
+const CSRF_MISSING = 'csrf_missing';
+
+/** Whether the API refused a change for its token: by the reason's code, the contract; the
+ * sentence beside it is for people and may change (.knowledge/architecture/reasons-with-codes.md). */
 async function isStaleCsrf(response: Response): Promise<boolean> {
 	if (response.status !== 403) return false;
 	try {
-		const body: unknown = await response.clone().json();
-		const detail = body && typeof body === 'object' && 'detail' in body ? body.detail : null;
-		return typeof detail === 'string' && detail.includes(CSRF_HEADER);
+		const body = (await response.clone().json()) as { reason?: { code?: unknown } | null } | null;
+		return body?.reason?.code === CSRF_MISSING;
 	} catch {
 		return false;
 	}

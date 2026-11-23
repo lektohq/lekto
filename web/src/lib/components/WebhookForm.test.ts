@@ -1,62 +1,70 @@
-import { render, screen } from '@testing-library/svelte';
+import { render, screen, waitFor, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { components } from '#lib/api/schema.ts';
+import { signIn } from '#lib/testing/session.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { choose, selectedValue } from '#lib/testing/select.ts';
 import { session } from '#lib/session.svelte.ts';
 import WebhookForm from './WebhookForm.svelte';
-import { fakeApi, json } from '#lib/testing/api.ts';
+import { fakeApi, json, recording, type Routes, type Sent } from '#lib/testing/api.ts';
+import { webhookOf } from '#lib/testing/system.ts';
 
-type Webhook = components['schemas']['WebhookOut'];
+// What the form's guard asks before a navigation (`UnsavedGuard`), to try leaving.
+const guards = vi.hoisted(() => [] as ((navigation: unknown) => void)[]);
+vi.mock('$app/navigation', () => ({
+	afterNavigate: vi.fn(),
+	beforeNavigate: (guard: (navigation: unknown) => void) => guards.push(guard),
+	goto: vi.fn()
+}));
 
-let fetchMock = fakeApi();
-const sent: { method: string; path: string; body: unknown }[] = [];
+/** Whether leaving by a link is held back with the question, which is then answered "stay". */
+async function heldBack(): Promise<boolean> {
+	const cancel = vi.fn();
+	guards.at(-1)?.({
+		type: 'link',
+		from: { url: new URL('http://lekto/ui/webhooks/hook/edit') },
+		to: { url: new URL('http://lekto/ui/documents') },
+		cancel
+	});
+	if (cancel.mock.calls.length === 0) return false;
+	const question = await screen.findByRole('alertdialog', { name: m.unsaved_title() });
+	await userEvent.click(within(question).getByRole('button', { name: m.cancel() }));
+	await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+	return true;
+}
 
-const stored: Webhook = {
-	id: 'hook',
+let fetchMock: ReturnType<typeof fakeApi>;
+const sent: Sent[] = [];
+
+const stored = webhookOf({
 	owner_id: 'erika',
 	name: 'HA',
 	url: 'http://ha.lan:8123/api/webhook/lekto',
-	event_types: ['*'],
-	active: true,
-	signed: true,
-	headers: ['Authorization'],
-	body: 'thin',
-	body_template: null,
-	max_open_tasks: 4,
-	model_call: null,
-	disabled_reason: null,
-	disabled_reasons: [],
-	failed_streak: 0,
-	previous_secret_valid_until: null,
-	created_at: '2026-10-25T10:00:00Z',
-	updated_at: '2026-10-25T10:00:00Z'
-};
+	headers: ['Authorization']
+});
+
+/** The API of the form: creating and changing the webhook `hook`, each request kept in `sent`;
+ * `more` before these. */
+function serve(more: Routes = {}) {
+	const routes: Routes = {
+		'POST /api/v1/webhooks': () => json({ ...stored, secret: null, signed: false }, 201),
+		'PATCH /api/v1/webhooks/hook': () => ({ ...stored, signed: false }),
+		'DELETE /api/v1/webhooks/hook/secret': () => ({ ...stored, signed: false }),
+		'GET /api/v1/fields': () => [],
+		...more
+	};
+	fetchMock = fakeApi(recording(routes, sent));
+	vi.stubGlobal('fetch', fetchMock);
+}
 
 beforeEach(() => {
-	session.start({
-		user: { id: 'erika', username: 'erika', role: 'user' },
-		method: 'password',
-		expires_at: '2026-10-26T12:00:00Z',
-		csrf_token: 'token'
-	});
+	signIn('user', { id: 'erika', username: 'erika' });
 	sent.length = 0;
-	fetchMock = fakeApi();
-	fetchMock.mockImplementation(async (request) => {
-		const path = new URL(request.url).pathname;
-		const body = request.method === 'DELETE' ? null : await request.json().catch(() => null);
-		sent.push({ method: request.method, path, body });
-		if (request.method === 'POST' && path === '/api/v1/webhooks')
-			return json({ ...stored, secret: null, signed: false }, 201);
-		return json({ ...stored, signed: false });
-	});
-	vi.stubGlobal('fetch', fetchMock);
+	serve();
 });
 
 afterEach(() => {
 	session.clear();
-	vi.unstubAllGlobals();
 });
 
 describe('WebhookForm', () => {
@@ -94,11 +102,7 @@ describe('WebhookForm', () => {
 	});
 
 	it('shows the secret of a signed webhook once, then goes on to its page', async () => {
-		fetchMock.mockImplementation(async (request) => {
-			const path = new URL(request.url).pathname;
-			sent.push({ method: request.method, path, body: await request.json().catch(() => null) });
-			return json({ ...stored, secret: 'whsec_once' }, 201);
-		});
+		serve({ 'POST /api/v1/webhooks': () => json({ ...stored, secret: 'whsec_once' }, 201) });
 		const ondone = vi.fn();
 		render(WebhookForm, { cancelHref: '/ui/webhooks', ondone });
 		await userEvent.type(screen.getByLabelText(m.field_name()), 'HA');
@@ -167,12 +171,7 @@ describe('WebhookForm', () => {
 	});
 
 	it('lets an admin make a webhook serve as a model call, with its time to answer', async () => {
-		session.start({
-			user: { id: 'erika', username: 'erika', role: 'admin' },
-			method: 'password',
-			expires_at: '2026-10-26T12:00:00Z',
-			csrf_token: 'token'
-		});
+		signIn('admin', { id: 'erika', username: 'erika' });
 		render(WebhookForm, { webhook: stored, cancelHref: '/ui/webhooks/hook', ondone: () => {} });
 		const user = userEvent.setup();
 		await choose(
@@ -191,12 +190,7 @@ describe('WebhookForm', () => {
 	});
 
 	it('lets an admin take the model call away', async () => {
-		session.start({
-			user: { id: 'boss', username: 'boss', role: 'admin' },
-			method: 'password',
-			expires_at: '2026-10-26T12:00:00Z',
-			csrf_token: 'token'
-		});
+		signIn('admin', { id: 'boss', username: 'boss' });
 		const serving = { ...stored, model_call: { kind: 'extract' as const, timeout_seconds: 300 } };
 		render(WebhookForm, { webhook: serving, cancelHref: '/ui/webhooks/hook', ondone: () => {} });
 		const user = userEvent.setup();
@@ -251,5 +245,74 @@ describe('WebhookForm', () => {
 		await userEvent.click(screen.getByLabelText(m.event_filed()));
 		const line = screen.getByText(m.webhook_volume_total_exact({ count: 1 }));
 		expect(line.textContent).not.toContain(m.webhook_volume_steps({ least: 26, most: 54 }));
+	});
+
+	describe('leaving with something changed', () => {
+		const open = () =>
+			render(WebhookForm, {
+				webhook: { ...stored, model_call: null },
+				cancelHref: '/ui/webhooks/hook',
+				ondone: () => {}
+			});
+
+		it('asks nothing while the form is as it opened', async () => {
+			open();
+			expect(await heldBack()).toBe(false);
+		});
+
+		it('asks after a name was typed', async () => {
+			open();
+			await userEvent.type(screen.getByLabelText(m.field_name()), 'x');
+			expect(await heldBack()).toBe(true);
+		});
+
+		it('asks nothing once what was typed is typed back', async () => {
+			const user = userEvent.setup();
+			open();
+			const name = screen.getByLabelText(m.field_name());
+			await user.type(name, 'x');
+			await user.type(name, '{Backspace}');
+			expect(await heldBack()).toBe(false);
+		});
+
+		// None of these sends an event of a form: the guard heard nothing of them once.
+		it('asks after only the trigger was switched', async () => {
+			open();
+			await userEvent.click(screen.getByRole('button', { name: m.webhook_trigger_rules() }));
+			expect(await heldBack()).toBe(true);
+		});
+
+		it('asks after only the kind of body was chosen', async () => {
+			open();
+			await userEvent.click(screen.getByRole('button', { name: m.webhook_body_full() }));
+			expect(await heldBack()).toBe(true);
+		});
+
+		it('asks after only a header was removed', async () => {
+			open();
+			await userEvent.click(
+				screen.getByRole('button', { name: m.webhook_header_remove({ name: 'Authorization' }) })
+			);
+			expect(await heldBack()).toBe(true);
+		});
+
+		it('asks after only the model call was chosen', async () => {
+			signIn('admin', { id: 'erika', username: 'erika' });
+			open();
+			await choose(
+				userEvent.setup(),
+				await screen.findByRole('combobox', { name: m.webhook_model_call() }),
+				'propose'
+			);
+			expect(await heldBack()).toBe(true);
+		});
+
+		it('asks nothing once saved', async () => {
+			open();
+			await userEvent.click(screen.getByRole('button', { name: m.webhook_trigger_rules() }));
+			await userEvent.click(screen.getByRole('button', { name: m.save() }));
+			await waitFor(() => expect(sent.length).toBeGreaterThan(0));
+			expect(await heldBack()).toBe(false);
+		});
 	});
 });

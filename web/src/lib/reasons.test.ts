@@ -7,6 +7,7 @@ import { getLocale, setLocale } from '#lib/paraglide/runtime.js';
 import {
 	ACTIONS,
 	REASONS,
+	THINGS,
 	outputReasonText,
 	reasonText,
 	reasonsText,
@@ -27,6 +28,15 @@ describe('the actions of the API', () => {
 	it('each have a text, and no text is left without its action', () => {
 		const actions = (openapi as unknown as { 'x-actions': string[] })['x-actions'];
 		expect(Object.keys(ACTIONS).sort()).toEqual([...actions].sort());
+	});
+});
+
+describe('the things of the API', () => {
+	it('each have a word, and no word is left without its thing (WH-03)', () => {
+		// The nouns a reason names come from the core; one without a word here would stand in
+		// English in a German sentence.
+		const things = (openapi as unknown as { 'x-things': string[] })['x-things'];
+		expect(Object.keys(THINGS).sort()).toEqual([...things].sort());
 	});
 });
 
@@ -73,6 +83,34 @@ describe('a reason in the user language', () => {
 		expect(reasonText(reason('rules_disagree', { values }))).toBe(
 			'Regeln setzen verschiedene Werte („Bezahlt“: Ja, „Offen“: „offen“)'
 		);
+		// A value the API sends with its type is written as the language writes it (WH-07).
+		const typed = (type: string, value: unknown, text: string) => ({ type, value, text });
+		const other = (value: unknown) => reasonText(reason('model_value_other', { value }));
+		expect(other(typed('date', '2026-03-31', '2026-03-31'))).toBe(
+			'das Modell hat einen anderen Wert gesetzt (31.03.2026)'
+		);
+		expect(other(typed('amount', { amount: '84.2', currency: 'EUR' }, '84.2 EUR'))).toBe(
+			'das Modell hat einen anderen Wert gesetzt (84,20\u00a0€)'
+		);
+		expect(other(typed('number', '1234.5', '1234.5'))).toBe(
+			'das Modell hat einen anderen Wert gesetzt (1.234,5)'
+		);
+		const september = { start: '2026-09-01', end: '2026-09-30' };
+		expect(other(typed('period', september, '2026-09'))).toBe(
+			'das Modell hat einen anderen Wert gesetzt (2026-09)'
+		);
+		expect(
+			reasonText(
+				reason('rules_disagree', {
+					values: [{ rule: 'a', value: typed('date', '2026-03-31', '2026-03-31') }]
+				})
+			)
+		).toBe('Regeln setzen verschiedene Werte („a“: 31.03.2026)');
+		// A type this UI does not know, and a reason kept from before: the API's text.
+		expect(other(typed('gizmo', 'x', 'as written'))).toBe(
+			'das Modell hat einen anderen Wert gesetzt (as written)'
+		);
+		expect(other('2026-03-31')).toBe('das Modell hat einen anderen Wert gesetzt (2026-03-31)');
 		const widens = reason('space_widens_needs_confirmed', {
 			space: 'Familie',
 			fields: ['contact', 'document_type']
@@ -94,9 +132,9 @@ describe('a reason in the user language', () => {
 		);
 		const field = { code: 'contact_none', params: {}, field: 'contact' } as Reason;
 		expect(reasonText(field, { field: () => 'Kontakt' })).toBe('Kontakt: kein Kontakt erkannt');
-		const back = { code: 'rules_back_and_forth', params: { spaces: ['tobi', 'Haushalt', 'tobi'] } };
+		const back = { code: 'rules_back_and_forth', params: { spaces: ['john', 'Haushalt', 'john'] } };
 		expect(outputReasonText(back, 'English')).toBe(
-			'Regeln verschieben es hin und her: tobi → Haushalt → tobi'
+			'Regeln verschieben es hin und her: john → Haushalt → john'
 		);
 		expect(outputReasonText(undefined, 'English')).toBe('English');
 		expect(outputReasonText(undefined, undefined)).toBeNull();
@@ -114,6 +152,22 @@ describe('a reason in the user language', () => {
 		);
 		expect(reasonText(reason('name_too_long', { what: 'title', max: 300 }))).toBe(
 			'Der Titel darf höchstens 300 Zeichen haben.'
+		);
+		// The nouns of the pages and cards that name what is gone (WF-04, WH-03).
+		expect(reasonText(reason('not_found', { kind: 'mailbox', id: 'x3' }))).toBe(
+			'Postfach x3 wurde nicht gefunden.'
+		);
+		expect(reasonText(reason('not_found', { kind: 'mail rule', id: 'x3' }))).toBe(
+			'Mail-Regel x3 wurde nicht gefunden.'
+		);
+		expect(reasonText(reason('not_found', { kind: 'API token', id: 'x3' }))).toBe(
+			'API-Token x3 wurde nicht gefunden.'
+		);
+		expect(reasonText(reason('not_found', { kind: 'push device', id: 'x3' }))).toBe(
+			'Gerät x3 wurde nicht gefunden.'
+		);
+		expect(reasonText(reason('name_empty', { what: 'device name' }))).toBe(
+			'Der Name des Geräts darf nicht leer sein.'
 		);
 		expect(reasonText(reason('not_found', { kind: 'gizmo', id: 'x2' }))).toBe(
 			'gizmo x2 wurde nicht gefunden.'

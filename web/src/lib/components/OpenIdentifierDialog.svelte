@@ -98,21 +98,23 @@
 	const title = $derived(item ? `${kindLabel(item.kind)} ${shown(item)}` : '');
 	const description = $derived.by(() => {
 		if (!item) return '';
-		const count = formatNumber(item.documents);
 		if (item.source === 'learned') {
-			return m.open_learned_at({ contact: item.contacts[0]?.name ?? '', count });
+			return m.open_learned_at({
+				contact: item.contacts[0]?.name ?? '',
+				count: formatNumber(item.documents)
+			});
 		}
 		const one = item.documents === 1;
 		if (item.person) {
 			const person = item.person.name;
 			return one
 				? m.open_suggested_person_one({ person })
-				: m.open_suggested_person({ person, count });
+				: m.open_suggested_person({ person, count: formatNumber(item.documents) });
 		}
 		const contact = targetName(item);
 		return one
 			? m.open_suggested_contact_one({ contact })
-			: m.open_suggested_contact({ contact, count });
+			: m.open_suggested_contact({ contact, count: formatNumber(item.documents) });
 	});
 
 	// On a phone the bar on top keeps room for the title: the verb alone, the text names whose.

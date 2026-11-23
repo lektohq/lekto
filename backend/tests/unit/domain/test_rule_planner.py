@@ -185,6 +185,46 @@ def test_reasons_name_values_not_ids() -> None:
         "'choice': rules set different values ('c': 'monthly', 'd': 'yearly')",
         "'period': rules set different values ('e': 2026-09, 'f': 2026-Q3)",
     ]
+    # What a language writes its own way goes with its type and its value, for a client to
+    # write it ("12,50 €", "September 2026"); a choice is a text as before.
+    shown = [reason.params["values"] for reason in amounts.reasons]
+    assert shown[0] == [
+        {
+            "rule": "a",
+            "value": {
+                "type": "amount",
+                "value": {"amount": "12.50", "currency": "EUR"},
+                "text": "12.50 EUR",
+            },
+        },
+        {
+            "rule": "b",
+            "value": {
+                "type": "amount",
+                "value": {"amount": "13", "currency": "EUR"},
+                "text": "13 EUR",
+            },
+        },
+    ]
+    assert shown[1] == [{"rule": "c", "value": "'monthly'"}, {"rule": "d", "value": "'yearly'"}]
+    assert shown[2] == [
+        {
+            "rule": "e",
+            "value": {
+                "type": "period",
+                "value": {"start": "2026-09-01", "end": "2026-09-30"},
+                "text": "2026-09",
+            },
+        },
+        {
+            "rule": "f",
+            "value": {
+                "type": "period",
+                "value": {"start": "2026-07-01", "end": "2026-09-30"},
+                "text": "2026-Q3",
+            },
+        },
+    ]
     model = run(
         [rule(SetContact(ACME))],
         situation(doc(contact_id=BETA), names=names, model_values={"contact": str(BETA)}),
@@ -679,10 +719,10 @@ def test_the_title_sees_fields_tags_space_and_uploader() -> None:
     names = {**NAMES, PAID: "paid", URGENT: "urgent", DEFAULT: "Inbox"}
     result = run(
         [rule(AddTags(frozenset({URGENT})), SetTitle(template))],
-        situation(document, definitions=DEFINITIONS, names=names, uploader_name="tobi"),
+        situation(document, definitions=DEFINITIONS, names=names, uploader_name="john"),
     )
 
-    assert result.changes.title == "99,90 EUR paid+urgent Inbox tobi"
+    assert result.changes.title == "99,90 EUR paid+urgent Inbox john"
 
 
 def test_a_text_field_from_a_template() -> None:

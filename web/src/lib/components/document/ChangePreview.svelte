@@ -8,7 +8,7 @@
 	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import { cardVariants } from '#lib/components/ui/card/index.ts';
 	import { describeValue, fieldLabel } from '#lib/describe.ts';
-	import { formatDate, listLocale } from '#lib/i18n.ts';
+	import { formatDate, formatList } from '#lib/i18n.ts';
 	import { spaceNameFor, userName, type Lookup } from '#lib/masterdata.svelte.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import { session } from '#lib/session.svelte.ts';
@@ -90,8 +90,7 @@
 		membersBefore.filter((member) => !membersAfter.some((item) => item.user_id === member.user_id))
 	);
 	const isNew = (member: Member) => !membersBefore.some((item) => item.user_id === member.user_id);
-	const names = (members: readonly Member[]) =>
-		new Intl.ListFormat(listLocale(), { type: 'conjunction' }).format(members.map(person));
+	const names = (members: readonly Member[]) => formatList(members.map(person));
 </script>
 
 {#snippet change(old: string | null, next: string | null)}

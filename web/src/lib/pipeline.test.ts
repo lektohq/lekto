@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fakeApi, json } from '#lib/testing/api.ts';
+import type { components } from '#lib/api/schema.ts';
+import { fakeApi, problem } from '#lib/testing/api.ts';
 import {
 	descendants,
 	durationSeconds,
@@ -12,17 +13,18 @@ import {
 	type GraphNode,
 	type Processing
 } from './pipeline.ts';
+import { graphOf } from '#lib/testing/pipeline.ts';
 
-const GRAPH: GraphNode[] = [
-	{ node: 'receive', requires: [], waits_for: [] },
-	{ node: 'ocr', requires: ['receive'], waits_for: [] },
-	{ node: 'pages', requires: ['receive'], waits_for: [] },
-	{ node: 'parse', requires: ['ocr'], waits_for: [] },
-	{ node: 'judge', requires: ['parse'], waits_for: [] },
-	{ node: 'fields', requires: ['judge'], waits_for: [] },
-	{ node: 'apply_rules', requires: ['fields'], waits_for: [] },
-	{ node: 'file', requires: ['apply_rules', 'pages'], waits_for: [] }
-];
+const GRAPH = graphOf({
+	receive: [],
+	ocr: ['receive'],
+	pages: ['receive'],
+	parse: ['ocr'],
+	judge: ['parse'],
+	fields: ['judge'],
+	apply_rules: ['fields'],
+	file: ['apply_rules', 'pages']
+});
 
 function processing(
 	status: Processing['status'],
@@ -162,7 +164,6 @@ describe('hasText', () => {
 
 describe('the pipeline of the installation', () => {
 	afterEach(() => {
-		vi.unstubAllGlobals();
 		forgetPipeline();
 	});
 
@@ -171,11 +172,16 @@ describe('the pipeline of the installation', () => {
 		const fetch = fakeApi({
 			'GET /api/v1/pipeline': () =>
 				fail
-					? json({ type: 'about:blank', title: 'Unavailable', status: 503 }, 503)
-					: { nodes: GRAPH, vision: null }
+					? problem(503)
+					: ({
+							nodes: GRAPH,
+							vision: null,
+							logo_fetch: false,
+							meaning_search: false
+						} satisfies components['schemas']['PipelineOut'])
 		});
 		vi.stubGlobal('fetch', fetch);
-		await expect(pipeline()).rejects.toBeTruthy();
+		await expect(pipeline()).rejects.toMatchObject({ status: 503 });
 		fail = false;
 		const [first, second] = await Promise.all([pipeline(), pipeline()]);
 		expect(first).toBe(second);

@@ -1,5 +1,6 @@
 // The webhook pages against a real API: a webhook is created on its own page (the secret shown
 // once), opened, tested from its page, changed on its edit page and deleted from the list.
+import { watch } from './watch.ts';
 import { expect, test, type Page } from '@playwright/test';
 
 const ADMIN = process.env.LEKTO_ADMIN_USERNAME ?? 'admin';
@@ -8,6 +9,24 @@ const NAME = `e2e-webhook-${Date.now()}`;
 
 test.beforeAll(() => {
 	test.skip(!ADMIN_PASSWORD, 'LEKTO_ADMIN_PASSWORD is not set');
+});
+
+/** The webhook the test made, once it has one: deleted afterwards if the test did not. */
+let made = '';
+
+test.afterAll(async ({ playwright, baseURL }) => {
+	if (!made) return;
+	const api = await playwright.request.newContext({ baseURL });
+	const login = await api.post('/api/v1/auth/login', {
+		data: { username: ADMIN, password: ADMIN_PASSWORD }
+	});
+	const { csrf_token } = (await login.json()) as { csrf_token: string };
+	const gone = await api.delete(`/api/v1/webhooks/${made}`, {
+		headers: { 'X-CSRF-Token': csrf_token }
+	});
+	// Deleted by the test already, or now.
+	expect([204, 404]).toContain(gone.status());
+	await api.dispose();
 });
 
 async function signIn(page: Page) {
@@ -19,17 +38,13 @@ async function signIn(page: Page) {
 }
 
 test('a webhook is created, tested, changed and deleted', async ({ page }) => {
-	const problems: string[] = [];
-	page.on('console', (message) => {
-		if (message.type() === 'error' && !/status of [45]\d\d/.test(message.text()))
-			problems.push(message.text());
-	});
-	page.on('pageerror', (error) => problems.push(error.message));
+	const problems = watch(page);
 	await signIn(page);
 
 	// Created on its own page, with a header of its own; the secret is shown once.
 	await page.goto('/ui/webhooks');
-	await page.getByRole('link', { name: 'New webhook' }).click();
+	// The header's link; an empty list leads to the new one too.
+	await page.getByRole('link', { name: 'New webhook' }).first().click();
 	await page.waitForURL('**/ui/webhooks/new');
 	await expect(page.getByRole('heading', { name: 'New webhook', level: 1 })).toBeVisible();
 	const create = page.getByRole('button', { name: 'Create', exact: true });
@@ -47,14 +62,20 @@ test('a webhook is created, tested, changed and deleted', async ({ page }) => {
 	// The webhook's page: name, URL, deliveries. A test goes nowhere (port 9), its delivery shows.
 	await page.waitForURL(/\/ui\/webhooks\/(?!new$)[^/]+$/);
 	const url = page.url();
+	made = url.split('/').pop()!;
 	await expect(page.getByRole('heading', { name: NAME, level: 1 })).toBeVisible();
 	await expect(page.getByText('http://127.0.0.1:9/hook')).toBeVisible();
 	await expect(page.getByText('No deliveries yet.')).toBeVisible();
 	await page.getByRole('button', { name: 'Send test' }).click();
 	await expect(page.getByText(/^Test failed/)).toBeVisible();
-	// A test is sent once: its row says what came of it, the next row why.
-	await expect(page.getByRole('cell', { name: 'Gave up' })).toBeVisible();
-	await expect(page.getByRole('cell', { name: 'cannot connect' })).toBeVisible();
+	// A test is sent once: its row says what came of it, the next row why. The webhook takes
+	// every event, so what else happens in the instance meanwhile has rows of its own here.
+	const sent = page
+		.getByRole('row')
+		.filter({ has: page.getByRole('cell', { name: 'Test', exact: true }) });
+	await expect(sent).toHaveCount(1);
+	await expect(sent.getByRole('cell', { name: 'Gave up' })).toBeVisible();
+	await expect(sent.locator('xpath=following-sibling::tr[1]')).toHaveText(/cannot connect/);
 
 	// Changed on the edit page: the stored header keeps its value, signing stops, a new name.
 	await page.getByRole('link', { name: 'Edit' }).click();
@@ -77,7 +98,7 @@ test('a webhook is created, tested, changed and deleted', async ({ page }) => {
 	await expect(page.getByRole('heading', { name: `${NAME} v2`, level: 1 })).toBeVisible();
 
 	// Deleted on its page, then gone from the list.
-	await page.getByRole('button', { name: `Delete ${NAME} v2` }).click();
+	await page.getByRole('button', { name: `Delete “${NAME} v2”` }).click();
 	await page.getByRole('alertdialog').getByRole('button', { name: 'Delete' }).click();
 	await page.waitForURL('**/ui/webhooks');
 	await expect(page.getByText(`${NAME} v2`)).toHaveCount(0);

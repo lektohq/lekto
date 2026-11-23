@@ -9,6 +9,7 @@ import type { Mark } from '#lib/document-view.ts';
 import { refValue } from '#lib/fact-refs.svelte.ts';
 import { type IdentifierKind, kindLabel, printed } from '#lib/identifiers.ts';
 import { m } from '#lib/paraglide/messages.js';
+import { own } from '#lib/utils.ts';
 
 export type Facts = components['schemas']['FactsOut'];
 export type FoundIdentifier = components['schemas']['FoundIdentifierOut'];
@@ -129,8 +130,9 @@ const HOLDER_SOURCES: Record<Holder['source'], () => string> = {
 /** Whose an IBAN or a creditor ID is, in words, with the name the document gives and who told
  * it ("Inhaber: Dritter · Stadtwerke · laut Sprachmodell"). */
 export function holderLabel(holder: Holder): string {
-	const kind = HOLDER_LABELS[holder.kind]();
-	const source = HOLDER_SOURCES[holder.source]();
+	// A kind or source a newer API sends stands as it is.
+	const kind = own<() => string>(HOLDER_LABELS, holder.kind)?.() ?? holder.kind;
+	const source = own<() => string>(HOLDER_SOURCES, holder.source)?.() ?? holder.source;
 	return holder.name
 		? m.facts_holder_named({ holder: kind, name: holder.name, source })
 		: m.facts_holder({ holder: kind, source });
@@ -357,13 +359,14 @@ export function parseFactFilter(fact: string): {
 
 /** A fact of the filter in words: "Rechnungsnummer R1001 · verweist auf ein Dokument", the value
  * as the API names its reference ("…" until it has); a kind or role this UI does not know (an
- * old link) as written, without a value. */
+ * old link, one written by hand) as written, without a value. Known is what the tables
+ * themselves hold: `valueOf` or `__proto__` from a link must not reach the prototype's members. */
 export function factFilterLabel(fact: string): string {
 	const { kind, ref, role } = parseFactFilter(fact);
-	const known = kind !== null && kind in KIND_ROLES;
+	const known = kind !== null && Object.hasOwn(KIND_ROLES, kind);
 	const kindText = kind ? (known ? kindLabel(kind) : kind) : m.filter_fact_any_kind();
 	const stored = ref && known ? refValue(kind, ref) : null;
 	const value = ref && known ? (stored === null ? '…' : printed(kind, stored)) : null;
-	const roleText = role ? (role in ROLE_LABELS ? roleLabel(role) : role) : null;
+	const roleText = role ? (Object.hasOwn(ROLE_LABELS, role) ? roleLabel(role) : role) : null;
 	return [[kindText, value].filter(Boolean).join(' '), roleText].filter(Boolean).join(' · ');
 }

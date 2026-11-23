@@ -2,68 +2,61 @@ import { render, screen, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { masterDataDialogs } from '#lib/masterdata-dialog.svelte.ts';
+import { signIn } from '#lib/testing/session.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { phone } from '#lib/phone.svelte.ts';
 import { scope } from '#lib/scope.svelte.ts';
 import { session } from '#lib/session.svelte.ts';
 import WithDialogs from '#lib/testing/WithDialogs.svelte';
 import FieldsPanel from './FieldsPanel.svelte';
-import { fakeApi, json } from '#lib/testing/api.ts';
+import { type Routes, fakeApi, json, noContent } from '#lib/testing/api.ts';
+import { fieldOf } from '#lib/testing/master-data.ts';
 
 const INVOICE = '0199a6c4-0000-7000-8000-0000000000e1';
 const REMINDER = '0199a6c4-0000-7000-8000-0000000000e2';
 
-let fetchMock = fakeApi();
+let fetchMock: ReturnType<typeof fakeApi>;
 
-beforeEach(() => {
-	session.start({
-		user: { id: 'admin', username: 'admin', role: 'admin' },
-		method: 'password',
-		expires_at: '2026-10-14T12:00:00Z',
-		csrf_token: 'token'
-	});
-	fetchMock = fakeApi();
-	fetchMock.mockImplementation(async (request) => {
-		const path = new URL(request.url).pathname;
-		if (request.method === 'GET' && path === '/api/v1/fields') {
-			return json([
-				{
-					id: 'f1',
-					name: 'Rechnungsnummer',
-					key: 'rechnungsnummer',
-					data_type: 'text',
-					document_type_ids: [INVOICE, REMINDER],
-					choices: [],
-					required: false,
-					required_document_type_ids: [INVOICE],
-					description: 'Die Nummer, unter der die Rechnung geführt wird',
-					position: 0,
-					created_at: '2026-10-13T12:00:00Z'
-				},
-				{
-					id: 'f2',
-					name: 'Betrag',
-					key: 'betrag',
-					data_type: 'amount',
-					document_type_ids: [INVOICE],
-					choices: [],
-					required: false,
-					required_document_type_ids: [],
-					description: null,
-					position: 5,
-					created_at: '2026-10-13T12:00:00Z'
-				}
-			]);
-		}
-		if (request.method === 'GET' && path === '/api/v1/document-types') {
-			return json([
-				{ id: INVOICE, name: 'Rechnung', created_at: '2026-10-13T12:00:00Z' },
-				{ id: REMINDER, name: 'Mahnung', created_at: '2026-10-13T12:00:00Z' }
-			]);
-		}
-		return json({}, 201);
+const FIELDS = [
+	fieldOf({
+		id: 'f1',
+		name: 'Rechnungsnummer',
+		key: 'rechnungsnummer',
+		document_type_ids: [INVOICE, REMINDER],
+		required_document_type_ids: [INVOICE],
+		description: 'Die Nummer, unter der die Rechnung geführt wird'
+	}),
+	fieldOf({
+		id: 'f2',
+		name: 'Betrag',
+		key: 'betrag',
+		data_type: 'amount',
+		document_type_ids: [INVOICE],
+		position: 5
+	})
+];
+
+/** The API of the panel: the fields, the types, deleting a field; `more` before these. */
+function serve(more: Routes = {}) {
+	fetchMock = fakeApi({
+		'GET /api/v1/fields': () => FIELDS,
+		'GET /api/v1/document-types': () => [
+			{ id: INVOICE, name: 'Rechnung', created_at: '2026-10-13T12:00:00Z' },
+			{ id: REMINDER, name: 'Mahnung', created_at: '2026-10-13T12:00:00Z' }
+		],
+		// Saving answers with what was saved.
+		'POST /api/v1/fields': () => json({ ...FIELDS[0], id: 'f3' }, 201),
+		'PATCH /api/v1/fields/f1': () => FIELDS[0],
+		'PATCH /api/v1/fields/f2': () => FIELDS[1],
+		'DELETE /api/v1/fields/f1': () => noContent(),
+		...more
 	});
 	vi.stubGlobal('fetch', fetchMock);
+}
+
+beforeEach(() => {
+	signIn('admin', { id: 'admin', username: 'admin' });
+	serve();
 });
 
 afterEach(() => {
@@ -71,9 +64,6 @@ afterEach(() => {
 	phone.override(null);
 	scope.set(false);
 	session.clear();
-	vi.unstubAllGlobals();
-	// A dialog makes the page unclickable until it has closed; the next test must not wait.
-	window.document.body.style.pointerEvents = '';
 });
 
 describe('FieldsPanel', () => {
@@ -199,25 +189,14 @@ describe('FieldsPanel', () => {
 	});
 
 	it('shows the answer of the newest load, not of the slowest', async () => {
-		const field = (name: string) => ({
-			id: name,
-			name,
-			key: name.toLowerCase(),
-			data_type: 'text',
-			document_type_ids: null,
-			choices: [],
-			required: false,
-			required_document_type_ids: [],
-			description: null,
-			created_at: '2026-10-13T12:00:00Z'
-		});
+		const field = (name: string) => fieldOf({ id: name, name, key: name.toLowerCase() });
 		let slow!: (answer: Response) => void;
-		fetchMock.mockImplementation(async (request) => {
-			const url = new URL(request.url);
-			if (url.pathname !== '/api/v1/fields') return json([]);
+		serve({
 			// The own fields take their time; those of all users, asked for later, come first.
-			if (url.searchParams.has('all_users')) return json([field('Betrag')]);
-			return new Promise((resolve) => (slow = resolve));
+			'GET /api/v1/fields': (_, url) =>
+				url.searchParams.has('all_users')
+					? [field('Betrag')]
+					: new Promise<Response>((resolve) => (slow = resolve))
 		});
 		render(FieldsPanel);
 		await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled());
@@ -273,24 +252,15 @@ describe('FieldsPanel', () => {
 		expect(new URL(deleted!.url).pathname).toBe('/api/v1/fields/f1');
 	});
 	it('shows 25 fields a page, in their order', async () => {
-		fetchMock.mockImplementation(async (request) => {
-			const path = new URL(request.url).pathname;
-			if (path !== '/api/v1/fields') return json([]);
-			return json(
-				Array.from({ length: 30 }, (_, index) => ({
-					id: `f${index}`,
-					name: `Feld ${String(index + 1).padStart(2, '0')}`,
-					key: `feld_${index}`,
-					data_type: 'text',
-					document_type_ids: null,
-					choices: [],
-					required: false,
-					required_document_type_ids: [],
-					description: null,
-					position: 0,
-					created_at: '2026-10-13T12:00:00Z'
-				}))
-			);
+		serve({
+			'GET /api/v1/fields': () =>
+				Array.from({ length: 30 }, (_, index) =>
+					fieldOf({
+						id: `f${index}`,
+						name: `Feld ${String(index + 1).padStart(2, '0')}`,
+						key: `feld_${index}`
+					})
+				)
 		});
 		render(FieldsPanel);
 		expect(await screen.findByText('Feld 25')).toBeTruthy();

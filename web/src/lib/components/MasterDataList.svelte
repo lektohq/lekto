@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
+	import { formatNumber } from '#lib/i18n.ts';
 	import { api } from '#lib/api/client.ts';
 	import { unwrap } from '#lib/api/call.ts';
 	import { BASE } from '#lib/base.ts';
@@ -140,7 +141,7 @@
 		if (aliases.length === 0) return null;
 		return aliases.length === 1
 			? m.master_alias_short({ alias: aliases[0] })
-			: m.master_alias_more({ alias: aliases[0], count: aliases.length - 1 });
+			: m.master_alias_more({ alias: aliases[0], count: formatNumber(aliases.length - 1) });
 	}
 
 	/** What else it holds: a contact's identifiers and topics; a type's fields, its title pattern
@@ -157,11 +158,16 @@
 							text:
 								identifiers.length === 1
 									? m.master_identifier_one()
-									: m.master_identifiers_many({ count: identifiers.length })
+									: m.master_identifiers_many({ count: formatNumber(identifiers.length) })
 						},
 				topics === 0
 					? null
-					: { text: topics === 1 ? m.master_topic_one() : m.master_topics_many({ count: topics }) }
+					: {
+							text:
+								topics === 1
+									? m.master_topic_one()
+									: m.master_topics_many({ count: formatNumber(topics) })
+						}
 			);
 		} else {
 			const fieldsText = fieldsNote(item);
@@ -180,11 +186,13 @@
 		if (own.length === 0) return null;
 		const required = own.filter((field) => field.required_document_type_ids.includes(item.id));
 		const count =
-			own.length === 1 ? m.master_field_one() : m.master_fields_many({ count: own.length });
+			own.length === 1
+				? m.master_field_one()
+				: m.master_fields_many({ count: formatNumber(own.length) });
 		return required.length > 0
 			? m.master_fields_required({
 					fields: count,
-					required: m.master_required_count({ count: required.length })
+					required: m.master_required_count({ count: formatNumber(required.length) })
 				})
 			: count;
 	}
@@ -295,7 +303,7 @@
 	{#each groups.slice(0, room) as tag (tag.id)}<TagChip {tag} group size="sm" />{/each}
 	{#if groups.length > room}
 		<span class="shrink-0 text-xs" title={groups.slice(room).map(pathLabel).join(', ')}>
-			{m.master_groups_more({ count: groups.length - room })}
+			{m.master_groups_more({ count: formatNumber(groups.length - room) })}
 		</span>
 	{/if}
 {/snippet}

@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { NODE_LABELS } from '#lib/node-labels.ts';
 	import { m } from '#lib/paraglide/messages.js';
-	import { stepLook, TONE_TEXT, type Tone } from '#lib/step-look.ts';
+	import { stepLook, type Tone } from '#lib/step-look.ts';
+	import { TONE_TEXT } from '#lib/tones.ts';
 	import type { Step } from '#lib/steps.ts';
 	import { cn } from '#lib/utils.ts';
 
@@ -74,7 +75,7 @@
 	onfocus={() => onhighlight?.(true)}
 	onblur={() => onhighlight?.(false)}
 	class={cn(
-		'flex w-full min-w-0 flex-col gap-1 rounded-2xl border px-3 py-2.5 text-left transition-colors',
+		'flex w-full min-w-0 flex-col gap-1 rounded-2xl border px-3 py-2.5 text-left transition-colors max-sm:min-h-11 max-sm:justify-center',
 		cards[look.tone],
 		expanded && ['ring-2', rings[look.tone]],
 		highlighted && !expanded && lit[look.tone]

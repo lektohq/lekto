@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { components } from '#lib/api/schema.ts';
-import type { Lookup } from '#lib/masterdata.svelte.ts';
+import { signIn } from '#lib/testing/session.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { session } from '#lib/session.svelte.ts';
 import {
@@ -13,16 +13,17 @@ import {
 	unseenHere,
 	unseenText
 } from '#lib/space-suggestion.ts';
+import { lookupOf } from '#lib/testing/master-data.ts';
 
 type OpenNode = components['schemas']['OpenNodeOut'];
 
-const member = (user_id: string, username: string, role = 'edit') => ({
+const member = (user_id: string, username: string, role: 'read' | 'edit' = 'edit') => ({
 	user_id,
 	username,
 	role,
 	active: true
 });
-const lookup = {
+const lookup = lookupOf({
 	contacts: [],
 	documentTypes: [],
 	tags: [],
@@ -32,34 +33,27 @@ const lookup = {
 			name: 'Personal',
 			personal_of: 'u1',
 			role: 'edit',
-			members: [member('u1', 'tobi')]
+			members: [member('u1', 'john')]
 		},
 		{
 			id: 'house',
 			name: 'Haushalt',
 			personal_of: null,
 			role: 'edit',
-			members: [member('u1', 'tobi'), member('u2', 'erika', 'read'), member('u3', 'bob')]
+			members: [member('u1', 'john'), member('u2', 'erika', 'read'), member('u3', 'jane')]
 		}
 	],
 	users: [
-		{ id: 'u1', username: 'tobi', role: 'user', personal_space_id: 'mine' },
+		{ id: 'u1', username: 'john', role: 'user', personal_space_id: 'mine' },
 		{ id: 'u2', username: 'erika', role: 'user', personal_space_id: 'erikas' }
 	]
-} as unknown as Lookup;
+});
 
 const node = (fields: { field: string; suggestion?: unknown; unseen_by?: string[] }[]) =>
 	({ node: 'judge', outcome: 'uncertain', reason: null, fields }) as unknown as OpenNode;
 
 describe('the suggested space', () => {
-	beforeEach(() =>
-		session.start({
-			user: { id: 'u1', username: 'tobi', role: 'user' },
-			method: 'password',
-			expires_at: '2026-10-22T12:00:00Z',
-			csrf_token: 'token'
-		} as never)
-	);
+	beforeEach(() => signIn());
 	afterEach(() => session.clear());
 
 	it('is the first open space check with a suggestion', () => {
@@ -87,7 +81,7 @@ describe('the suggested space', () => {
 	});
 
 	it('names who sees the document there anew', () => {
-		expect(newReaders('house', 'mine', lookup)).toEqual(['erika', 'bob']);
+		expect(newReaders('house', 'mine', lookup)).toEqual(['erika', 'jane']);
 		// Another user's personal space the caller is no member of: that user.
 		expect(newReaders('erikas', 'mine', lookup)).toEqual(['erika']);
 		expect(newReaders('elsewhere', 'mine', lookup)).toEqual([]);
@@ -96,7 +90,7 @@ describe('the suggested space', () => {
 
 	it('reads as a suggestion with the new readers', () => {
 		expect(suggestionText('house', 'mine', lookup)).toBe(
-			m.space_suggestion_for({ space: 'Haushalt', names: 'erika, bob' })
+			m.space_suggestion_for({ space: 'Haushalt', names: 'erika, jane' })
 		);
 		expect(suggestionText('mine', 'house', lookup)).toBe(
 			m.space_suggestion({ space: m.space_personal() })

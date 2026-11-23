@@ -4,6 +4,8 @@
  * events and when the window comes back into view (seen in another tab or on another device
  * sends no event).
  */
+import { formatNumber } from '#lib/i18n.ts';
+import { unwrap } from '#lib/api/call.ts';
 import { api } from '#lib/api/client.ts';
 import type { components } from '#lib/api/schema.ts';
 import { events, NODE_EVENTS } from '#lib/events.svelte.ts';
@@ -32,11 +34,11 @@ export function badgeTone(summary: InboxSummary | null): BadgeTone | null {
 /** What a screen reader says of the counter: everything open, then each kind in it. */
 export function badgeLabel(summary: InboxSummary): string {
 	const parts = [
-		m.inbox_badge_total({ count: summary.open }),
-		summary.intervene > 0 && m.inbox_badge_red({ count: summary.intervene }),
-		summary.review > 0 && m.inbox_badge_yellow({ count: summary.review }),
-		summary.new > 0 && m.inbox_badge_new({ count: summary.new }),
-		summary.processing > 0 && m.inbox_badge_processing({ count: summary.processing })
+		m.inbox_badge_total({ count: formatNumber(summary.open) }),
+		summary.intervene > 0 && m.inbox_badge_red({ count: formatNumber(summary.intervene) }),
+		summary.review > 0 && m.inbox_badge_yellow({ count: formatNumber(summary.review) }),
+		summary.new > 0 && m.inbox_badge_new({ count: formatNumber(summary.new) }),
+		summary.processing > 0 && m.inbox_badge_processing({ count: formatNumber(summary.processing) })
 	];
 	return parts.filter(Boolean).join(', ');
 }
@@ -48,6 +50,12 @@ export function badgeText(open: number): string {
 
 class Inbox {
 	summary = $state<InboxSummary | null>(null);
+	/** Why the last fetch failed; null after one that did not. The counter says nothing of it
+	 * and keeps what it showed; the overview's tile shows it where it has nothing to show. */
+	failure = $state<unknown>(null);
+	/** Everything open in the caller's own inbox, whatever the counter's scope: the number on
+	 * the app's icon, the one a notification sets (web/DESIGN.md, "App"); null until read. */
+	own = $state<number | null>(null);
 	#timer: ReturnType<typeof setTimeout> | undefined;
 	#stop: (() => void) | null = null;
 	// An answer overtaken by a later request (the scope changed meanwhile) is dropped.
@@ -62,12 +70,16 @@ class Inbox {
 	async refresh(): Promise<void> {
 		const request = ++this.#request;
 		try {
-			const { data } = await api.GET('/api/v1/inbox/summary', {
-				params: { query: { all_users: scope.query } }
-			});
-			if (data && request === this.#request) this.summary = data;
-		} catch {
-			// Offline (fetch rejects): the counter keeps what it showed until the next refresh.
+			// With "all users" the counter counts everyone's; the icon still counts the caller's.
+			const [data, mine] = await Promise.all([
+				unwrap(api.GET('/api/v1/inbox/summary', { params: { query: { all_users: scope.query } } })),
+				scope.query ? unwrap(api.GET('/api/v1/inbox/summary')) : null
+			]);
+			if (request === this.#request)
+				[this.summary, this.own, this.failure] = [data, (mine ?? data).open, null];
+		} catch (failure) {
+			// Offline or refused: the counter keeps what it showed until the next refresh.
+			if (request === this.#request) this.failure = failure;
 		}
 	}
 
@@ -100,7 +112,7 @@ class Inbox {
 		this.#stop?.();
 		this.#stop = null;
 		this.#request++;
-		this.summary = null;
+		[this.summary, this.failure] = [null, null];
 	}
 }
 

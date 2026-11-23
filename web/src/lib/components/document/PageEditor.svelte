@@ -36,7 +36,7 @@
 	import { pageImageHref } from '#lib/document-view.ts';
 	import { describeError } from '#lib/errors.ts';
 	import { GRID_KEYS, nextTile } from '#lib/grid-keys.ts';
-	import { quoted } from '#lib/i18n.ts';
+	import { quoted, formatNumber } from '#lib/i18n.ts';
 	import type { Candidate, Mergeable } from '#lib/merge.ts';
 	import {
 		History,
@@ -138,7 +138,7 @@
 	);
 	const title = $derived(
 		merging
-			? m.merge_title({ count: String(documents.length) })
+			? m.merge_title({ count: formatNumber(documents.length) })
 			: m.page_edit_title({ title: document.title })
 	);
 
@@ -393,7 +393,7 @@
 			});
 			if (!data) throw await apiError(response, error);
 			put({ file }, data.pages);
-			toast.success(m.page_edit_added({ count: data.pages.length, file: file.name }));
+			toast.success(m.page_edit_added({ count: formatNumber(data.pages.length), file: file.name }));
 		} catch (problem) {
 			toast.error(describeError(problem));
 		} finally {
@@ -482,17 +482,21 @@
 			? m.page_edit_none()
 			: chosen.size === 1
 				? m.page_edit_chosen_one()
-				: m.page_edit_chosen({ count: chosen.size })
+				: m.page_edit_chosen({ count: formatNumber(chosen.size) })
 	);
 	const pagesOf = ([first, last]: [number, number]) =>
 		first === last
 			? m.page_edit_part_page({ page: String(first) })
 			: m.page_edit_part_pages({ first: String(first), last: String(last) });
 	const pageCount = $derived(
-		stack.length === 1 ? m.page_edit_pages_one() : m.page_edit_pages({ count: stack.length })
+		stack.length === 1
+			? m.page_edit_pages_one()
+			: m.page_edit_pages({ count: formatNumber(stack.length) })
 	);
 	const partCount = $derived(
-		parts.length === 1 ? m.page_edit_parts_one() : m.page_edit_parts_count({ count: parts.length })
+		parts.length === 1
+			? m.page_edit_parts_one()
+			: m.page_edit_parts_count({ count: formatNumber(parts.length) })
 	);
 	/** The document the part that replaces makes the next version of. */
 	const goal = $derived((merging && documents.find((item) => item.id === target)) || document);
@@ -731,7 +735,7 @@
 	submitLabel={step === 'pages'
 		? parts.length === 1
 			? m.page_edit_next()
-			: m.page_edit_next_parts({ count: parts.length })
+			: m.page_edit_next_parts({ count: formatNumber(parts.length) })
 		: m.page_edit_apply()}
 	shortSubmitLabel={step === 'pages' ? m.page_edit_next() : m.page_edit_apply()}
 	disabled={nothing || adding || (step === 'parts' && merging && replacing === null)}
@@ -873,7 +877,8 @@
 {#snippet deleted()}
 	<!-- Struck through in red, as a removed tag in the question before saving a document. -->
 	<span class="flex flex-wrap gap-x-2">
-		{#each gone?.titles ?? [] as title (title)}
+		<!-- By place: documents made by one title pattern share their title. -->
+		{#each gone?.titles ?? [] as title, index (index)}
 			<span class="text-destructive line-through">{quoted(title)}</span>
 		{/each}
 	</span>

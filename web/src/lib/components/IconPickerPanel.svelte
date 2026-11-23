@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { formatNumber } from '#lib/i18n.ts';
 	import SearchField from '#lib/components/SearchField.svelte';
 	import LucideIcon from '#lib/components/LucideIcon.svelte';
 	import { GRID_KEYS, nextTile } from '#lib/grid-keys.ts';
@@ -79,7 +80,7 @@
 				</div>
 				{#if found.total > found.names.length}
 					<p class="text-sm text-muted-foreground">
-						{m.icon_search_more({ count: found.total - found.names.length })}
+						{m.icon_search_more({ count: formatNumber(found.total - found.names.length) })}
 					</p>
 				{/if}
 			{/if}

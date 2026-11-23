@@ -1,33 +1,35 @@
 import { describe, expect, it } from 'vitest';
+import { m } from '#lib/paraglide/messages.js';
 import { describeValue, fieldLabel } from './describe.ts';
-import type { Lookup } from './masterdata.svelte.ts';
+import { lookupOf } from '#lib/testing/master-data.ts';
 
-const lookup = {
-	contacts: [{ id: 'c1', name: 'ACME', created_at: '' }],
+const lookup = lookupOf({
+	contacts: [{ id: 'c1', name: 'Muster AG', created_at: '' }],
 	documentTypes: [],
 	tags: [{ id: 't1', name: 'Tax', created_at: '' }],
 	fields: [{ id: 'a1', name: 'Due', data_type: 'date' }],
 	spaces: [],
 	users: [
-		{ id: 'u1', username: 'alice', personal_space_id: 's1' },
-		{ id: 'u2', username: 'bob', personal_space_id: 's2' }
+		{ id: 'u1', username: 'jane', personal_space_id: 's1' },
+		{ id: 'u2', username: 'john', personal_space_id: 's2' }
 	]
-} as unknown as Lookup;
+});
 
 describe('describing changes', () => {
 	it('names ids', () => {
-		expect(describeValue('c1', lookup)).toBe('ACME');
+		expect(describeValue('c1', lookup)).toBe('Muster AG');
 		expect(describeValue(['t1', 'zz'], lookup)).toBe('Tax, zz');
 		expect(describeValue({ start: '2026-09-01', end: '2026-09-30' }, lookup)).toBe('2026-09');
-		expect(describeValue('u1', lookup)).toBe('alice');
+		expect(describeValue('u1', lookup)).toBe('jane');
 		// The personal space of a user the caller is no member of: by that user.
-		expect(describeValue('s2', lookup)).toBe('bob');
+		expect(describeValue('s2', lookup)).toBe('john');
 	});
 
 	it('shows plain values', () => {
-		expect(describeValue(true, lookup)).not.toBe('');
+		expect(describeValue(true, lookup)).toBe(m.value_yes());
+		expect(describeValue(false, lookup)).toBe(m.value_no());
 		expect(describeValue('hello', lookup)).toBe('hello');
-		expect(describeValue({ amount: '1.5', currency: 'EUR' }, lookup)).toContain('1');
+		expect(describeValue({ amount: '1.5', currency: 'EUR' }, lookup)).toBe('€1.50');
 	});
 
 	it('names fields', () => {

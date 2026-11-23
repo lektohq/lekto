@@ -1,6 +1,6 @@
 /**
  * A decision through an API token names the token after the person (DESIGN.md, Names of
- * people): "Tobi über Token „Claude“". The API sends the token's name as it was then, so it
+ * people): "John über Token „Claude“". The API sends the token's name as it was then, so it
  * stays readable once the token is renamed or revoked.
  */
 import { m } from '#lib/paraglide/messages.js';

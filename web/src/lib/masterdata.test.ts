@@ -14,7 +14,7 @@ import {
 } from './masterdata.svelte.ts';
 
 const users = [
-	{ id: 'u1', username: 'tobi', role: 'user' as const, personal_space_id: 'mine' },
+	{ id: 'u1', username: 'john', role: 'user' as const, personal_space_id: 'mine' },
 	{ id: 'u2', username: 'erika', role: 'user' as const, personal_space_id: 'erika' },
 	{ id: 'u3', username: 'bob', role: 'user' as const, personal_space_id: 'bobs' }
 ];
@@ -24,7 +24,7 @@ const space = (id: string, changes: Partial<Space> = {}): Space => ({
 	personal_of: null,
 	description: null,
 	role: 'edit',
-	members: [{ user_id: 'u1', role: 'edit', username: 'tobi', active: true }],
+	members: [{ user_id: 'u1', role: 'edit', username: 'john', active: true }],
 	created_at: '2026-10-21T08:00:00Z',
 	version: 1,
 	...changes
@@ -37,14 +37,14 @@ const erika = space('erika', {
 	role: 'read',
 	members: [
 		{ user_id: 'u2', role: 'edit', username: 'erika', active: true },
-		{ user_id: 'u1', role: 'read', username: 'tobi', active: true }
+		{ user_id: 'u1', role: 'read', username: 'john', active: true }
 	]
 });
 
 describe('spaces by name', () => {
 	it('names a personal space "Personal" for its user and by the user for others', () => {
 		expect(spaceLabel(mine, users, 'u1')).toBe(m.space_personal());
-		expect(spaceLabel(mine, users, 'u2')).toBe('tobi');
+		expect(spaceLabel(mine, users, 'u2')).toBe('john');
 		expect(spaceLabel(house, users, 'u1')).toBe('Haushalt');
 	});
 
@@ -52,7 +52,7 @@ describe('spaces by name', () => {
 		const lookup = { spaces: [mine, house], users };
 		expect(spaceNameFor('house', lookup, 'u1')).toBe('Haushalt');
 		expect(spaceNameFor('mine', lookup, 'u1')).toBe(m.space_personal());
-		// bob's personal space is no space of tobi's, yet named by its user.
+		// bob's personal space is no space of john's, yet named by its user.
 		expect(spaceNameFor('bobs', lookup, 'u1')).toBe('bob');
 		expect(spaceNameFor('gone', lookup, 'u1')).toBe(m.space_unseen());
 		expect(spaceNameFor('gone', lookup, 'u1', '')).toBe('');
@@ -64,12 +64,12 @@ describe('spaces by name', () => {
 		const lookup = { spaces: [mine, house, erika], users };
 		expect(foreignSpace('house', lookup, 'u1')).toBeNull();
 		expect(foreignSpace('house', lookup, 'u3')).toBe('Haushalt');
-		expect(foreignSpace('mine', lookup, 'u3')).toBe('tobi');
+		expect(foreignSpace('mine', lookup, 'u3')).toBe('john');
 		expect(foreignSpace('gone', lookup, 'u3')).toBeNull();
 	});
 
 	it('offers the edited spaces, then hand-overs to every other user', () => {
-		// bob's personal space is not listed for tobi; a hand-over needs no membership.
+		// bob's personal space is not listed for john; a hand-over needs no membership.
 		expect(spaceOptions([mine, house, erika], users, users[0])).toEqual([
 			{ value: 'mine', label: m.space_personal() },
 			{ value: 'house', label: 'Haushalt' },
@@ -81,15 +81,13 @@ describe('spaces by name', () => {
 
 describe('the names of users', () => {
 	it('shows the display name, else the username', () => {
-		const named = { id: 'u4', username: 'carla', display_name: 'Carla Example' };
-		expect(userLabel(named)).toBe('Carla Example');
-		expect(userLabel({ username: 'carla', display_name: null })).toBe('carla');
-		expect(userName([...users, named], 'u4')).toBe('Carla Example');
+		const named = { id: 'u4', username: 'jane', display_name: 'Jane Doe' };
+		expect(userLabel(named)).toBe('Jane Doe');
+		expect(userLabel({ username: 'jane', display_name: null })).toBe('jane');
+		expect(userName([...users, named], 'u4')).toBe('Jane Doe');
 		expect(userName(users, 'nobody')).toBe(m.user_unknown());
 		expect(userName(users, null)).toBe(m.user_unknown());
-		expect(spaceLabel({ name: 'Personal', personal_of: 'u4' }, [named], 'u1')).toBe(
-			'Carla Example'
-		);
+		expect(spaceLabel({ name: 'Personal', personal_of: 'u4' }, [named], 'u1')).toBe('Jane Doe');
 	});
 });
 

@@ -42,7 +42,7 @@
 		pageBars,
 		pageCharacters
 	} from '#lib/step-details.ts';
-	import { DOT, MARK } from '#lib/step-look.ts';
+	import { LANE_MARK, TONE_DOT } from '#lib/tones.ts';
 	import { cn } from '#lib/utils.ts';
 	import Eyebrow from '#lib/components/page/Eyebrow.svelte';
 
@@ -183,7 +183,7 @@
 								aria-hidden="true"
 							>
 								<span
-									class={cn('w-full', weak ? MARK.yellow : 'bg-primary')}
+									class={cn('w-full', weak ? LANE_MARK.yellow : 'bg-primary')}
 									style:height={unsureHeight(page.unsure)}
 								></span>
 							</span>
@@ -200,7 +200,7 @@
 				</ol>
 				{#if poor.length > 0}
 					<p class="flex items-center gap-1.5 text-xs text-muted-foreground" aria-hidden="true">
-						<span class={cn('size-2.5 rounded-sm', DOT.yellow)}></span>{m.details_poor()}
+						<span class={cn('size-2.5 rounded-sm', TONE_DOT.yellow)}></span>{m.details_poor()}
 					</p>
 				{/if}
 			</figure>
@@ -233,7 +233,7 @@
 				</ol>
 			</figure>
 		{:else if pages > 0}
-			<p class="text-sm">{m.summary_page_images({ count: pages })}</p>
+			<p class="text-sm">{m.summary_page_images({ count: formatNumber(pages) })}</p>
 		{/if}
 	{:else if entry.node === 'parse'}
 		{#if total !== null}

@@ -10,12 +10,12 @@ from tests import builders
 
 judge_space = partial(verdict.judge_space, thresholds=builders.THRESHOLDS)
 
-TOBI, ERIKA = UserId(new_id()), UserId(new_id())
+JOHN, ERIKA = UserId(new_id()), UserId(new_id())
 OWN, HOUSEHOLD, ERIKAS = SpaceId(new_id()), SpaceId(new_id()), SpaceId(new_id())
-SHARED_OWN = SpaceId(new_id())  # Tobi's personal space, shared with Erika
+SHARED_OWN = SpaceId(new_id())  # John's personal space, shared with Erika
 OPTIONS = {
-    OWN: SpaceOption("the uploader's personal space", frozenset({TOBI}), personal_of=TOBI),
-    HOUSEHOLD: SpaceOption("a shared space", frozenset({TOBI, ERIKA})),
+    OWN: SpaceOption("the uploader's personal space", frozenset({JOHN}), personal_of=JOHN),
+    HOUSEHOLD: SpaceOption("a shared space", frozenset({JOHN, ERIKA})),
     ERIKAS: SpaceOption("another user's personal space", frozenset({ERIKA}), personal_of=ERIKA),
 }
 
@@ -26,10 +26,10 @@ def choice(
     locked: bool = False,
     options: dict[SpaceId, SpaceOption] | None = None,
 ) -> SpaceChoice:
-    """Tobi's upload in `current` among `options` (`OPTIONS`); in `SHARED_OWN`, that one too."""
+    """John's upload in `current` among `options` (`OPTIONS`); in `SHARED_OWN`, that one too."""
     chosen = dict(options or OPTIONS)
     if current == SHARED_OWN:
         chosen[SHARED_OWN] = SpaceOption(
-            "the uploader's personal space", frozenset({TOBI, ERIKA}), personal_of=TOBI
+            "the uploader's personal space", frozenset({JOHN, ERIKA}), personal_of=JOHN
         )
-    return SpaceChoice(current=current, options=chosen, locked=locked, uploader=TOBI)
+    return SpaceChoice(current=current, options=chosen, locked=locked, uploader=JOHN)

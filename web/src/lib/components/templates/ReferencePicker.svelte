@@ -15,6 +15,7 @@
 	import PickerShell from '#lib/components/PickerShell.svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import * as Command from '#lib/components/ui/command/index.ts';
+	import { searchTyped } from '#lib/document-search.ts';
 	import { m } from '#lib/paraglide/messages.js';
 
 	// The document a template is shown with. At first the newest of the type (a title pattern's),
@@ -77,36 +78,13 @@
 		};
 	});
 
-	$effect(() => {
-		const text = query.trim();
-		found = null;
-		if (!text) return;
-		let current = true;
-		const timer = setTimeout(() => {
-			void unwrap(
-				api.POST('/api/v1/documents/search', {
-					params: { query: { limit: 20, semantic_ratio: 0 } },
-					body: { q: text }
-				})
-			).then(
-				(page) => {
-					if (current) found = page.items.map((item) => short(item.document));
-				},
-				() => {
-					const wanted = text.toLocaleLowerCase();
-					if (current) {
-						found = untrack(() => recent).filter((item) =>
-							item.title.toLocaleLowerCase().includes(wanted)
-						);
-					}
-				}
-			);
-		}, 250);
-		return () => {
-			current = false;
-			clearTimeout(timer);
-		};
-	});
+	$effect(() =>
+		searchTyped(query, {
+			recent: () => untrack(() => recent),
+			read: short,
+			show: (documents) => (found = documents)
+		})
+	);
 
 	const shown = $derived((found ?? recent).filter((item) => item.id !== exclude));
 
@@ -139,7 +117,7 @@
 			placeholder={m.template_reference_search()}
 			aria-label={m.template_reference_search()}
 		/>
-		<Command.List>
+		<Command.List aria-label={label ?? m.template_reference_choose()}>
 			<Command.Empty class="py-4 text-center text-sm text-muted-foreground">
 				{m.template_reference_empty()}
 			</Command.Empty>

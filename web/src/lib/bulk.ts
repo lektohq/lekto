@@ -13,6 +13,9 @@ type Operation = components['schemas']['BulkOperationOut'];
 /** The most documents one action takes, as the API takes it (mirrors `MAX_DOCUMENTS` in
  * `backend/src/lekto/core/domain/bulk.py`). */
 export const MAX_DOCUMENTS = 10_000;
+/** The most documents chosen one by one that an action takes, as the API takes their ids
+ * (`document_ids` of `BulkRequest`); every hit of a search and filters goes without ids. */
+export const MAX_CHOSEN = 500;
 /** The most hits a search by words reaches (mirrors `MAX_HITS` in
  * `backend/src/lekto/core/ports/search_index.py`). */
 export const MAX_HITS = 1_000;

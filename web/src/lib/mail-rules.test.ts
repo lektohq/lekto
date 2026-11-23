@@ -8,6 +8,7 @@ import {
 	createBody,
 	dryRunBody,
 	formOf,
+	mailRulePlaces,
 	mailsCount,
 	newCondition,
 	patchBody,
@@ -18,6 +19,9 @@ import {
 	type MailConditionNode,
 	type MailRule
 } from './mail-rules.ts';
+import { ApiError } from '#lib/api/problem.ts';
+import { problemOf } from '#lib/testing/api.ts';
+import { saveErrorsAt } from '#lib/rules/errors.ts';
 import { CONDITION_FIELD_OPERATORS } from '#lib/rules/model.ts';
 import { newGroup } from '#lib/rules/tree.ts';
 import { OPERATORS } from './mail-rules.ts';
@@ -48,7 +52,7 @@ const RULE: MailRule = {
 	updated_at: '2026-11-04T10:00:00Z'
 };
 
-const names = { user: () => 'Max', space: () => 'Haushalt', type: () => 'E-Mail' };
+const names = { user: () => 'John', space: () => 'Haushalt', type: () => 'E-Mail' };
 
 describe('the form of a mail rule', () => {
 	it('starts for a mailbox with its type of the mail text', () => {
@@ -105,8 +109,8 @@ describe('the form of a mail rule', () => {
 		expect(conditionText({ field: 'keyword', op: 'contains', value: 'Lekto' })).toBe(
 			`${m.mail_rule_field_keyword()} ${m.rule_op_tags_contains()} Lekto`
 		);
-		expect(conditionText({ field: 'cc', op: 'is', value: 'ben@example.test' })).toBe(
-			`${m.mail_rule_field_cc()} ${m.rule_op_is()} ben@example.test`
+		expect(conditionText({ field: 'cc', op: 'is', value: 'john@example.test' })).toBe(
+			`${m.mail_rule_field_cc()} ${m.rule_op_is()} john@example.test`
 		);
 		const form = formOf(RULE);
 		const keyword = newCondition('keyword');
@@ -184,6 +188,40 @@ describe('the form of a mail rule', () => {
 		expect(validate(form).user).toBeUndefined(); // takes nothing: no person needed
 	});
 
+	it('puts what the API refuses next to the field, the condition or the step it names (WD-05)', () => {
+		// The editor of a mail rule saved by itself: a 422 stood as one line above the buttons,
+		// never at its block, as a document rule's does.
+		const form = formOf(RULE);
+		const refused = (detail: string) => new ApiError(422, problemOf(422, { detail }), null);
+		const [, second] = form.conditions.items;
+		expect(
+			saveErrorsAt(
+				refused(
+					"conditions.any[1]: 'present' takes no value; after[1]: a folder; user_id: no such active user"
+				),
+				mailRulePlaces(form)
+			)
+		).toEqual({
+			byKey: {
+				[second.key]: "'present' takes no value",
+				[form.steps[1].key]: 'a folder',
+				user: 'no such active user'
+			},
+			general: null
+		});
+		expect(
+			saveErrorsAt(refused('space_id: a space the person files into'), mailRulePlaces(form)).byKey
+		).toEqual({ space: 'a space the person files into' });
+		// A place the form has no block for stays a line of its own, with its place.
+		expect(
+			saveErrorsAt(refused('text_type_id: no such document type'), mailRulePlaces(form))
+		).toEqual({ byKey: {}, general: 'text_type_id: no such document type' });
+		// Anything else in the user's language, as every failed call.
+		expect(saveErrorsAt(new ApiError(409, null, null), mailRulePlaces(form)).general).toBe(
+			m.error_unexpected({ status: 409 })
+		);
+	});
+
 	it('offers each field the comparisons the document rules offer for the mail', () => {
 		expect(OPERATORS.subject).toEqual(CONDITION_FIELD_OPERATORS.mail_subject);
 		expect(OPERATORS.sender).toEqual(CONDITION_FIELD_OPERATORS.mail_sender);
@@ -221,7 +259,7 @@ describe('the form of a mail rule', () => {
 
 	it('says a rule in one line', () => {
 		expect(summaryOf(RULE, names)).toBe(
-			`${m.rule_priority_short({ priority: 1 })} · ${m.mail_rule_field_sender()} ${m.rule_op_ends_with()} @stadtwerke.example${m.rule_or()}${m.mail_rule_field_attachments()} ${m.mail_rule_attachments_present()} → ${m.mail_rule_parts_all()}, ${m.mail_rule_summary_for({ name: 'Max' })}, ${m.mail_rule_summary_space({ name: 'Haushalt' })}, ${m.mail_rule_after_add_keyword({ keyword: 'Lekto' })}, ${m.mail_rule_summary_move({ folder: 'Lekto/Erledigt' })}`
+			`${m.rule_priority_short({ priority: 1 })} · ${m.mail_rule_field_sender()} ${m.rule_op_ends_with()} @stadtwerke.example${m.rule_or()}${m.mail_rule_field_attachments()} ${m.mail_rule_attachments_present()} → ${m.mail_rule_parts_all()}, ${m.mail_rule_summary_for({ name: 'John' })}, ${m.mail_rule_summary_space({ name: 'Haushalt' })}, ${m.mail_rule_after_add_keyword({ keyword: 'Lekto' })}, ${m.mail_rule_summary_move({ folder: 'Lekto/Erledigt' })}`
 		);
 		expect(
 			summaryOf(

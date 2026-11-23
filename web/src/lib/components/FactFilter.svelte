@@ -44,6 +44,7 @@
 	let role = $state('');
 	let busy = $state(false);
 	let problem = $state<string | null>(null);
+	const errorId = $props.id();
 	const ready = $derived(Boolean(kind || role) && !(value.trim() && !kind) && !busy);
 
 	async function add() {
@@ -108,12 +109,13 @@
 			oninput={() => (problem = null)}
 			aria-label={m.facts_decide_value()}
 			aria-invalid={problem ? true : undefined}
+			aria-describedby={problem ? errorId : undefined}
 			placeholder={m.filter_fact_value()}
 			disabled={!kind}
 			autocomplete="off"
 			spellcheck="false"
 		/>
-		{#if problem}<Field.Error>{problem}</Field.Error>{/if}
+		{#if problem}<Field.Error id={errorId}>{problem}</Field.Error>{/if}
 		<Select
 			aria-label={m.facts_decide_role()}
 			bind:value={role}

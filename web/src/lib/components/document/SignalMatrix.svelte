@@ -6,7 +6,7 @@
 	import { m } from '#lib/paraglide/messages.js';
 	import { SIGNAL_NODES } from '#lib/signals.ts';
 	import type { CellKind, MatrixRow } from '#lib/signal-matrix.ts';
-	import { DOT } from '#lib/step-look.ts';
+	import { TONE_DOT } from '#lib/tones.ts';
 	import { cn } from '#lib/utils.ts';
 	import * as Card from '#lib/components/ui/card/index.ts';
 	import SectionTitle from '#lib/components/page/SectionTitle.svelte';
@@ -22,18 +22,18 @@
 	// Flat shapes in the colours of the lane chips (Tobi, 23.10.2026): a circle names, a square
 	// is evidence in the text, a diamond contradicts; rings for another value or silence.
 	function mark(kind: CellKind, open: boolean): string {
-		const fill = open ? DOT.yellow : DOT.green;
+		const fill = open ? TONE_DOT.yellow : TONE_DOT.green;
 		switch (kind) {
 			case 'names':
 				return cn('size-4 rounded-full', fill);
 			case 'evidence':
 				return cn('size-4 rounded-xs', fill);
 			case 'other':
-				return 'size-4 rounded-full border-[1.5px] border-muted-foreground';
+				return 'size-4 rounded-full border-dot border-muted-foreground';
 			case 'contradicts':
-				return cn('mx-0.5 size-3 rotate-45 rounded-xs', DOT.red);
+				return cn('mx-0.5 size-3 rotate-45 rounded-xs', TONE_DOT.red);
 			case 'silent':
-				return 'size-4 rounded-full border-[1.5px] border-dashed border-muted-foreground/60';
+				return 'size-4 rounded-full border-dot border-dashed border-muted-foreground/60';
 		}
 	}
 
@@ -67,7 +67,7 @@
 		<SectionTitle size="card" id="matrix-heading">{m.matrix_title()}</SectionTitle>
 		<p class="mt-0.5 text-sm text-muted-foreground">{m.matrix_hint()}</p>
 	</div>
-	<Table.Root class="w-full table-fixed border-collapse text-sm">
+	<Table.Root label={m.matrix_title()} class="w-full table-fixed border-collapse text-sm">
 		<colgroup>
 			<col />
 			{#each SIGNAL_NODES as signal (signal)}

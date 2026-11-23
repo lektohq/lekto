@@ -8,6 +8,8 @@
 	import { ApiError } from '#lib/api/problem.ts';
 	import type { components } from '#lib/api/schema.ts';
 	import { fieldLabel } from '#lib/describe.ts';
+	import StatTile from '#lib/components/StatTile.svelte';
+	import EmptyNote from '#lib/components/EmptyNote.svelte';
 	import LoadProblem from '#lib/components/LoadProblem.svelte';
 	import * as Chart from '#lib/components/ui/chart/index.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
@@ -165,6 +167,10 @@
 </script>
 
 <div class="flex flex-col gap-6">
+	<!-- A failed reload: said above what was read before, which stays (web/DESIGN.md, "States"). -->
+	{#if problem && status && !unavailable}
+		<LoadProblem {problem} onretry={load} />
+	{/if}
 	{#if unavailable}
 		<p class="text-muted-foreground">{m.classifier_not_configured()}</p>
 	{:else if problem && !status}
@@ -211,7 +217,7 @@
 						{/if}
 					</div>
 					{#if session.isAdmin}
-						<Button onclick={train} disabled={busy}>
+						<Button onclick={train} {busy}>
 							<RefreshCw aria-hidden="true" />{m.classifier_train()}
 						</Button>
 					{/if}
@@ -220,12 +226,7 @@
 					{@const model = status.model}
 					<div class="grid grid-cols-[repeat(auto-fit,minmax(120px,1fr))] gap-3">
 						{#each [[model.classes.contact, m.classifier_class_contacts()], [model.classes.document_type, m.classifier_class_types()], [model.classes.topic, m.classifier_class_topics()], [model.classes.tags, m.classifier_class_tags()], [model.classes.space, m.classifier_class_spaces()], [model.learned_identifiers, m.classifier_class_identifiers()]] as const as [count, label] (label)}
-							<div class="flex flex-col gap-0.5 rounded-xl bg-surface px-3.5 py-3">
-								<span class="text-figure tabular-nums">
-									{formatNumber(count)}
-								</span>
-								<span class="text-meta text-muted-foreground">{label}</span>
-							</div>
+							<StatTile value={formatNumber(count)} {label} tone="quiet" />
 						{/each}
 					</div>
 					{#if model.accuracy}
@@ -299,7 +300,9 @@
 				</span>
 				<Separator class="my-1" />
 				<span class="text-meta text-muted-foreground">
-					{m.classifier_confirmed_total({ count: formatNumber(status.confirmed) })}
+					{status.confirmed === 1
+						? m.classifier_confirmed_total_one()
+						: m.classifier_confirmed_total({ count: formatNumber(status.confirmed) })}
 				</span>
 				<span class="text-meta text-muted-foreground">
 					{m.classifier_threshold({ threshold: percent(status.threshold) })}
@@ -317,7 +320,7 @@
 				<span class="text-meta text-muted-foreground">{m.classifier_history_hint()}</span>
 			</div>
 			{#if measured.length < 2}
-				<p class="mt-3 text-muted-foreground">{m.classifier_history_none()}</p>
+				<EmptyNote size="line">{m.classifier_history_none()}</EmptyNote>
 			{:else}
 				<div class="mt-3 flex flex-wrap gap-x-[18px] gap-y-2 text-meta text-muted-foreground">
 					<span class="inline-flex items-center gap-1.5">
@@ -398,10 +401,13 @@
 				<span class="text-meta text-muted-foreground">{m.classifier_signals_hint()}</span>
 			</div>
 			{#if !anySignal}
-				<p class="mt-3 text-muted-foreground">{m.classifier_signals_none()}</p>
+				<EmptyNote size="line">{m.classifier_signals_none()}</EmptyNote>
 			{:else}
 				<div class="mt-4 overflow-x-auto">
-					<Table.Root class="w-full min-w-[720px] border-collapse tabular-nums">
+					<Table.Root
+						label={m.classifier_signals_title()}
+						class="w-full min-w-[720px] border-collapse tabular-nums"
+					>
 						<Table.Header>
 							<Table.Row>
 								<Table.Head

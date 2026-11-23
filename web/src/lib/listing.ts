@@ -193,20 +193,40 @@ export function rememberLayout(layout: Layout): void {
 	store(KEYS.layout, layout);
 }
 
-/** Remember `filters` for the next opening of the documents; none forgets them. */
-export function rememberFilters(filters: Filters): void {
+/** Remember `filters` of `user` for the next opening of the documents; none forgets them. They
+ * are kept with the user they belong to: a filter can name a contact or a fact of a document,
+ * and the next person to sign in in this browser must not get it. */
+export function rememberFilters(filters: Filters, user: string | undefined): void {
 	store(
 		KEYS.filters,
-		isFiltered(filters) ? writeFilters(new URLSearchParams(), filters).toString() : null
+		user !== undefined && isFiltered(filters)
+			? JSON.stringify({ user, filters: writeFilters(new URLSearchParams(), filters).toString() })
+			: null
 	);
 }
 
-/** The filters this browser last set, or null without any (or any that still count). */
-export function rememberedFilters(): Filters | null {
+/** The filters `user` last set in this browser, or null without any (or any that still
+ * count); those of another user are none. */
+export function rememberedFilters(user: string | undefined): Filters | null {
 	const found = stored(KEYS.filters);
-	if (found === null) return null;
-	const filters = parseFilters(new URLSearchParams(found));
+	if (found === null || user === undefined) return null;
+	let kept: unknown;
+	try {
+		kept = JSON.parse(found);
+	} catch {
+		// As kept before the filters named their user: no one's.
+		return null;
+	}
+	if (typeof kept !== 'object' || kept === null) return null;
+	const { user: owner, filters: query } = kept as { user?: unknown; filters?: unknown };
+	if (owner !== user || typeof query !== 'string') return null;
+	const filters = parseFilters(new URLSearchParams(query));
 	return isFiltered(filters) ? filters : null;
+}
+
+/** Forget the remembered filters: on signing out, nothing of them stays on the device. */
+export function forgetFilters(): void {
+	store(KEYS.filters, null);
 }
 
 /** Whether the panel of filters beside the list stands collapsed; open at first. */

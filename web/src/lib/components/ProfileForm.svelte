@@ -34,12 +34,16 @@
 		data,
 		userId = null,
 		part = 'all',
-		onsaved
+		onsaved,
+		ondirty
 	}: {
 		data: ProfileData;
 		userId?: string | null;
 		part?: 'person' | 'numbers' | 'all';
 		onsaved?: (profile: Profile) => void;
+		/** Whether the form holds something unsaved, whenever that changes: a dialog around it
+		 * asks before it closes. */
+		ondirty?: (dirty: boolean) => void;
 	} = $props();
 
 	const uid = $props.id();
@@ -92,6 +96,7 @@
 	}
 
 	const dirty = $derived(JSON.stringify(body()) !== saved);
+	$effect(() => ondirty?.(dirty));
 
 	async function save(event: SubmitEvent) {
 		event.preventDefault();
@@ -117,7 +122,9 @@
 	}
 </script>
 
-<form class="flex flex-col gap-4" onsubmit={save}>
+<!-- The API checks the address and says so in the language of the UI; the browser's own
+     message would come in the browser's language. -->
+<form class="flex flex-col gap-4" novalidate onsubmit={save}>
 	{#if person}
 		<Field.Field>
 			<HintLabel
@@ -189,7 +196,7 @@
 		<p class="text-sm text-destructive" role="alert">{problem}</p>
 	{/if}
 	<div>
-		<Button type="submit" disabled={busy}>{m.save()}</Button>
+		<Button type="submit" {busy}>{m.save()}</Button>
 	</div>
 </form>
 <UnsavedGuard dirty={dirty && !busy} />

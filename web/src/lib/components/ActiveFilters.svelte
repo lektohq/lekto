@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { formatNumber } from '#lib/i18n.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { factFilterLabel } from '#lib/facts.ts';
 	import { NO_FILTERS, isFiltered, type Filters } from '#lib/filters.ts';
@@ -54,7 +55,7 @@
 				name: period,
 				label: m.filter_remove({ name: period }),
 				shape: 'round',
-				without: { dateFrom: null, dateTo: null }
+				without: { dateFrom: null, dateTo: null, period: null }
 			});
 		}
 		const lists = [
@@ -150,7 +151,7 @@
 				{#snippet icon()}
 					<ListChecks class="size-3.5 shrink-0" aria-hidden="true" />
 				{/snippet}
-				{m.selection_chip({ count: selection })}
+				{m.selection_chip({ count: formatNumber(selection) })}
 			</Chip>
 		{/if}
 		{#each chips as chip (chip.key)}

@@ -23,6 +23,6 @@
 	<BackLink
 		href={inbox ? `${BASE}/inbox` : returnTo.documents}
 		label={inbox ? m.nav_inbox() : m.nav_documents()}
-		state={inbox ? undefined : returnTo.state}
+		state={inbox ? returnTo.inboxState : returnTo.state}
 	/>
 {/if}

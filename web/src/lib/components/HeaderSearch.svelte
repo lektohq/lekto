@@ -1,8 +1,10 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { m } from '#lib/paraglide/messages.js';
 	import { BASE } from '#lib/base.ts';
 	import { openLens } from '#lib/open-lens.svelte.ts';
+	import { showPageSearch } from '#lib/page-search.ts';
 	import { warmSearch } from '#lib/meaning-search.ts';
 	import { gotoSearching, stateWords } from '#lib/words.ts';
 	import SearchField from '#lib/components/SearchField.svelte';
@@ -10,7 +12,9 @@
 	// The search field of the header: Enter searches the documents with the words (and, in the
 	// document view, the filters already set, and its lens, which it names); `/` jumps here from
 	// anywhere but a field one types into. On a desktop the document view has no field of its
-	// own: this is it.
+	// own: this is it. Where the header shows a magnifier instead of the field (a phone, the
+	// widths at which the menu takes the room), `/` goes the magnifier's way: the field of the
+	// documents page, or that page with its field in focus (web/DESIGN.md, "Sticky heads").
 	let { class: className = '' }: { class?: string } = $props();
 
 	let input = $state<HTMLInputElement | null>(null);
@@ -39,7 +43,16 @@
 			(target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName));
 		if (typing) return;
 		event.preventDefault();
-		input?.focus();
+		if (shown(input)) input?.focus();
+		else if (!showPageSearch()) void goto(`${DOCUMENTS}#search`);
+	}
+
+	/** Whether the element is drawn: neither it nor what it stands in is taken out. */
+	function shown(element: Element | null): boolean {
+		for (let at = element; at; at = at.parentElement) {
+			if (getComputedStyle(at).display === 'none') return false;
+		}
+		return element !== null;
 	}
 </script>
 

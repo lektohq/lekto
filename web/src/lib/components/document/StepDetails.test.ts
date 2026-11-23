@@ -1,10 +1,10 @@
 import { render, screen, waitFor, within } from '@testing-library/svelte';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { components } from '#lib/api/schema.ts';
-import type { Lookup } from '#lib/masterdata.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import StepDetails, { type DetailContext } from './StepDetails.svelte';
 import { calls, fakeApi } from '#lib/testing/api.ts';
+import { lookupOf } from '#lib/testing/master-data.ts';
 
 type LogEntry = components['schemas']['LogEntry'];
 
@@ -12,13 +12,13 @@ let fetchMock = fakeApi();
 
 const MUSTERVEREIN = '0199a6c4-0000-7000-8000-0000000000c2';
 const ERIKA = '0199a6c4-0000-7000-8000-0000000000a1';
-const lookup = {
+const lookup = lookupOf({
 	contacts: [{ id: MUSTERVEREIN, name: 'Jugendverein Muster e.V.' }],
 	documentTypes: [],
 	tags: [],
 	spaces: [],
 	users: [{ id: ERIKA, username: 'erika', display_name: 'Jane Doe' }]
-} as unknown as Lookup;
+});
 
 const stored = (format: string, pdfa: string | null, size: number) => ({
 	size,
@@ -70,8 +70,6 @@ beforeEach(() => {
 	});
 	vi.stubGlobal('fetch', fetchMock);
 });
-
-afterEach(() => vi.unstubAllGlobals());
 
 describe('StepDetails', () => {
 	it('shows the text recognition: the files, its notes and how well each page was read', () => {

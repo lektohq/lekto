@@ -27,7 +27,7 @@
 	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import { Button, buttonVariants } from '#lib/components/ui/button/index.ts';
 	import * as Table from '#lib/components/ui/table/index.ts';
-	import { describeError, reportError } from '#lib/errors.ts';
+	import { describeLoad, reportError, type LoadFailure } from '#lib/errors.ts';
 	import { events } from '#lib/events.svelte.ts';
 	import { formatMoment, formatNumber } from '#lib/i18n.ts';
 	import {
@@ -61,7 +61,7 @@
 	// each fetch of it shows at once (`mailbox.fetched`).
 	const id = $derived(page.params.id ?? '');
 	let mailbox = $state<Mailbox | null>(null);
-	let problem = $state<string | null>(null);
+	let failure = $state<LoadFailure | null>(null);
 	let editing = $state(false);
 	let removing = $state(false);
 	let fetching = $state(false);
@@ -110,7 +110,7 @@
 
 	/** Load the mailbox; whether it is there. */
 	async function load(wanted: string): Promise<boolean> {
-		problem = null;
+		failure = null;
 		try {
 			const found = await unwrap(
 				api.GET('/api/v1/mailboxes/{id}', { params: { path: { id: wanted } } })
@@ -118,7 +118,7 @@
 			if (wanted === id) mailbox = found;
 			return wanted === id;
 		} catch (error) {
-			if (wanted === id) problem = describeError(error);
+			if (wanted === id) failure = describeLoad(error, m.mailbox_not_found);
 			return false;
 		}
 	}
@@ -133,10 +133,16 @@
 			rule = '';
 			log.summary = null;
 		});
+		open(wanted);
+	});
+
+	/** The mailbox, then its log: when the page opens and when one tries again after a problem
+	 * (the log was never asked for then). */
+	function open(wanted: string) {
 		void load(wanted).then((found) => {
 			if (found) untrack(() => void log.reset());
 		});
-	});
+	}
 
 	// Live (Tobi, 06.11.2026): the end of a fetch of this mailbox shows what became of its mails
 	// at once; after a break of the stream the page loads anew, an end may have been missed.
@@ -237,8 +243,8 @@
 		{/snippet}
 	</PageHeader>
 
-	{#if problem}
-		<LoadProblem {problem} onretry={() => void load(id)} />
+	{#if failure}
+		<LoadProblem problem={failure.text} onretry={failure.final ? undefined : () => open(id)} />
 	{:else if !mailbox}
 		<Loading />
 	{/if}
@@ -351,7 +357,7 @@
 						{/if}
 						{#if item.documents_hidden}
 							<span class="block text-xs text-muted-foreground">
-								{m.mailbox_hidden_documents({ count: item.documents_hidden })}
+								{m.mailbox_hidden_documents({ count: formatNumber(item.documents_hidden) })}
 							</span>
 						{/if}
 					</Table.Cell>

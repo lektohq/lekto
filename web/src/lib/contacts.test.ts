@@ -3,15 +3,15 @@ import { initials } from './contacts.ts';
 
 describe('initials', () => {
 	it.each([
-		['Nord Versicherungsgruppe', 'NV'],
-		['Stadtwerke Süd', 'SS'],
-		['Praxis Dr. Berg', 'PB'],
-		['Stadtwerke München GmbH', 'SM'],
-		['ACME', 'A'],
-		['ärztekammer nordrhein', 'ÄN'],
-		['Müller & Söhne KG', 'MS'],
+		['Nord Muster Versicherungsgruppe', 'NV'],
+		['Stadtwerke Muster', 'SM'],
+		['Praxis Dr. Mustermann', 'PM'],
+		['Stadtwerke Musterstadt GmbH', 'SM'],
+		['Muster', 'M'],
+		['ärztekammer musterland', 'ÄM'],
+		['Muster & Söhne KG', 'MS'],
 		['GmbH', 'G'],
-		['1&1 Telecom', '1T'],
+		['24/7 Muster', '2M'],
 		['...', '?']
 	])('of %s is %s', (name, expected) => {
 		expect(initials(name)).toBe(expected);

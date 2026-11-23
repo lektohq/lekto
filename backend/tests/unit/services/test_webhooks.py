@@ -390,10 +390,16 @@ async def test_a_template_body_is_checked_when_saved(world: World) -> None:
         ('{"x": {{ title | nofilter }}}', "unknown filter"),
         ('{"x": {% if %}}', "invalid template"),
     ):
-        with pytest.raises(ValidationError, match=error):
+        with pytest.raises(ValidationError, match=error) as refused:
             await service.update(
                 Actor(user.id), hook.id, body=BodyFormat.TEMPLATE, body_template=template
             )
+        # Lekto's own message has a code and says where; the engine's is text.
+        if error.startswith("unknown value"):
+            assert refused.value.reason.code is ReasonCode.TEMPLATE_UNKNOWN_VALUE_AT
+            assert refused.value.reason.params["at"] == "body_template"
+        else:
+            assert refused.value.reason.code is ReasonCode.ERROR
     with pytest.raises(ValidationError):
         await service.update(Actor(user.id), hook.id, body_template=good)  # without the body
     full = await service.update(Actor(user.id), hook.id, body=BodyFormat.FULL)

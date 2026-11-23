@@ -5,23 +5,27 @@
 	// A form whose submit runs `action` (a request): busy meanwhile (a second submit does
 	// nothing), `ondone` once it resolves (the dialog closes), the error described when it
 	// throws. `children` get both, for the buttons and the error line. In a dialog the form is
-	// made anew each time the dialog opens, so nothing is left over from the last time.
+	// made anew each time the dialog opens, so nothing is left over from the last time. The
+	// dialog around it binds `busy`: while the action runs it does not close (web/DESIGN.md,
+	// "Footers"), since the request goes on and takes effect all the same.
 	let {
 		action,
 		ondone,
+		busy = $bindable(false),
 		class: className,
 		onchanged,
 		children
 	}: {
 		action: () => Promise<void>;
 		ondone: () => void;
+		/** The action runs. */
+		busy?: boolean;
 		class?: string;
 		/** Something in the form was typed or chosen (for a question before leaving). */
-		onchanged?: () => void;
+		onchanged?: (event: Event) => void;
 		children: Snippet<[{ busy: boolean; error: string | null }]>;
 	} = $props();
 
-	let busy = $state(false);
 	let error = $state<string | null>(null);
 
 	async function submit(event: SubmitEvent) {

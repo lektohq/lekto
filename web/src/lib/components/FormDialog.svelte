@@ -10,13 +10,16 @@
 	import { cn } from '#lib/utils.ts';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import ConfirmDialog from '#lib/components/ConfirmDialog.svelte';
+	import { CloseGuard } from '#lib/close-guard.svelte.ts';
 	import { describeError } from '#lib/errors.ts';
 
 	// A short form in a dialog (a space, a webhook, a code, a token): its title, the fields
 	// (`children`, told the error for `aria-invalid`), what the API answered below them, and
 	// "Cancel" before the submit button. On a phone it fills the screen with the bar of every
 	// editor ("Cancel" · title · submit; web/DESIGN.md, "Dialogs"). `action` runs on submit; the dialog is busy meanwhile,
-	// closes when it resolves and stays open with the error when it throws.
+	// closes when it resolves and stays open with the error when it throws. Closing over what was
+	// typed by Escape, a click beside it or the X asks first (`lib/close-guard.svelte.ts`;
+	// `guarded={false}` for a dialog whose text is nothing to lose, a code); "Abbrechen" does not.
 	let {
 		open = $bindable(false),
 		title,
@@ -30,6 +33,7 @@
 		deleteTitle = '',
 		deleteDescription = '',
 		alternative,
+		guarded = true,
 		children: fields
 	}: {
 		open?: boolean;
@@ -49,6 +53,8 @@
 		/** A second way to finish, at the start of the footer, without asking (an open
 		 * identifier: rejecting it beside confirming it). */
 		alternative?: { label: string; action: () => Promise<void> };
+		/** Ask before Escape, a click beside the dialog or its X drop what was typed. */
+		guarded?: boolean;
 		children: Snippet<[string | null]>;
 	} = $props();
 
@@ -56,8 +62,14 @@
 	let altBusy = $state(false);
 	let altError = $state<string | null>(null);
 
+	const guard = new CloseGuard();
+	let saving = $state(false);
+
 	$effect(() => {
-		if (open) altError = null;
+		if (open) {
+			altError = null;
+			guard.start();
+		}
 	});
 
 	async function runAlternative() {
@@ -75,7 +87,13 @@
 	}
 </script>
 
-<Dialog.Root bind:open>
+<!-- While the action runs nothing closes the dialog (X, Escape, a click beside it, "Abbrechen"):
+the request goes on and takes effect all the same. -->
+<Dialog.Root
+	bind:open={
+		() => open, (next) => (next || (!saving && (!guarded || guard.wants()))) && (open = next)
+	}
+>
 	<Dialog.Content
 		{size}
 		showCloseButton={!phone.current}
@@ -84,6 +102,8 @@
 		<AsyncForm
 			class={cn('flex min-h-0 flex-col gap-4', phone.current && 'flex-1 gap-0')}
 			{action}
+			bind:busy={saving}
+			onchanged={guard.changed}
 			ondone={() => (open = false)}
 		>
 			{#snippet children({ busy, error })}
@@ -93,7 +113,8 @@
 						{title}
 						{submitLabel}
 						{destructive}
-						disabled={busy || disabled}
+						{disabled}
+						{busy}
 						oncancel={() => (open = false)}
 					/>
 					<div class="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain p-4">
@@ -105,7 +126,8 @@
 								type="button"
 								variant="outline"
 								class="mt-2"
-								disabled={busy || altBusy}
+								{busy}
+								disabled={altBusy}
 								onclick={runAlternative}
 							>
 								{alternative.label}
@@ -141,7 +163,8 @@
 								type="button"
 								variant="outline"
 								class="sm:mr-auto"
-								disabled={busy || altBusy}
+								{busy}
+								disabled={altBusy}
 								onclick={runAlternative}
 							>
 								{alternative.label}
@@ -159,13 +182,14 @@
 								{m.delete_title()}
 							</Button>
 						{/if}
-						<Button type="button" variant="ghost" onclick={() => (open = false)}
-							>{m.cancel()}</Button
-						>
+						<Button type="button" variant="ghost" {busy} onclick={() => (open = false)}>
+							{m.cancel()}
+						</Button>
 						<Button
 							type="submit"
 							variant={destructive ? 'destructive' : 'default'}
-							disabled={busy || altBusy || disabled}
+							{busy}
+							disabled={altBusy || disabled}
 						>
 							{submitLabel}
 						</Button>
@@ -175,6 +199,16 @@
 		</AsyncForm>
 	</Dialog.Content>
 </Dialog.Root>
+
+<ConfirmDialog
+	bind:open={guard.asking}
+	title={m.unsaved_title()}
+	description={m.unsaved_hint()}
+	confirmLabel={m.unsaved_discard()}
+	onconfirm={async () => {
+		open = false;
+	}}
+/>
 
 {#if ondelete}
 	<ConfirmDialog

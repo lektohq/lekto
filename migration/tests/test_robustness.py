@@ -90,7 +90,7 @@ async def test_prepare_wakes_a_user_it_deactivated_to_make_them_a_member(setup: 
     assert await setup.migrate() == 0
     gone = next(u for u in setup.lekto.users.values() if u["username"] == "gone")
     assert gone["active"] is False
-    # tobias' new document is one gone (deactivated in Paperless) may change: a new space.
+    # johndoe's new document is one gone (deactivated in Paperless) may change: a new space.
     add_document(
         setup,
         30,
@@ -101,7 +101,7 @@ async def test_prepare_wakes_a_user_it_deactivated_to_make_them_a_member(setup: 
     space = next(
         s
         for s in setup.lekto.spaces.values()
-        if s["name"] == "Geteilt: gone (bearbeiten), tobias (bearbeiten)"
+        if s["name"] == "Geteilt: gone (bearbeiten), johndoe (bearbeiten)"
     )
     assert {"user_id": gone["id"], "role": "edit"} in space["members"]
     assert gone["active"] is False  # deactivated again

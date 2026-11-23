@@ -41,6 +41,15 @@ export function listLocale(): string {
 	return formatLocale();
 }
 
+/** A list in the user's language: "A, B und C", or "A, B oder C" for a choice
+ * (`disjunction`). The one way to write a list (web/DESIGN.md, "Formats"). */
+export function formatList(
+	items: readonly string[],
+	type: Intl.ListFormatType = 'conjunction'
+): string {
+	return new Intl.ListFormat(listLocale(), { type }).format(items);
+}
+
 /** The browser's time zone (`Europe/Berlin`), which the API needs to count by its days. */
 export function browserZone(): string {
 	return Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -51,10 +60,16 @@ export function quoted(text: string): string {
 	return m.rule_quoted({ text });
 }
 
-/** A moment with its time: `medium` "5. Nov. 2026, 14:03", as the lists of fetches and origins
- * show it; `short` "05.11.26, 14:03", for the rows of tables. */
-export function formatMoment(value: Date | string, style: 'medium' | 'short' = 'medium'): string {
-	return formatDate(value, { dateStyle: style, timeStyle: 'short' });
+/** A moment with its time, the one way to write one (web/DESIGN.md, "Formats"): `medium`
+ * "05.11.2026, 14:03" in lines, `short` "05.11.26, 14:03" in the rows of tables. `seconds`
+ * only in a log whose entries lie seconds apart (a run's start, the attempts of a delivery):
+ * "05.11.2026, 14:03:27". */
+export function formatMoment(
+	value: Date | string,
+	style: 'medium' | 'short' = 'medium',
+	seconds = false
+): string {
+	return formatDate(value, { dateStyle: style, timeStyle: seconds ? 'medium' : 'short' });
 }
 
 /**

@@ -24,7 +24,9 @@
 	// loaded ("Anhalten" while it loads, "Weiter laden" once stopped), and "Anwenden", with
 	// "Aktivieren und anwenden" while the rule is paused. Once applied, how far the application
 	// has come in place of all that: waiting for the worker (what comes before it, or that no
-	// worker takes jobs), running, done or stopped.
+	// worker takes jobs), running, done or stopped. One application takes at most `limit`
+	// documents: with more hits the bar says so (the rest goes in a further run), and with more
+	// chosen by hand it does not apply.
 	let {
 		chosen,
 		allChosen,
@@ -32,6 +34,7 @@
 		total,
 		loaded,
 		conflicts,
+		limit,
 		loading,
 		complete,
 		offerSwitchOn,
@@ -58,6 +61,8 @@
 		loaded: number;
 		/** Of them, those with a conflict. */
 		conflicts: number;
+		/** Documents one application takes at most; null while unknown. */
+		limit: number | null;
 		/** The dry run loads its next pages. */
 		loading: boolean;
 		/** The dry run has every document. */
@@ -94,9 +99,35 @@
 		}
 	});
 	const stopped = $derived(!loading && !complete);
+	const over = $derived(limit !== null && chosen > limit);
+	// More hits without a conflict than one application takes.
+	const limited = $derived(limit !== null && loaded - conflicts > limit);
 	// On a desktop the bar has room for an icon button before the count; a box or a mark stands
 	// where its text would start.
 	const inset = $derived(phone.current ? undefined : 'ml-2.5');
+	// What a screen reader is told, in one region that stays (a region that comes with its text
+	// is often not read): the end of the dry run or that it stopped, not every page of it; then
+	// what the application waits for and how it ended. The progress and a failure say themselves.
+	const said = $derived.by(() => {
+		if (!application) {
+			if (loading) return '';
+			const found = { checked: formatNumber(lookedAt), total: formatNumber(total ?? 0) };
+			if (stopped) return m.rule_preview_stopped({ ...found, count: formatNumber(loaded) });
+			const sum = m.rule_preview_total({ documents: bulkDocuments(loaded) });
+			return conflicts > 0
+				? `${sum} · ${m.rule_preview_conflicts({ count: formatNumber(conflicts) })}`
+				: sum;
+		}
+		if (application.status === 'queued') {
+			const ahead = waiting
+				? waiting.still
+					? m.rule_apply_no_worker()
+					: aheadText(waiting.jobs)
+				: '';
+			return `${ahead} ${m.rule_apply_leave()}`.trim();
+		}
+		return application.status === 'done' ? applicationResult(application) : '';
+	});
 	const progress = $derived(
 		application
 			? m.bulk_running({
@@ -153,8 +184,15 @@
 			{m.rule_preview_total({ documents: bulkDocuments(loaded) })}{#if conflicts > 0}
 				· {m.rule_preview_conflicts({ count: formatNumber(conflicts) })}{/if}
 		{/if}
+		{#if over}
+			<span class="text-destructive" role="alert">
+				{m.rule_apply_over({ max: formatNumber(limit ?? 0) })}
+			</span>
+		{:else if limited}
+			<span>{m.rule_apply_limit({ max: formatNumber(limit ?? 0) })}</span>
+		{/if}
 	{:else if application.status === 'queued'}
-		<span aria-live="polite">
+		<span>
 			{#if waiting}{waiting.still ? m.rule_apply_no_worker() : aheadText(waiting.jobs)}{/if}
 			{m.rule_apply_leave()}
 		</span>
@@ -175,7 +213,7 @@
 			{applicationResult(application)}
 		</span>
 	{:else}
-		<span aria-live="polite">{applicationResult(application)}</span>
+		<span>{applicationResult(application)}</span>
 	{/if}
 {/snippet}
 
@@ -198,14 +236,20 @@
 		<Button
 			variant={offerSwitchOn ? 'outline' : 'default'}
 			size="sm"
-			disabled={busy || loading || chosen === 0}
+			{busy}
+			disabled={loading || chosen === 0 || over}
 			onclick={() => onapply(false)}
 		>
 			<Play aria-hidden="true" />
 			{m.rule_apply_action()}
 		</Button>
 		{#if offerSwitchOn}
-			<Button size="sm" disabled={busy || loading || chosen === 0} onclick={() => onapply(true)}>
+			<Button
+				size="sm"
+				{busy}
+				disabled={loading || chosen === 0 || over}
+				onclick={() => onapply(true)}
+			>
 				<Power aria-hidden="true" />
 				{m.rule_switch_on_apply()}
 			</Button>
@@ -229,6 +273,7 @@
 	{/if}
 {/snippet}
 
+<span class="sr-only" role="status" aria-live="polite" data-testid="apply-said">{said}</span>
 <SelectionBar
 	{count}
 	busy={busy || application?.status === 'running'}

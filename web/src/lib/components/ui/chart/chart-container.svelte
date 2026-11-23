@@ -1,13 +1,10 @@
 <script lang="ts">
 	import { cn, type WithElementRef } from '#lib/utils.ts';
 	import type { HTMLAttributes } from 'svelte/elements';
-	import { setChartContext, type ChartConfig } from './chart-utils.ts';
-
-	const uid = $props.id();
+	import type { ChartConfig } from './chart-utils.ts';
 
 	let {
 		ref = $bindable(null),
-		id = uid,
 		class: className,
 		children,
 		config,
@@ -15,8 +12,6 @@
 	}: WithElementRef<HTMLAttributes<HTMLElement>> & {
 		config: ChartConfig;
 	} = $props();
-
-	const chartId = $derived(`chart-${id || uid.replace(/:/g, '')}`);
 
 	// The colors as custom properties in the style attribute, not in an inserted `<style>`
 	// element (as shadcn-svelte's `ChartStyle`): the CSP forbids those. A color is a token
@@ -27,17 +22,10 @@
 			.map(([key, item]) => `--color-${key}: ${item.color}`)
 			.join('; ')
 	);
-
-	setChartContext({
-		get config() {
-			return config;
-		}
-	});
 </script>
 
 <div
 	bind:this={ref}
-	data-chart={chartId}
 	data-slot="chart"
 	class={cn(
 		'flex aspect-video justify-center overflow-visible text-xs',

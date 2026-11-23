@@ -3,8 +3,18 @@ import { json } from '#lib/testing/api.ts';
 import { apiFetch, CSRF_HEADER, isChange, setSessionHooks, type SessionHooks } from './fetch.ts';
 
 const ORIGIN = location.origin;
-// The API's own wording (backend `rest/auth.py`).
-const STALE = `the header ${CSRF_HEADER} is missing or wrong`;
+// The API's answer to a change without the current token: the code is what counts.
+const stale = (detail = `the header ${CSRF_HEADER} is missing or wrong`): Response =>
+	json(
+		{
+			type: 'about:blank',
+			title: 'Error',
+			status: 403,
+			detail,
+			reason: { code: 'csrf_missing', params: { header: CSRF_HEADER } }
+		},
+		403
+	);
 const fetchMock = vi.fn<(request: Request) => Promise<Response>>();
 
 function problem(status: number, detail: string): Response {
@@ -27,7 +37,6 @@ beforeEach(() => {
 
 afterEach(() => {
 	setSessionHooks(null);
-	vi.unstubAllGlobals();
 });
 
 describe('apiFetch', () => {
@@ -59,7 +68,7 @@ describe('apiFetch', () => {
 		const session = hooks();
 		setSessionHooks(session);
 		fetchMock
-			.mockResolvedValueOnce(problem(403, STALE))
+			.mockResolvedValueOnce(stale())
 			.mockResolvedValueOnce(new Response('{"id":1}', { status: 201 }));
 
 		const response = await apiFetch(
@@ -71,6 +80,27 @@ describe('apiFetch', () => {
 		const retried = fetchMock.mock.calls[1][0];
 		expect(retried.headers.get(CSRF_HEADER)).toBe('token-2');
 		expect(await retried.text()).toBe('{"name":"a"}');
+	});
+
+	it('knows the stale token by the reason’s code, not by the sentence (WG-08)', async () => {
+		const session = hooks();
+		setSessionHooks(session);
+		// Another wording of the same reason: still retried.
+		fetchMock
+			.mockResolvedValueOnce(stale('Send the token of your session.'))
+			.mockResolvedValueOnce(new Response(null, { status: 204 }));
+		await apiFetch(new Request(`${ORIGIN}/api/v1/spaces`, { method: 'POST', body: '{}' }));
+		expect(session.refreshCsrfToken).toHaveBeenCalledOnce();
+
+		// A sentence that names the header without that reason: not retried.
+		fetchMock.mockReset();
+		fetchMock.mockResolvedValue(problem(403, `the header ${CSRF_HEADER} is missing or wrong`));
+		const response = await apiFetch(
+			new Request(`${ORIGIN}/api/v1/spaces`, { method: 'POST', body: '{}' })
+		);
+		expect(response.status).toBe(403);
+		expect(fetchMock).toHaveBeenCalledOnce();
+		expect(session.refreshCsrfToken).toHaveBeenCalledOnce();
 	});
 
 	it('does not retry other refusals', async () => {
@@ -89,7 +119,7 @@ describe('apiFetch', () => {
 
 	it('gives up when no fresh token comes', async () => {
 		setSessionHooks(hooks({ refreshCsrfToken: async () => null }));
-		fetchMock.mockResolvedValue(problem(403, STALE));
+		fetchMock.mockResolvedValue(stale());
 
 		const response = await apiFetch(new Request(`${ORIGIN}/api/v1/spaces`, { method: 'DELETE' }));
 

@@ -1,11 +1,11 @@
 import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { components } from '#lib/api/schema.ts';
 import { showPages } from '#lib/beam.svelte.ts';
 import { quoted } from '#lib/i18n.ts';
 import { m } from '#lib/paraglide/messages.js';
-import { fakeApi, json } from '#lib/testing/api.ts';
+import { fakeApi, problem } from '#lib/testing/api.ts';
 import PageEditor from './PageEditor.svelte';
 
 // The Beam is the app's: here only what the editor hands it.
@@ -19,7 +19,7 @@ type Document = components['schemas']['DocumentDetails'];
 const DOCUMENT = { id: 'doc-1', title: '2022/11', page_count: 3 } as unknown as Document;
 
 let sent: FormData | null = null;
-let fetchMock = fakeApi();
+let fetchMock: ReturnType<typeof fakeApi>;
 
 beforeEach(() => {
 	sent = null;
@@ -29,15 +29,14 @@ beforeEach(() => {
 		}),
 		'POST /api/v1/documents/doc-1/edit': async (request) => {
 			sent = await request.formData();
-			return { documents: [], deleted: false };
+			return { documents: [], deleted: false, merged: [] };
 		},
 		'GET /api/v1/documents/doc-1/files': () => ({ versions: [{}, {}] }),
-		'GET /api/v1/documents/doc-2/files': () => ({ versions: [{}] })
+		'GET /api/v1/documents/doc-2/files': () => ({ versions: [{}] }),
+		'GET /api/v1/documents/doc-3/files': () => ({ versions: [{}] })
 	});
 	vi.stubGlobal('fetch', fetchMock);
 });
-
-afterEach(() => vi.unstubAllGlobals());
 
 function open(onedited = vi.fn()) {
 	render(PageEditor, { open: true, document: DOCUMENT, onedited });
@@ -210,8 +209,7 @@ describe('PageEditor', () => {
 		// Still the parts, as they were.
 		expect(screen.getAllByRole('button', { name: m.page_edit_version() })).toHaveLength(2);
 		fetchMock = fakeApi({
-			'POST /api/v1/documents/doc-1/edit': () =>
-				json({ title: 'Conflict', status: 409, detail: 'Being processed.' }, 409)
+			'POST /api/v1/documents/doc-1/edit': () => problem(409, { detail: 'Being processed.' })
 		});
 		vi.stubGlobal('fetch', fetchMock);
 		await apply(user);
@@ -310,6 +308,26 @@ describe('PageEditor', () => {
 		expect(JSON.parse(String(sent?.get('documents')))).toEqual(['doc-2']);
 		expect(sent?.get('target')).toBeNull();
 		expect(onedited).toHaveBeenCalledWith(expect.anything(), 'doc-1');
+	});
+
+	it('merges documents of one title: the question names each of them', async () => {
+		const user = userEvent.setup();
+		// A title pattern gives the same title to every statement of a month.
+		const same = (id: string) => ({ id, title: 'Kontoauszug 2026-03', page_count: 1 });
+		render(PageEditor, {
+			open: true,
+			document: DOCUMENT,
+			mergeWith: [same('doc-2'), same('doc-3')],
+			onedited: vi.fn()
+		});
+		await user.click(screen.getByRole('button', { name: m.page_edit_next() }));
+		await user.click(screen.getByRole('button', { name: m.page_edit_apply() }));
+
+		const title = quoted('Kontoauszug 2026-03');
+		expect(rows().at(-1)).toEqual([
+			m.page_edit_deleted(),
+			`${title}${title} ${m.merge_moved({ target: '2022/11' })}`
+		]);
 	});
 
 	it('merges no document whose pages all left the stack', async () => {

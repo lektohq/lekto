@@ -2,28 +2,27 @@ import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import { createRawSnippet, tick } from 'svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { LANGUAGE_NAMES, locales } from '#lib/i18n.ts';
+import { signIn } from '#lib/testing/session.ts';
+import { NO_FILTERS } from '#lib/filters.ts';
 import { inbox } from '#lib/inbox.svelte.ts';
+import { rememberedFilters, rememberFilters } from '#lib/listing.ts';
 import { offerPageSearch } from '#lib/page-search.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { phone } from '#lib/phone.svelte.ts';
+import { leaveDevice } from '#lib/push-device.ts';
 import { scope } from '#lib/scope.svelte.ts';
 import { SETTINGS } from '#lib/sections.ts';
-import { session, type User } from '#lib/session.svelte.ts';
+import { session } from '#lib/session.svelte.ts';
 import AppShell from './AppShell.svelte';
 
-vi.mock('$app/navigation', () => ({ beforeNavigate: vi.fn(), goto: vi.fn() }));
-vi.mock('$app/state', () => ({ page: { url: new URL('http://lekto/ui/inbox'), state: {} } }));
+vi.mock('$app/navigation', () => import('#lib/testing/navigation.ts'));
+vi.mock('#lib/push-device.ts', async (original) => ({
+	...(await original<typeof import('#lib/push-device.ts')>()),
+	leaveDevice: vi.fn(async () => {})
+}));
+vi.mock('$app/state', () => import('#lib/testing/app-state.ts'));
 
 const children = createRawSnippet(() => ({ render: () => '<p>content</p>' }));
-
-function signIn(role: User['role']) {
-	session.start({
-		user: { id: '0199a6c4-0000-7000-8000-000000000001', username: 'tobi', role },
-		method: 'password',
-		expires_at: '2026-10-09T12:00:00Z',
-		csrf_token: 'token'
-	});
-}
 
 afterEach(async () => {
 	session.clear();
@@ -43,7 +42,7 @@ function mainNavigation() {
 /** The account menu; bits-ui opens it on a pointer press. */
 async function openAccountMenu(): Promise<HTMLElement> {
 	await fireEvent.pointerDown(
-		screen.getByRole('button', { name: m.account_menu({ username: 'tobi' }) }),
+		screen.getByRole('button', { name: m.account_menu({ username: 'john' }) }),
 		{
 			button: 0,
 			pointerType: 'mouse'
@@ -208,8 +207,39 @@ describe('AppShell', () => {
 		expect(screen.getByRole('link', { name: m.skip_to_content() }).getAttribute('href')).toBe(
 			'#main'
 		);
-		expect(screen.getByRole('button', { name: m.account_menu({ username: 'tobi' }) })).toBeTruthy();
+		expect(screen.getByRole('button', { name: m.account_menu({ username: 'john' }) })).toBeTruthy();
 		expect(screen.getByText('content')).toBeTruthy();
+	});
+
+	it('forgets the remembered filters on signing out: nothing of them stays on the device', async () => {
+		phone.override(false);
+		signIn('user');
+		const id = session.user!.id;
+		rememberFilters({ ...NO_FILTERS, contacts: ['c1'] }, id);
+		const logout = vi.spyOn(session, 'logout').mockResolvedValue();
+		render(AppShell, { children });
+
+		const menu = await openAccountMenu();
+		await fireEvent.click(within(menu).getByRole('menuitem', { name: m.sign_out() }));
+
+		await vi.waitFor(() => expect(logout).toHaveBeenCalled());
+		expect(rememberedFilters(id)).toBeNull();
+		expect(localStorage.getItem('lekto.documents.filters')).toBeNull();
+	});
+
+	it('gives the device up before the session ends: no more notifications of this person', async () => {
+		phone.override(false);
+		signIn('user');
+		const order: string[] = [];
+		vi.mocked(leaveDevice).mockImplementation(async () => void order.push('device'));
+		vi.spyOn(session, 'logout').mockImplementation(async () => void order.push('session'));
+		render(AppShell, { children });
+
+		const menu = await openAccountMenu();
+		await fireEvent.click(within(menu).getByRole('menuitem', { name: m.sign_out() }));
+
+		// The device first: the server only takes it back from someone signed in.
+		await vi.waitFor(() => expect(order).toEqual(['device', 'session']));
 	});
 
 	it('keeps language and theme in the account menu (web/DESIGN.md, "Navigation")', async () => {
@@ -228,11 +258,11 @@ describe('AppShell', () => {
 		signIn('admin');
 		render(AppShell, { children });
 		expect(screen.queryByRole('button', { name: m.theme_label() })).toBeNull();
-		expect(screen.queryByRole('button', { name: /^Sprache|^Language/ })).toBeNull();
-		expect(screen.queryByRole('button', { name: m.account_menu({ username: 'tobi' }) })).toBeNull();
+		expect(screen.queryByRole('button', { name: /Sprache:|Language:/ })).toBeNull();
+		expect(screen.queryByRole('button', { name: m.account_menu({ username: 'john' }) })).toBeNull();
 		await fireEvent.click(screen.getByRole('button', { name: m.nav_open() }));
 		const sheet = await screen.findByRole('dialog');
-		expect(within(sheet).getByText('tobi')).toBeTruthy();
+		expect(within(sheet).getByText('john')).toBeTruthy();
 		expect(within(sheet).getByText(m.role_admin())).toBeTruthy();
 		expect(within(sheet).getByRole('switch', { name: new RegExp(m.all_users()) })).toBeTruthy();
 		const links = within(sheet).getAllByRole('link');
@@ -247,6 +277,14 @@ describe('AppShell', () => {
 			'/ui/system',
 			'/api/v1/docs'
 		]);
+		// The rows below the navigation are a finger tall, as those above (WB-09).
+		for (const row of [
+			within(sheet).getByRole('button', { name: SETTINGS.label() }),
+			within(sheet).getByRole('link', { name: new RegExp(m.api_docs()) }),
+			within(sheet).getByRole('button', { name: m.sign_out() })
+		]) {
+			expect(row.className.split(' ')).toEqual(expect.arrayContaining(['h-11', 'text-sm']));
+		}
 		const language = within(sheet).getByRole('group', { name: m.language_label() });
 		expect(
 			within(language)
@@ -267,10 +305,10 @@ describe('AppShell', () => {
 		phone.override(false);
 		signIn('user');
 		render(AppShell, { children });
-		expect(screen.getByRole('button', { name: m.account_menu({ username: 'tobi' }) })).toBeTruthy();
+		expect(screen.getByRole('button', { name: m.account_menu({ username: 'john' }) })).toBeTruthy();
 		await fireEvent.click(screen.getByRole('button', { name: m.nav_open() }));
 		const sheet = await screen.findByRole('dialog');
-		expect(within(sheet).queryByText('tobi')).toBeNull();
+		expect(within(sheet).queryByText('john')).toBeNull();
 		expect(within(sheet).queryByRole('button', { name: m.sign_out() })).toBeNull();
 		expect(within(sheet).getAllByRole('link')).toHaveLength(6);
 	});

@@ -4,6 +4,7 @@ import { fakeApi } from '#lib/testing/api.ts';
 import { events } from '#lib/events.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import DocumentText from './DocumentText.svelte';
+import { streamEvents } from '#lib/testing/events.ts';
 
 let answer: object = {};
 let fetchMock = fakeApi();
@@ -18,36 +19,15 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-	vi.unstubAllGlobals();
 	vi.restoreAllMocks();
 });
 
 describe('DocumentText', () => {
 	it('reads the text again only when its node has read it again', async () => {
 		// Issue #75: of a run's events only the text's node changes the text.
-		const listeners = new Map<string, (message: { data: string }) => void>();
-		events.useFactory(
-			() =>
-				({
-					addEventListener(type: string, handler: (message: { data: string }) => void) {
-						listeners.set(type, handler);
-					},
-					close() {}
-				}) as unknown as EventSource
-		);
-		events.start(() => {});
+		const send = streamEvents();
 		const completed = (node: string) =>
-			listeners.get('document.node_completed')?.({
-				data: JSON.stringify({
-					type: 'document.node_completed',
-					id: node,
-					occurred_at: '',
-					document_id: 'doc-1',
-					node,
-					run: 1,
-					outcome: 'ok'
-				})
-			});
+			send('document.node_completed', { document_id: 'doc-1', node, run: 1, outcome: 'ok' });
 		render(DocumentText, { documentId: 'doc-1' });
 		await screen.findByRole('region', { name: m.content_page({ page: 1 }) });
 		for (const node of ['ocr', 'pages', 'signal_llm', 'judge']) completed(node);

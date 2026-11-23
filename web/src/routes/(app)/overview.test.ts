@@ -1,13 +1,15 @@
-import { render, screen, within } from '@testing-library/svelte';
+import { render, screen, waitFor, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { components } from '#lib/api/schema.ts';
+import { signIn } from '#lib/testing/session.ts';
 import { formatDate } from '#lib/i18n.ts';
 import { inbox } from '#lib/inbox.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { session } from '#lib/session.svelte.ts';
 import { calls, fakeApi } from '#lib/testing/api.ts';
 import Page from './+page.svelte';
+import { jobsSummaryOf } from '#lib/testing/system.ts';
 
 type Expected = components['schemas']['ExpectedOut'];
 
@@ -26,24 +28,17 @@ const series = (state: Expected['state'], changes: Partial<Expected> = {}): Expe
 	...changes
 });
 
-const JOBS = {
-	kinds: [
-		{ kind: 'contacts.logo', running: 0, due: 3, planned: 0, failed: 2, done: 10 },
-		{ kind: 'documents.index', running: 1, due: 0, planned: 0, failed: 0, done: 40 }
-	],
-	last_started_at: '2026-10-27T11:59:56Z',
-	now: '2026-10-27T12:00:00Z',
-	kept_since: '2026-10-20T12:00:00Z'
-};
-
-function signIn(role: 'admin' | 'user') {
-	session.start({
-		user: { id: 'u1', username: 'tobi', role },
-		method: 'password',
-		expires_at: '2026-10-28T12:00:00Z',
-		csrf_token: 'token'
-	} as never);
-}
+const JOBS = jobsSummaryOf(
+	{
+		'contacts.logo': { due: 3, failed: 2, done: 10 },
+		'documents.index': { running: 1, done: 40 }
+	},
+	{
+		last_started_at: '2026-10-27T11:59:56Z',
+		now: '2026-10-27T12:00:00Z',
+		kept_since: '2026-10-20T12:00:00Z'
+	}
+);
 
 function routes(expected: Expected[] = [], suggested = 2) {
 	return fakeApi({
@@ -54,9 +49,8 @@ function routes(expected: Expected[] = [], suggested = 2) {
 }
 
 afterEach(() => {
-	inbox.summary = null;
+	inbox.stop();
 	session.clear();
-	vi.unstubAllGlobals();
 });
 
 describe('Übersicht', () => {
@@ -108,7 +102,7 @@ describe('Übersicht', () => {
 				'GET /api/v1/expected': () => [],
 				'GET /api/v1/jobs/summary': () => ({
 					...JOBS,
-					kinds: [{ kind: 'documents.index', running: 0, due: 0, planned: 0, failed: 0, done: 4 }]
+					kinds: jobsSummaryOf({ 'documents.index': { done: 4 } }).kinds
 				})
 			})
 		);
@@ -139,6 +133,41 @@ describe('Übersicht', () => {
 		expect(await within(identifiers).findByText('0')).toBeTruthy();
 		expect(identifiers.textContent).toContain(m.overview_identifiers_suggestions());
 		expect(container.querySelector('.lg\\:grid-cols-3')).toBeTruthy();
+	});
+
+	it('breaks a tile’s title with a hyphen where it is too long, never off (WE-07)', () => {
+		signIn('user');
+		vi.stubGlobal('fetch', routes());
+		render(Page);
+		const title = screen
+			.getByRole('region', { name: m.nav_inbox() })
+			.querySelector('[data-slot="card-title"]')!;
+		expect(title.className.split(' ')).toEqual(
+			expect.arrayContaining(['hyphens-auto', 'break-words'])
+		);
+		expect(title.className.split(' ')).not.toContain('truncate');
+	});
+
+	it('says that the inbox could not be read, and reads it again on request (WE-08)', async () => {
+		signIn('user');
+		const api = routes();
+		vi.stubGlobal('fetch', api);
+		// The header's counter failed and nothing was read before: the tile loaded without end.
+		inbox.failure = new TypeError('Failed to fetch');
+		render(Page);
+		const tile = screen.getByRole('region', { name: m.nav_inbox() });
+		expect(within(tile).getByRole('alert').textContent).toContain(m.error_network());
+		inbox.summary = {
+			open: 0,
+			new: 0,
+			review: 0,
+			intervene: 0,
+			processing: 0,
+			done: 0,
+			worst_lane: null
+		} as never;
+		inbox.failure = null;
+		await waitFor(() => expect(within(tile).queryByRole('alert')).toBeNull());
 	});
 
 	it('leaves the identifiers to admins', async () => {

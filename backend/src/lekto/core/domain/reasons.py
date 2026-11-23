@@ -316,6 +316,7 @@ class ReasonCode(StrEnum):
     SPACE_MEMBERS_PERSONAL = "space_members_personal"
     SPACE_MEMBERS = "space_members"
     SPACE_RULE_APPLY = "space_rule_apply"
+    RULE_APPLY_TOO_MANY = "rule_apply_too_many"
     RULE_DISABLED_DELETED = "rule_disabled_deleted"
     RULE_DISABLED_PERSONAL_SPACE = "rule_disabled_personal_space"
     RULE_DISABLED_CHOICE = "rule_disabled_choice"
@@ -389,6 +390,8 @@ class ReasonCode(StrEnum):
     TITLE_PATTERN_TOO_LONG = "title_pattern_too_long"
     DESCRIPTION_TOO_LONG = "description_too_long"
     TITLE_PATTERN_UNKNOWN = "title_pattern_unknown"
+    TEMPLATE_UNKNOWN_VALUE = "template_unknown_value"
+    TEMPLATE_UNKNOWN_VALUE_AT = "template_unknown_value_at"
     TAG_OWN_PARENT = "tag_own_parent"
     GROUPS_MANUAL = "groups_manual"
     TAG_WRONG_SCOPE = "tag_wrong_scope"
@@ -843,6 +846,7 @@ TEMPLATES: Mapping[ReasonCode, str] = {
     ReasonCode.SPACE_MEMBERS_PERSONAL: "only its user and admins choose the members of space {id}",
     ReasonCode.SPACE_MEMBERS: "only editors and admins choose the members of space {id}",
     ReasonCode.SPACE_RULE_APPLY: "only the space's editors and admins apply a space rule",
+    ReasonCode.RULE_APPLY_TOO_MANY: "select at most {max:number} documents",
     ReasonCode.RULE_DISABLED_DELETED: "{kind:thing} '{name}' was deleted",
     ReasonCode.RULE_DISABLED_PERSONAL_SPACE: "the personal space of '{user}' was deleted",
     ReasonCode.RULE_DISABLED_CHOICE: "field '{field}' no longer allows a value the rule uses",
@@ -955,6 +959,11 @@ TEMPLATES: Mapping[ReasonCode, str] = {
     ReasonCode.TITLE_PATTERN_UNKNOWN: (
         "the title pattern uses {value}, which a template of '{type}' does not know (fields: "
         "field.<key> of those that apply to the type)"
+    ),
+    ReasonCode.TEMPLATE_UNKNOWN_VALUE: "unknown value {value}",
+    ReasonCode.TEMPLATE_UNKNOWN_VALUE_AT: (
+        "{at}: unknown value {value}; templates know {known:list}, field.<key> of an existing "
+        "field and steps.<name> of a step before that asks"
     ),
     ReasonCode.TAG_OWN_PARENT: "a tag cannot be its own parent",
     ReasonCode.GROUPS_MANUAL: "groups are set by hand only (assignment 'manual')",
@@ -1083,6 +1092,88 @@ TEMPLATES: Mapping[ReasonCode, str] = {
 }
 
 
+class Thing(StrEnum):
+    """What a reason names (`NOT_FOUND`, `NAME_EMPTY`, `RULE_DISABLED_DELETED` and the others
+    with a parameter of the kind `thing`): the nouns the core writes, in English as they stand
+    in the text. Clients word them in their language and need to know every one (`x-things` of
+    the OpenAPI document), so a noun is added here when the core starts to name something; a
+    test reads the code for nouns that are missing."""
+
+    API_TOKEN = "API token"
+    ALIAS = "alias"
+    ARCHIVE = "archive"
+    BULK_OPERATION = "bulk operation"
+    CHOICE = "choice"
+    CLASSIFIER_MODEL = "classifier model"
+    CONTACT = "contact"
+    CONTACT_GROUP = "contact group"
+    CREDENTIAL = "credential"
+    DEVICE_NAME = "device name"
+    DISPLAY_NAME = "display name"
+    DOCUMENT = "document"
+    DOCUMENT_TAG = "document tag"
+    DOCUMENT_TYPE = "document type"
+    DOCUMENT_TYPE_GROUP = "document type group"
+    DOCUMENT_VERSION = "document version"
+    EXTERNAL_IDENTITY = "external identity"
+    FACT = "fact"
+    FIELD = "field"
+    FILE = "file"
+    IDENTIFIER = "identifier"
+    IDENTITY_PROVIDER = "identity provider"
+    INSTANCE = "instance"
+    ISSUER = "issuer"
+    JOB = "job"
+    KNOWN_DEVICE = "known device"
+    LENS = "lens"
+    LENS_NAME = "lens name"
+    LOGIN_FAILURES = "login failures"
+    LOGO_OF_CONTACT = "logo of contact"
+    MAIL_RECORD = "mail record"
+    MAIL_RULE = "mail rule"
+    MAILBOX = "mailbox"
+    MEDIA_TYPE = "media type"
+    NAME = "name"
+    OBJECT = "object"
+    ORIGINAL = "original"
+    ORIGINAL_FILENAME = "original filename"
+    PAGE = "page"
+    PERSONAL_SPACE_OF_USER = "personal space of user"
+    PREVIEW = "preview"
+    PROFILE = "profile"
+    PUSH_DEVICE = "push device"
+    PUSH_PREFERENCES = "push preferences"
+    RELATION = "relation"
+    RULE = "rule"
+    RULE_APPLICATION = "rule application"
+    RULE_NAME = "rule name"
+    RULE_VERSION = "rule version"
+    SESSION = "session"
+    SPACE = "space"
+    SPACE_NAME = "space name"
+    SUBJECT = "subject"
+    TAG = "tag"
+    TASK = "task"
+    TITLE = "title"
+    TOKEN_NAME = "token name"
+    TOPIC = "topic"
+    USER = "user"
+    USERNAME = "username"
+    VERSION = "version"
+    WEBHOOK = "webhook"
+    WEBHOOK_DELIVERY = "webhook delivery"
+    WEBHOOK_NAME = "webhook name"
+    # A step of a mail rule on a mail on the server (`mail.MailAction`).
+    MAIL_STEP_READ = "mail_step:read"
+    MAIL_STEP_UNREAD = "mail_step:unread"
+    MAIL_STEP_FLAG = "mail_step:flag"
+    MAIL_STEP_UNFLAG = "mail_step:unflag"
+    MAIL_STEP_ADD_KEYWORD = "mail_step:add_keyword"
+    MAIL_STEP_REMOVE_KEYWORD = "mail_step:remove_keyword"
+    MAIL_STEP_MOVE = "mail_step:move"
+    MAIL_STEP_TRASH = "mail_step:trash"
+
+
 class Action(StrEnum):
     """What only some may do (`ADMINS_ONLY`, `EDITORS_ONLY`, `ADMINS_CANNOT`): the parameter
     of the kind `action`, written in English as `ACTIONS` has it."""
@@ -1188,7 +1279,9 @@ KINDS: Mapping[str, str] = {
 """The kinds a template may give a parameter (after its colon; none: text), by the name the
 catalog gives them: `number` a number, `percent` a fraction from 0 to 1, `date` a day in ISO
 8601, `value` a field's value as a reason shows it (a string, true or false for yes or no, null
-for none), `names` a list of names, `fields` a list of check fields (`contact`, `field:<id>`,
+for none; a number, an amount, a date and a period as `{"type", "value", "text"}`: the data type,
+the value in the JSON form of fields for the client to write in its language, and its English
+text), `names` a list of names, `fields` a list of check fields (`contact`, `field:<id>`,
 ...), `rule_values` a list of `{"rule": name, "value": value}` (what each rule sets), `path`
 a list of names one after the other (spaces a document went through), `reason` another reason
 (`Reason.to_json`), `list` a list of names, quoted and joined by commas, `nodes` a list of
@@ -1255,11 +1348,21 @@ def _items(value: object) -> list[object]:
     return list(value) if isinstance(value, list | tuple) else [value]
 
 
+def typed_value(type: str, value: JsonValue, text: str) -> JsonValue:
+    """A field's value for a reason's `value` parameter that a client writes in its language:
+    its data type (`number`, `amount`, `date`, `period`), the value in the JSON form of fields
+    (`fields.field_to_json`) and `text`, how the English reason writes it."""
+    return {"type": type, "value": value, "text": text}
+
+
 def _value(value: object) -> str:
     if value is None:
         return "none"
     if isinstance(value, bool):
         return "yes" if value else "no"
+    if isinstance(value, dict):
+        # A value with its type (`typed_value`): its English text.
+        return str(value.get("text"))
     return str(value)
 
 

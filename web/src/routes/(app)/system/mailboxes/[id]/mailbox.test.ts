@@ -4,49 +4,18 @@ import { render, screen, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MailItem } from '#lib/mail-log.ts';
-import type { Mailbox } from '#lib/mailboxes.ts';
+import { signIn } from '#lib/testing/session.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { session } from '#lib/session.svelte.ts';
-import { calls, fakeApi, json } from '#lib/testing/api.ts';
+import { calls, fakeApi, notFound, problem } from '#lib/testing/api.ts';
 import { goTo } from '#lib/testing/page-state.svelte.ts';
 import Page from './+page.svelte';
+import { mailboxOf } from '#lib/testing/system.ts';
 
-vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
-vi.mock('$app/state', async () => ({
-	page: (await import('#lib/testing/page-state.svelte.ts')).testPage
-}));
+vi.mock('$app/navigation', () => import('#lib/testing/navigation.ts'));
+vi.mock('$app/state', () => import('#lib/testing/app-state.ts'));
 
-const MAILBOX: Mailbox = {
-	id: 'm1',
-	name: 'Haushalt',
-	host: 'imap.example.test',
-	port: 993,
-	security: 'tls',
-	username: 'haushalt@example.test',
-	folders: ['INBOX'],
-	interval_minutes: 5,
-	start: 'since_setup',
-	since: null,
-	fallback: 'nothing',
-	fallback_user_id: null,
-	body_type_id: null,
-	enabled: true,
-	status: {
-		last_attempt_at: null,
-		last_success_at: null,
-		error: null,
-		mails: 0,
-		documents: 0,
-		skipped_at: null,
-		skipped: null,
-		step_failed_at: null,
-		step_failed: null,
-		keywords: [],
-		own_keywords: null
-	},
-	created_at: '2026-11-04T10:00:00Z',
-	updated_at: '2026-11-04T10:00:00Z'
-};
+const MAILBOX = mailboxOf();
 
 const MAIL: MailItem = {
 	id: 'mail-1',
@@ -76,18 +45,12 @@ const tip = () => screen.queryByRole('button', { name: m.hint_about({ name: m.ma
 
 describe('the page of a mailbox', () => {
 	beforeEach(() => {
-		session.start({
-			user: { id: 'u1', username: 'tobi', role: 'admin' },
-			method: 'password',
-			expires_at: '2026-11-08T12:00:00Z',
-			csrf_token: 'token'
-		} as never);
+		signIn('admin');
 		goTo('/ui/system/mailboxes/m1', { id: 'm1' });
 	});
 
 	afterEach(() => {
 		session.clear();
-		vi.unstubAllGlobals();
 		localStorage.clear();
 	});
 
@@ -147,15 +110,41 @@ describe('the page of a mailbox', () => {
 		expect(within(table).getByText('stadtwerke@example.test')).toBeTruthy();
 	});
 
+	it('loads the log too when trying again brought the mailbox (WF-02)', async () => {
+		// The retry read only the mailbox: its log stood at "loading" and asked for nothing.
+		let down = true;
+		const api = fakeApi({
+			'GET /api/v1/mailboxes/m1': () => (down ? problem(503) : MAILBOX),
+			'GET /api/v1/mailboxes/m1/mails': () => ({ items: [MAIL], total: 1, next_offset: null }),
+			'GET /api/v1/mailboxes/m1/mails/summary': () => ({
+				counts: { taken: 1 },
+				rules: [],
+				waiting: [],
+				kept: 500
+			})
+		});
+		vi.stubGlobal('fetch', api);
+		render(Page);
+		await screen.findByRole('alert');
+		expect(calls(api).filter((call) => call.includes('/mails'))).toEqual([]);
+		down = false;
+		await userEvent.setup().click(screen.getByRole('button', { name: m.retry() }));
+		const table = await screen.findByRole('table');
+		expect(within(table).getByText('Rechnung Oktober')).toBeTruthy();
+		expect(screen.queryByRole('alert')).toBeNull();
+	});
+
 	it('shows one problem for a mailbox that is not there, and asks for no log', async () => {
 		const api = fakeApi({
-			'GET /api/v1/mailboxes/m1': () =>
-				json({ type: 'about:blank', title: 'Not Found', status: 404 }, 404)
+			'GET /api/v1/mailboxes/m1': () => notFound('mailbox', 'm1')
 		});
 		vi.stubGlobal('fetch', api);
 		render(Page);
 		expect(await screen.findByRole('alert')).toBeTruthy();
 		expect(screen.getAllByRole('alert')).toHaveLength(1);
+		// In the page's own words, and no "Try again": it would change nothing (WF-04).
+		expect(screen.getByText(m.mailbox_not_found())).toBeTruthy();
+		expect(screen.queryByRole('button', { name: m.retry() })).toBeNull();
 		expect(screen.queryByText(m.mailbox_log())).toBeNull();
 		expect(calls(api).filter((call) => call.includes('/mails'))).toEqual([]);
 	});

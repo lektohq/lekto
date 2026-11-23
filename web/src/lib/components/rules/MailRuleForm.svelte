@@ -1,13 +1,13 @@
 <script lang="ts">
-	import Plus from '@lucide/svelte/icons/plus';
-	import HintLabel from '#lib/components/HintLabel.svelte';
+	import AddActionMenu from '#lib/components/rules/AddActionMenu.svelte';
+	import RuleFormFoot from '#lib/components/rules/RuleFormFoot.svelte';
+	import MailValueInput from '#lib/components/rules/MailValueInput.svelte';
+	import RuleFormHead from '#lib/components/rules/RuleFormHead.svelte';
 	import ConditionGroup, { type RowMoves } from '#lib/components/rules/ConditionGroup.svelte';
 	import RuleRow from '#lib/components/rules/RuleRow.svelte';
 	import SectionTitle from '#lib/components/page/SectionTitle.svelte';
 	import SearchSelect from '#lib/components/SearchSelect.svelte';
 	import Select from '#lib/components/Select.svelte';
-	import { Button, buttonVariants } from '#lib/components/ui/button/index.ts';
-	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.ts';
 	import * as Field from '#lib/components/ui/field/index.ts';
 	import { Input } from '#lib/components/ui/input/index.ts';
 	import {
@@ -21,6 +21,7 @@
 		firstValue,
 		FIELDS,
 		hasValue,
+		MAIL_VALUE_MAX,
 		newCondition,
 		operatorText,
 		OPERATORS,
@@ -32,13 +33,6 @@
 		type MailRuleForm,
 		type Optional
 	} from '#lib/mail-rules.ts';
-	import { withChoice } from '#lib/components/rules/options.ts';
-	import {
-		flagOptions,
-		importanceOptions,
-		keywordOptions,
-		typedKeyword
-	} from '#lib/mail-traits.ts';
 	import { folderLabel, LIMITS as MAILBOX_LIMITS, type Mailbox } from '#lib/mailboxes.ts';
 	import {
 		userChoice,
@@ -47,9 +41,7 @@
 		type UserName
 	} from '#lib/masterdata.svelte.ts';
 	import { m } from '#lib/paraglide/messages.js';
-	import { LIMITS } from '#lib/rules/model.ts';
 	import { move } from '#lib/rules/tree.ts';
-	import { cn } from '#lib/utils.ts';
 
 	// The editor of a mail rule (Tobi, 04.11.2026; mock E), in the frame of the document rule's:
 	// name and priority, the mailbox it belongs to, the conditions on the mail in the tree every
@@ -148,36 +140,13 @@
 		if (!busy) onsubmit();
 	}}
 >
-	<div class="grid gap-4 sm:grid-cols-[1fr_12rem]">
-		<Field.Field>
-			<Field.Label for="mail-rule-name">{m.field_name()}</Field.Label>
-			<Input
-				id="mail-rule-name"
-				bind:value={form.name}
-				maxlength={LIMITS.name}
-				aria-invalid={errors.name ? true : undefined}
-			/>
-			{#if errors.name}<Field.Error>{errors.name}</Field.Error>{/if}
-		</Field.Field>
-		<Field.Field>
-			<HintLabel
-				for="mail-rule-priority"
-				label={m.rule_priority()}
-				hint={m.mail_rule_priority_info()}
-			/>
-			<Input
-				id="mail-rule-priority"
-				type="number"
-				min={LIMITS.priorityMin}
-				max={LIMITS.priorityMax}
-				step={1}
-				bind:value={form.priority}
-				aria-invalid={errors.priority ? true : undefined}
-			/>
-			{#if errors.priority}<Field.Error>{errors.priority}</Field.Error>{/if}
-			<Field.Description>{m.rule_priority_hint()}</Field.Description>
-		</Field.Field>
-	</div>
+	<RuleFormHead
+		bind:name={form.name}
+		bind:priority={form.priority}
+		{errors}
+		prefix="mail-rule"
+		priorityInfo={m.mail_rule_priority_info()}
+	/>
 
 	<Field.Field>
 		<Field.Label for="mail-rule-mailbox">{m.mail_rule_mailbox()}</Field.Label>
@@ -186,8 +155,10 @@
 			bind:value={form.mailboxId}
 			options={mailboxes.map((entry) => ({ value: entry.id, label: entry.name }))}
 			aria-invalid={errors.mailbox ? true : undefined}
+			aria-describedby={errors.mailbox ? 'mail-rule-mailbox-error' : undefined}
 		/>
-		{#if errors.mailbox}<Field.Error>{errors.mailbox}</Field.Error>{/if}
+		{#if errors.mailbox}<Field.Error id="mail-rule-mailbox-error">{errors.mailbox}</Field.Error
+			>{/if}
 	</Field.Field>
 
 	<section class="flex flex-col gap-3" aria-labelledby="mail-rule-conditions">
@@ -221,37 +192,21 @@
 							bind:value={condition.value}
 							options={folders}
 						/>
-					{:else if condition.field === 'importance'}
-						<Select
-							aria-label={m.rule_condition_value()}
-							aria-invalid={invalid || undefined}
-							bind:value={condition.value}
-							options={importanceOptions()}
-						/>
-					{:else if condition.field === 'flag'}
-						<Select
-							aria-label={m.rule_condition_value()}
-							aria-invalid={invalid || undefined}
-							bind:value={condition.value}
-							options={withChoice(flagOptions(), condition.value)}
-						/>
-					{:else if condition.field === 'keyword'}
-						<SearchSelect
-							aria-label={m.rule_condition_value()}
-							aria-invalid={invalid || undefined}
-							title={m.mail_keyword_title()}
-							bind:value={condition.value}
-							options={keywordOptions(mailbox?.status.keywords ?? [], condition.value)}
-							placeholder={m.rule_choose()}
-							create={typedKeyword}
-							createLabel={m.mail_keyword_use}
+					{:else if condition.field === 'importance' || condition.field === 'flag' || condition.field === 'keyword'}
+						<MailValueInput
+							trait={condition.field}
+							label={m.rule_condition_value()}
+							{invalid}
+							value={condition.value}
+							keywords={mailbox?.status.keywords ?? []}
+							onchange={(next) => (condition.value = next)}
 						/>
 					{:else}
 						<Input
 							aria-label={m.rule_condition_value()}
 							aria-invalid={invalid || undefined}
 							bind:value={condition.value}
-							maxlength={LIMITS.text}
+							maxlength={MAIL_VALUE_MAX}
 						/>
 					{/if}
 				</div>
@@ -349,23 +304,14 @@
 				onremove={() => form.steps.splice(index, 1)}
 			>
 				<div class="flex min-w-0 flex-1 basis-64 flex-col gap-2">
-					{#if step.action === 'flag'}
-						<Select
-							aria-label={STEP_LABELS[step.action]()}
-							aria-invalid={invalid || undefined}
-							bind:value={step.value}
-							options={flagOptions()}
-						/>
-					{:else if step.action === 'add_keyword' || step.action === 'remove_keyword'}
-						<SearchSelect
-							aria-label={STEP_LABELS[step.action]()}
-							aria-invalid={invalid || undefined}
-							title={m.mail_keyword_title()}
-							bind:value={step.value}
-							options={keywordOptions(mailbox?.status.keywords ?? [], step.value)}
-							placeholder={m.rule_choose()}
-							create={typedKeyword}
-							createLabel={m.mail_keyword_use}
+					{#if step.action === 'flag' || step.action === 'add_keyword' || step.action === 'remove_keyword'}
+						<MailValueInput
+							trait={step.action === 'flag' ? 'flag' : 'keyword'}
+							label={STEP_LABELS[step.action]()}
+							{invalid}
+							value={step.value}
+							keywords={mailbox?.status.keywords ?? []}
+							onchange={(next) => (step.value = next)}
 						/>
 					{:else if step.action === 'move'}
 						<Input
@@ -386,41 +332,27 @@
 		{/if}
 
 		{#if addable.length > 0 || steps.length > 0}
-			<div>
-				<DropdownMenu.Root>
-					<DropdownMenu.Trigger class={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}>
-						<Plus aria-hidden="true" />
-						{m.rule_add_action()}
-					</DropdownMenu.Trigger>
-					<DropdownMenu.Content align="start" class="w-64">
-						{#each addable as item (item)}
-							<DropdownMenu.Item onSelect={() => (form.shown = [...form.shown, item])}
-								>{OPTIONAL_LABELS[item]()}</DropdownMenu.Item
-							>
-						{/each}
-						{#if steps.length > 0}
-							{#if addable.length > 0}<DropdownMenu.Separator />{/if}
-							<DropdownMenu.Label>{m.mail_rule_action_after()}</DropdownMenu.Label>
-							{#each steps as action (action)}
-								<DropdownMenu.Item onSelect={() => (form.steps = withStep(form.steps, action))}
-									>{STEP_LABELS[action]()}</DropdownMenu.Item
-								>
-							{/each}
-						{/if}
-					</DropdownMenu.Content>
-				</DropdownMenu.Root>
-			</div>
+			<AddActionMenu
+				groups={[
+					{
+						items: addable.map((item) => ({
+							key: item,
+							label: OPTIONAL_LABELS[item](),
+							onselect: () => (form.shown = [...form.shown, item])
+						}))
+					},
+					{
+						label: m.mail_rule_action_after(),
+						items: steps.map((action) => ({
+							key: action,
+							label: STEP_LABELS[action](),
+							onselect: () => (form.steps = withStep(form.steps, action))
+						}))
+					}
+				]}
+			/>
 		{/if}
 	</section>
 
-	<div class="flex flex-col gap-3 border-t pt-4">
-		{#if error}<Field.Error>{error}</Field.Error>{/if}
-		<p class="text-sm text-muted-foreground">{m.rule_save_hint()}</p>
-		<div class="flex flex-wrap justify-end gap-2">
-			<a href={cancelHref} class={cn(buttonVariants({ variant: 'ghost' }))} onclick={oncancel}
-				>{m.cancel()}</a
-			>
-			<Button type="submit" disabled={busy}>{m.rule_save()}</Button>
-		</div>
-	</div>
+	<RuleFormFoot {error} held={busy} {cancelHref} {oncancel} />
 </form>

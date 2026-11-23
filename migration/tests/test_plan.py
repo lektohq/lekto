@@ -17,7 +17,7 @@ target: http://lekto:8000
 
 settings:
   currency: EUR
-  fallback_owner: tobi
+  fallback_owner: john
   take_over_added: true
   space_name: "Geteilt: {members}"
 
@@ -28,7 +28,7 @@ documents:
     tags: [Privat]
 
 users:
-  Tobias: {to: user, name: tobi}
+  Johndoe: {to: user, name: john}
   erika: [{to: user, name: erika, create: true}, {to: tag, name: Erika}]
   scanner: drop
 
@@ -77,12 +77,12 @@ HEAD = "source: http://p\ntarget: http://l\n"
 def test_a_plan_says_where_everything_goes() -> None:
     plan = parse(EXAMPLE)
     assert (plan.source, plan.target) == ("http://paperless:8000", "http://lekto:8000")
-    assert plan.settings.fallback_owner == "tobi" and plan.settings.currency == "EUR"
+    assert plan.settings.fallback_owner == "john" and plan.settings.currency == "EUR"
     assert plan.selection.include == {"added": {"from": plans.yaml().load("2018-01-01")}}
     assert plan.selection.exclude == {"tags": ["Privat"]}
 
-    tobias = plan.entry("users", "TOBIAS")
-    assert tobias is not None and tobias.targets == (Target("user", "tobi"),)
+    johndoe = plan.entry("users", "JOHNDOE")
+    assert johndoe is not None and johndoe.targets == (Target("user", "john"),)
     erika = plan.entry("users", "erika")
     assert erika is not None and [t.to for t in erika.targets] == ["user", "tag"]
     scanner = plan.entry("users", "scanner")
@@ -269,7 +269,7 @@ def test_a_plan_that_is_no_yaml_is_refused(tmp_path: Path) -> None:
 # --- selection --------------------------------------------------------------------------------
 
 NAMES = Names(
-    users={1: "tobias", 2: "erika", 3: "bob"},
+    users={1: "johndoe", 2: "erika", 3: "bob"},
     correspondents={1: "ACME Energy"},
     document_types={1: "Invoice"},
     storage_paths={1: "Bank"},
@@ -330,7 +330,7 @@ DOCUMENT: dict[str, Any] = {
         ({"tags": {"all": ["tax", "Privat"]}}, False),
         ({"tags": {"none": ["Privat"]}}, True),
         ({"shared_with": "bob"}, True),  # through the group
-        ({"shared_with": ["tobias"]}, False),  # the owner is no share
+        ({"shared_with": ["johndoe"]}, False),  # the owner is no share
         ({"created": {"from": "2024-01-01", "to": "2024-12-31"}}, True),
         ({"added": {"to": "2024-05-01"}}, False),
         ({"modified": {"from": "2024-06-01"}}, True),
@@ -340,7 +340,7 @@ DOCUMENT: dict[str, Any] = {
         ({"custom_fields": {"Kind": "car"}}, True),
         ({"custom_fields": {"Due": {"from": "2024-07-01"}}}, False),
         ({"custom_fields": {"Missing": False}}, True),
-        ({"correspondent": "acme energy", "owner": "tobias"}, True),
+        ({"correspondent": "acme energy", "owner": "johndoe"}, True),
         ({"correspondent": "acme energy", "owner": "bob"}, False),
     ],
 )
@@ -371,7 +371,7 @@ def test_the_bounds_of_a_custom_field_fit_its_type() -> None:
 
 
 def test_exclude_needs_one_criterion() -> None:
-    exclude = {"tags": "Privat", "owner": "tobias"}
+    exclude = {"tags": "Privat", "owner": "johndoe"}
     assert not selected(plans.Selection(exclude=exclude), DOCUMENT, NAMES)
     assert selected(plans.Selection(exclude={"tags": "Privat"}), DOCUMENT, NAMES)
     both = plans.Selection(include={"correspondent": "ACME Energy"}, exclude={"asn": [77]})

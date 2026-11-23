@@ -1,17 +1,16 @@
 import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { goto } from '$app/navigation';
 import { apiQuery, NO_FILTERS } from '#lib/filters.ts';
 import { formatNumber } from '#lib/i18n.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { calls, fakeApi } from '#lib/testing/api.ts';
 import StreamView from './StreamView.svelte';
+import { goTo } from '#lib/testing/page-state.svelte.ts';
 
-vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
-vi.mock('$app/state', () => ({
-	page: { state: {}, url: new URL('http://localhost/ui/documents') }
-}));
+vi.mock('$app/navigation', () => import('#lib/testing/navigation.ts'));
+vi.mock('$app/state', () => import('#lib/testing/app-state.ts'));
 
 const doc = (id: string, date: string, lane: string | null = 'green') => ({
 	id,
@@ -38,9 +37,7 @@ const series = (documents: object[], changes: object = {}) => ({
 });
 
 describe('StreamView', () => {
-	afterEach(() => {
-		vi.unstubAllGlobals();
-	});
+	beforeEach(() => goTo('/ui/documents'));
 
 	it('shows the lanes on the months with the target and the expected document', async () => {
 		const api = fakeApi({
@@ -123,10 +120,58 @@ describe('StreamView', () => {
 			name: m.stream_more({ count: formatNumber(2) })
 		});
 		expect(more.getAttribute('aria-expanded')).toBe('false');
+		// A `Button` of the row's size, with its hit area on a phone (WA-12).
+		expect(more.getAttribute('data-slot')).toBe('button');
+		expect(more.className.split(' ')).toContain('h-8');
 		await fireEvent.click(more);
 		expect(within(table).getByRole('link', { name: /Abschlag c/ })).toBeTruthy();
 		expect(within(table).getByRole('link', { name: /Abschlag e/ })).toBeTruthy();
+		// What the branch refers to is read in its row, not only on hover.
+		const branch = within(table)
+			.getAllByRole('rowheader')
+			.find((head) => head.textContent?.includes(m.stream_joins({ title: 'Abschlag d' })));
+		expect(branch).toBeTruthy();
+		expect(branch?.getAttribute('title')).not.toContain(m.stream_joins({ title: 'Abschlag d' }));
 		expect(within(table).getByRole('button', { name: m.stream_fewer() })).toBeTruthy();
+	});
+
+	it('stays where one looks when the stream is read again (WA-02)', async () => {
+		// Every event of any document reads the stream anew: the lanes folded again and the
+		// months jumped back to the newest.
+		const lanes = [
+			series([doc('a', '2026-07-15'), doc('b', '2026-08-15')]),
+			series([doc('c', '2026-07-16'), doc('d', '2026-08-16')], { folded: true })
+		];
+		const api = fakeApi({
+			'GET /api/v1/documents/stream': () => ({ lanes, truncated: false })
+		});
+		vi.stubGlobal('fetch', api);
+		const query = apiQuery(NO_FILTERS);
+		const { rerender } = render(StreamView, { props: { query, lookup: null, version: 0 } });
+		const table = () => screen.getByRole('table', { name: m.stream_lanes() });
+		await screen.findByRole('table', { name: m.stream_lanes() });
+		await fireEvent.click(within(table()).getByRole('button', { name: m.stream_more_one() }));
+		const scroller = table().closest('.overflow-x-auto')!;
+		scroller.scrollLeft = 120;
+
+		await rerender({ query, lookup: null, version: 1 });
+		await vi.waitFor(() => expect(calls(api)).toHaveLength(2));
+		await new Promise((resolve) => setTimeout(resolve, 20));
+		expect(within(table()).getByRole('link', { name: /Abschlag c/ })).toBeTruthy();
+		expect(within(table()).getByRole('button', { name: m.stream_fewer() })).toBeTruthy();
+		expect(scroller.scrollLeft).toBe(120);
+
+		// Other filters: a new stream, opened at its newest month, the lanes folded.
+		await rerender({
+			query: apiQuery({ ...NO_FILTERS, contacts: ['c1'] }),
+			lookup: null,
+			version: 1
+		});
+		await vi.waitFor(() => expect(calls(api)).toHaveLength(3));
+		await vi.waitFor(() =>
+			expect(within(table()).queryByRole('link', { name: /Abschlag c/ })).toBeNull()
+		);
+		expect(scroller.scrollLeft).toBe(0);
 	});
 
 	it('shows a chip in the Beam, paging through its lane: a chip is a small card', async () => {

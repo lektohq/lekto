@@ -3,6 +3,7 @@
 	import SearchX from '@lucide/svelte/icons/search-x';
 	import TriangleAlert from '@lucide/svelte/icons/triangle-exclamation-point';
 	import { tick, type Snippet } from 'svelte';
+	import { formatNumber } from '#lib/i18n.ts';
 	import { chosen } from '#lib/candidates.ts';
 	import type { Candidate } from '#lib/candidates.ts';
 	import ContactAvatar from '#lib/components/ContactAvatar.svelte';
@@ -146,7 +147,9 @@
 		<button
 			type="button"
 			onclick={() => (expandedFor = placesKey)}
-			aria-label={m.source_more({ count: hiddenPlaces })}
+			aria-label={hiddenPlaces === 1
+				? m.source_more_one()
+				: m.source_more({ count: formatNumber(hiddenPlaces) })}
 			class="shrink-0 rounded-full bg-panel px-2 font-mono text-micro leading-5 text-brand hover:underline"
 		>
 			+{hiddenPlaces}
@@ -165,7 +168,10 @@
 	onfocusout={blur}
 	class={cn(
 		card
-			? 'my-1 flex flex-col gap-2.5 rounded-2xl border border-lane-yellow-foreground/25 bg-lane-yellow/25 p-3.5 transition-shadow'
+			? cn(
+					cardVariants({ size: 'sm', tone: 'open' }),
+					'my-1 flex flex-col gap-2.5 transition-shadow'
+				)
 			: calm
 				? cn(cardVariants({ size: 'sm' }), 'my-1 flex flex-col gap-2.5 transition-shadow')
 				: '-mx-2.5 flex flex-col gap-1.5 rounded-xl px-2.5 py-2 transition-colors',

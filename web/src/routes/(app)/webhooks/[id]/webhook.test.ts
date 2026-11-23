@@ -3,40 +3,21 @@ import { render, screen, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { components } from '#lib/api/schema.ts';
+import { signIn } from '#lib/testing/session.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { session } from '#lib/session.svelte.ts';
-import { calls, fakeApi, json } from '#lib/testing/api.ts';
+import { calls, fakeApi, notFound, problem } from '#lib/testing/api.ts';
 import { goTo } from '#lib/testing/page-state.svelte.ts';
 import { choose } from '#lib/testing/select.ts';
 import Page from './+page.svelte';
+import { webhookOf } from '#lib/testing/system.ts';
 
 type Delivery = components['schemas']['DeliveryOut'];
 
-vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
-vi.mock('$app/state', async () => ({
-	page: (await import('#lib/testing/page-state.svelte.ts')).testPage
-}));
+vi.mock('$app/navigation', () => import('#lib/testing/navigation.ts'));
+vi.mock('$app/state', () => import('#lib/testing/app-state.ts'));
 
-const webhook = {
-	id: 'hook',
-	owner_id: 'u1',
-	name: 'Test',
-	url: 'https://node.example/lekto',
-	event_types: ['*'],
-	active: true,
-	signed: true,
-	headers: [],
-	body: 'thin',
-	body_template: null,
-	max_open_tasks: 4,
-	model_call: null,
-	disabled_reason: null,
-	disabled_reasons: [],
-	failed_streak: 0,
-	previous_secret_valid_until: null,
-	created_at: '2026-10-25T10:00:00Z',
-	updated_at: '2026-10-25T10:00:00Z'
-};
+const webhook = webhookOf();
 
 const delivery = (changes: Partial<Delivery>): Delivery => ({
 	id: 'd1',
@@ -98,18 +79,12 @@ function routes() {
 
 describe('the page of a webhook', () => {
 	beforeEach(() => {
-		session.start({
-			user: { id: 'u1', username: 'tobi', role: 'user' },
-			method: 'password',
-			expires_at: '2026-10-28T12:00:00Z',
-			csrf_token: 'token'
-		} as never);
+		signIn();
 		goTo('/ui/webhooks/hook', { id: 'hook' });
 	});
 
 	afterEach(() => {
 		session.clear();
-		vi.unstubAllGlobals();
 		localStorage.clear();
 	});
 
@@ -146,15 +121,35 @@ describe('the page of a webhook', () => {
 
 	it('shows one problem for a webhook that is not there, and asks for no deliveries', async () => {
 		const api = fakeApi({
-			'GET /api/v1/webhooks/hook': () =>
-				json({ type: 'about:blank', title: 'Not Found', status: 404 }, 404)
+			'GET /api/v1/webhooks/hook': () => notFound('webhook', 'hook')
 		});
 		vi.stubGlobal('fetch', api);
 		render(Page);
 		expect(await screen.findByRole('alert')).toBeTruthy();
 		expect(screen.getAllByRole('alert')).toHaveLength(1);
+		// In the page's own words, and no "Try again": it would change nothing (WF-04).
+		expect(screen.getByText(m.webhook_not_found())).toBeTruthy();
+		expect(screen.queryByRole('button', { name: m.retry() })).toBeNull();
 		expect(screen.queryByText(m.webhook_log())).toBeNull();
 		expect(calls(api).filter((call) => call.includes('/deliveries'))).toEqual([]);
+	});
+
+	it('loads the deliveries too when trying again brought the webhook (WF-02)', async () => {
+		// The retry read only the webhook: its log stood at "loading" and asked for nothing.
+		const all = routes();
+		let down = true;
+		const api = fakeApi({}, (request, url) =>
+			down && url.pathname === '/api/v1/webhooks/hook' ? problem(503) : all(request)
+		);
+		vi.stubGlobal('fetch', api);
+		render(Page);
+		await screen.findByRole('alert');
+		expect(calls(api).filter((call) => call.includes('/deliveries'))).toEqual([]);
+		down = false;
+		await userEvent.click(screen.getByRole('button', { name: m.retry() }));
+		const table = await screen.findByRole('table');
+		expect(within(table).getByText('Stadtwerke – Abschlag')).toBeTruthy();
+		expect(screen.queryByRole('alert')).toBeNull();
 	});
 
 	it('shows the deliveries with their documents, counted by outcome', async () => {

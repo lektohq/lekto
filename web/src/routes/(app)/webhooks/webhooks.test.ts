@@ -3,49 +3,27 @@ import { render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { m } from '#lib/paraglide/messages.js';
+import { signIn } from '#lib/testing/session.ts';
 import { session } from '#lib/session.svelte.ts';
-import { calls, fakeApi } from '#lib/testing/api.ts';
+import { calls, fakeApi, masterData } from '#lib/testing/api.ts';
 import Page from './+page.svelte';
+import { webhookOf } from '#lib/testing/system.ts';
 
-const webhook = {
-	id: 'hook',
-	owner_id: 'u1',
-	name: 'Home Assistant',
-	url: 'https://node.example/lekto',
-	event_types: ['*'],
-	active: true,
-	signed: true,
-	headers: [],
-	body: 'thin',
-	body_template: null,
-	max_open_tasks: 4,
-	model_call: null,
-	disabled_reason: null,
-	disabled_reasons: [],
-	failed_streak: 0,
-	previous_secret_valid_until: null,
-	created_at: '2026-10-25T10:00:00Z',
-	updated_at: '2026-10-25T10:00:00Z'
-};
+const webhook = webhookOf({ name: 'Home Assistant' });
 
 describe('the list of webhooks', () => {
 	beforeEach(() => {
-		session.start({
-			user: { id: 'u1', username: 'tobi', role: 'user' },
-			method: 'password',
-			expires_at: '2026-10-28T12:00:00Z',
-			csrf_token: 'token'
-		} as never);
+		signIn();
 	});
 
 	afterEach(() => {
 		session.clear();
-		vi.unstubAllGlobals();
 	});
 
 	it('pauses a webhook from its row with a switch, not a badge', async () => {
 		const bodies: unknown[] = [];
 		const api = fakeApi({
+			...masterData(),
 			'GET /api/v1/webhooks': () => [webhook],
 			'PATCH /api/v1/webhooks/hook': async (request) => {
 				bodies.push(await request.json());
@@ -68,7 +46,7 @@ describe('the list of webhooks', () => {
 	});
 
 	it('leads from no webhook to a new one', async () => {
-		vi.stubGlobal('fetch', fakeApi({ 'GET /api/v1/webhooks': () => [] }));
+		vi.stubGlobal('fetch', fakeApi({ ...masterData(), 'GET /api/v1/webhooks': () => [] }));
 		render(Page);
 		expect(await screen.findByText(m.webhook_none())).toBeTruthy();
 		// One in the head of the page, one in the note.

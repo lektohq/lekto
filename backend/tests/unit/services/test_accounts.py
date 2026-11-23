@@ -299,10 +299,10 @@ async def test_spaces_that_stop_deleting_a_user_need_a_decision(world: World) ->
 
 async def test_deleting_a_user_settles_their_spaces(world: World) -> None:
     admin = await world.account("root", Role.ADMIN)
-    erika, tobi = await world.account("erika"), await world.account("tobi")
-    erikas, tobis = await world.personal_space(erika), await world.personal_space(tobi)
+    erika, john = await world.account("erika"), await world.account("john")
+    erikas, johns = await world.personal_space(erika), await world.personal_space(john)
     household = await world.spaces.create(Actor(erika.id), "Household")
-    await world.spaces.set_member(Actor(erika.id), household.id, tobi.id, SpaceRole.READ)
+    await world.spaces.set_member(Actor(erika.id), household.id, john.id, SpaceRole.READ)
     empty = await world.spaces.create(Actor(erika.id), "Empty")
     archive = await world.spaces.create(Actor(erika.id), "Archive")
     target = await world.spaces.create(Actor(admin.id), "Target")
@@ -317,10 +317,10 @@ async def test_deleting_a_user_settles_their_spaces(world: World) -> None:
         Actor(admin.id),
         erika.id,
         {
-            erikas.id: Settlement(Settle.MOVE_TO, move_to=tobis.id),
+            erikas.id: Settlement(Settle.MOVE_TO, move_to=johns.id),
             household.id: Settlement(Settle.MOVE_TO, move_to=target.id),
             empty.id: Settlement(Settle.REMOVE),
-            archive.id: Settlement(Settle.EDITOR, editor=tobi.id),
+            archive.id: Settlement(Settle.EDITOR, editor=john.id),
         },
     )
 
@@ -328,25 +328,25 @@ async def test_deleting_a_user_settles_their_spaces(world: World) -> None:
         assert await uow.users.find(erika.id) is None
         for gone in (erikas, household, empty):
             assert await uow.spaces.find(gone.id) is None
-        assert (await uow.spaces.get(archive.id)).members == {tobi.id: SpaceRole.EDIT}
+        assert (await uow.spaces.get(archive.id)).members == {john.id: SpaceRole.EDIT}
         for letter in letters:
             moved = await uow.documents.get(letter.id)
-            assert moved.space_id == tobis.id and moved.uploaded_by is None
-            assert moved.new_at is not None  # new for tobi, who could not read it before
+            assert moved.space_id == johns.id and moved.uploaded_by is None
+            assert moved.new_at is not None  # new for john, who could not read it before
         assert (await uow.documents.get(bill.id)).space_id == target.id
         assert (await uow.documents.get(kept.id)).space_id == archive.id
 
 
 async def test_a_deletion_that_cannot_settle_changes_nothing(world: World) -> None:
     admin = await world.account("root", Role.ADMIN)
-    erika, tobi = await world.account("erika"), await world.account("tobi")
+    erika, john = await world.account("erika"), await world.account("john")
     erikas = await world.personal_space(erika)
     full = await world.spaces.create(Actor(erika.id), "Full")
     async with world.uow() as uow:
         for space in (erikas, full):
             await uow.documents.add(builders.processed(erika, space))
         await uow.commit()
-    elsewhere = await world.spaces.create(Actor(tobi.id), "Elsewhere")
+    elsewhere = await world.spaces.create(Actor(john.id), "Elsewhere")
     settle = {erikas.id: Settlement(Settle.MOVE_TO, move_to=full.id)}
     # Into a space that goes as well, or: removing a space that holds documents.
     with pytest.raises(NotFoundError):
@@ -370,7 +370,7 @@ async def test_a_deletion_that_cannot_settle_changes_nothing(world: World) -> No
             erika.id,
             {
                 erikas.id: Settlement(Settle.MOVE_TO, move_to=elsewhere.id),
-                full.id: Settlement(Settle.EDITOR, editor=tobi.id),
+                full.id: Settlement(Settle.EDITOR, editor=john.id),
                 elsewhere.id: Settlement(Settle.REMOVE),
             },
         )

@@ -1,8 +1,15 @@
+<script lang="ts" module>
+	/** Whether the dialog shows its X: the head keeps the corner free for it. */
+	export const CLOSE_BUTTON = Symbol('dialog close button');
+</script>
+
 <script lang="ts">
+	import { setContext } from 'svelte';
 	import { m } from '#lib/paraglide/messages.js';
 	import { Dialog as DialogPrimitive } from 'bits-ui';
 	import XIcon from '@lucide/svelte/icons/x';
 	import { Button } from '#lib/components/ui/button/index.ts';
+	import { inToast } from '#lib/toasts.ts';
 	import { cn, type WithoutChildrenOrChild } from '#lib/utils.ts';
 	import * as Dialog from './index.js';
 	import DialogPortal from './dialog-portal.svelte';
@@ -14,6 +21,7 @@
 		class: className,
 		portalProps,
 		children,
+		onInteractOutside,
 		showCloseButton = true,
 		size = 'sm',
 		...restProps
@@ -24,6 +32,8 @@
 		/** The width from a phone on (web/DESIGN.md, "Dialogs"): 384, 512, 672 or 768 px. */
 		size?: 'sm' | 'md' | 'lg' | 'xl';
 	} = $props();
+
+	setContext(CLOSE_BUTTON, () => showCloseButton);
 
 	const WIDTHS = {
 		sm: 'sm:max-w-sm',
@@ -39,11 +49,16 @@
 		bind:ref
 		data-slot="dialog-content"
 		class={cn(
-			'fixed top-1/2 left-1/2 z-50 grid max-h-[calc(100dvh_-_2rem)] w-full max-w-[calc(100%_-_2rem)] -translate-x-1/2 -translate-y-1/2 grid-cols-1 gap-4 overflow-y-auto overscroll-contain rounded-2xl border bg-popover p-5 text-sm text-popover-foreground shadow-lg duration-100 outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95',
+			'fixed top-1/2 left-1/2 z-50 grid max-h-[calc(100dvh_-_2rem)] w-full max-w-[calc(100%_-_2rem)] -translate-x-1/2 -translate-y-1/2 grid-cols-1 gap-4 overflow-y-auto overscroll-contain rounded-2xl border bg-popover p-5 text-sm text-popover-foreground shadow-lg duration-100 outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0 motion-safe:data-[state=closed]:zoom-out-95 motion-safe:data-[state=open]:zoom-in-95',
 			WIDTHS[size],
 			className
 		)}
 		{...restProps}
+		onInteractOutside={(event) => {
+			// A tap on a toast above is none on the page behind: the layer stays.
+			if (inToast(event.target)) event.preventDefault();
+			else onInteractOutside?.(event);
+		}}
 	>
 		{@render children?.()}
 		{#if showCloseButton}

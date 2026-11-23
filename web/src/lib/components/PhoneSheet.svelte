@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
+	import { reducedMotion } from '#lib/motion.ts';
 	import * as Sheet from '#lib/components/ui/sheet/index.ts';
 	import { cn } from '#lib/utils.ts';
 
@@ -8,9 +9,10 @@
 	// A grab handle, then a row fixed on top with its `title` and the way out (`close`: an X,
 	// "Fertig"), then what it offers (`children`), which scrolls on its own, and `footer` fixed at
 	// the bottom. Pulled down by the handle or the title it follows the finger, and closes once it
-	// went far enough or was flicked; else it springs back. Nothing takes the focus when it opens:
-	// the keyboard waits for a tap, and a close button shows no tooltip. A choice closes it: the
-	// caller sets `open` false.
+	// went far enough or was flicked; else it springs back. No field takes the focus when it opens:
+	// the keyboard waits for a tap, and a close button shows no tooltip. The sheet itself takes
+	// it, so that the keyboard and a screen reader start inside it, not at the buttons of the
+	// page it covers. A choice closes it: the caller sets `open` false.
 	let {
 		open = $bindable(false),
 		title,
@@ -88,7 +90,7 @@
 		}
 		gone = true;
 		offset = sheet?.offsetHeight ?? offset;
-		const still = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+		const still = reducedMotion();
 		window.setTimeout(
 			() => {
 				open = false;
@@ -104,7 +106,11 @@
 		bind:ref={sheet}
 		side="bottom"
 		showCloseButton={false}
-		onOpenAutoFocus={(event) => event.preventDefault()}
+		tabindex={-1}
+		onOpenAutoFocus={(event) => {
+			event.preventDefault();
+			sheet?.focus();
+		}}
 		{style}
 		class={cn(
 			'gap-0 overflow-hidden rounded-t-2xl p-0 text-base',

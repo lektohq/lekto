@@ -86,11 +86,17 @@ describe('spaces', () => {
 		expect(canManageSpace(spaces[1], null)).toBe(false);
 	});
 
-	it('lets editors describe a space, a personal one too', () => {
+	it('lets editors describe a space; a personal one only its user and admins', () => {
 		expect(canDescribeSpace(spaces[0], me)).toBe(true);
 		expect(canDescribeSpace(spaces[1], me)).toBe(true);
 		expect(canDescribeSpace(spaces[2], me)).toBe(false);
 		expect(canDescribeSpace(spaces[1], null)).toBe(false);
+		// WH-02: who edits another's personal space along is refused by the API
+		// (403 `personal_space_describe`), so the editor is not offered.
+		const lent = { ...spaces[3], role: 'edit' as const };
+		expect(canDescribeSpace(lent, me)).toBe(false);
+		expect(canDescribeSpace(lent, other)).toBe(true);
+		expect(canDescribeSpace(lent, admin)).toBe(true);
 	});
 
 	it('lets editors choose members; of a personal space its user and admins', () => {

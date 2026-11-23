@@ -8,6 +8,7 @@
 	import FieldGroup from '#lib/components/document/FieldGroup.svelte';
 	import Select from '#lib/components/Select.svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Card } from '#lib/components/ui/card/index.ts';
 	import { memberChips, spaceName, whereText, type Filing, type Viewer } from '#lib/filing.ts';
 	import { formatDate } from '#lib/i18n.ts';
 	import { userName, type Lookup } from '#lib/masterdata.svelte.ts';
@@ -79,10 +80,13 @@
 {/snippet}
 
 {#if filing}
-	<section
+	<Card
+		as="section"
+		size="row"
+		tone="open"
 		aria-labelledby="filing-title"
 		data-testid="filing-open"
-		class="flex flex-col gap-3 rounded-2xl border border-lane-yellow-foreground/25 bg-lane-yellow/25 p-4"
+		class="flex flex-col gap-3"
 	>
 		<div class="flex items-center gap-2.5">
 			<TriangleAlert
@@ -90,7 +94,7 @@
 				aria-hidden="true"
 				strokeWidth={2.2}
 			/>
-			<SectionTitle size="card" level={3} id="filing-title">
+			<SectionTitle size="card" level={2} id="filing-title">
 				{m.filing_title()}
 			</SectionTitle>
 			<Badge variant="yellow" class="ml-auto">
@@ -148,7 +152,7 @@
 				</ChoiceCard>
 			{/if}
 		</fieldset>
-	</section>
+	</Card>
 {:else}
 	{#snippet move()}
 		{#if editable && onmove}

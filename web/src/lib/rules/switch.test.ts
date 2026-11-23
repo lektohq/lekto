@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fakeApi, json } from '#lib/testing/api.ts';
+import { fakeApi, problem } from '#lib/testing/api.ts';
 
 const { success, reportError } = vi.hoisted(() => ({ success: vi.fn(), reportError: vi.fn() }));
 vi.mock('svelte-sonner', () => ({ toast: { success } }));
@@ -9,14 +9,16 @@ import { m } from '#lib/paraglide/messages.js';
 import { switchMailbox, switchMailRule, switchRule } from './switch.ts';
 
 afterEach(() => {
-	vi.unstubAllGlobals();
 	vi.clearAllMocks();
 });
 
 function stub(status = 200) {
-	const fetch = fakeApi({}, () =>
-		json(status === 200 ? { id: 'x', enabled: false } : { title: 'no', status }, status)
-	);
+	const answer = () => (status === 200 ? { id: 'x', enabled: false } : problem(status));
+	const fetch = fakeApi({
+		'PATCH /api/v1/rules/r1': answer,
+		'PATCH /api/v1/mail-rules/m1': answer,
+		'PATCH /api/v1/mailboxes/b1': answer
+	});
 	vi.stubGlobal('fetch', fetch);
 	return fetch;
 }

@@ -18,6 +18,7 @@
 		id,
 		label,
 		invalid = false,
+		describedby,
 		disabled = false,
 		onchange,
 		onunreadable
@@ -26,6 +27,8 @@
 		id?: string;
 		label?: string;
 		invalid?: boolean;
+		/** The id of the error the caller shows below it. */
+		describedby?: string;
 		disabled?: boolean;
 		onchange?: (value: Period) => void;
 		onunreadable?: (unreadable: boolean) => void;
@@ -107,6 +110,7 @@
 			value={value.start}
 			{disabled}
 			{invalid}
+			{describedby}
 			label={label ? m.field_period_from_of({ name: label }) : m.field_period_from()}
 			onchange={(start) => set({ ...value, start })}
 		/>
@@ -118,6 +122,7 @@
 			value={value.end}
 			{disabled}
 			{invalid}
+			{describedby}
 			label={label ? m.field_period_to_of({ name: label }) : m.field_period_to()}
 			onchange={(end) => set({ ...value, end })}
 		/>

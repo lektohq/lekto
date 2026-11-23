@@ -112,7 +112,7 @@ def sample_archive(base_pdf: bytes, jpeg: bytes | None = None) -> Archive:
     none, an inactive user, groups, permissions, every custom field type, notes, an ASN, a tag
     with a parent, a document Lekto cannot take (an e-mail) and one in the trash."""
     users = [
-        {"id": 1, "username": "tobias", "is_active": True, "is_superuser": True, "groups": [1]},
+        {"id": 1, "username": "johndoe", "is_active": True, "is_superuser": True, "groups": [1]},
         {
             "id": 2,
             "username": "erika",
@@ -221,7 +221,7 @@ def sample_archive(base_pdf: bytes, jpeg: bytes | None = None) -> Archive:
                     "id": 2,
                     "note": "First",
                     "created": "2024-01-01T10:00:00Z",
-                    "user": {"username": "tobias"},
+                    "user": {"username": "johndoe"},
                 },
             ],
         ),

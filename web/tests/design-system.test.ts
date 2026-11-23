@@ -11,6 +11,7 @@
 import { describe, expect, it } from 'vitest';
 import de from '../messages/de.json';
 import en from '../messages/en.json';
+import design from '../DESIGN.md?raw';
 
 const sources = import.meta.glob<string>('/src/**/*.svelte', {
 	query: '?raw',
@@ -39,6 +40,34 @@ const EXCEPTIONS = {
 		'/src/lib/components/FilterSection.svelte',
 		'/src/lib/components/Lenses.svelte',
 		'/src/lib/components/SelectionBar.svelte'
+	]),
+	// A size or a place that comes from data or is measured (zoom, durations, bars, columns),
+	// and a value from data that a class reads as a custom property (`--depth`, `--steps`).
+	inlineStyle: new Set([
+		'/src/lib/components/ColorPicker.svelte',
+		'/src/lib/components/PageViewer.svelte',
+		'/src/lib/components/PeriodFacet.svelte',
+		'/src/lib/components/TagPickerList.svelte',
+		'/src/lib/components/TagsPanel.svelte',
+		'/src/lib/components/document/CodeThumb.svelte',
+		'/src/lib/components/document/DocumentFiles.svelte',
+		'/src/lib/components/document/PageImages.svelte',
+		'/src/lib/components/document/ProcessingBand.svelte',
+		'/src/lib/components/document/ProcessingGraph.svelte',
+		'/src/lib/components/document/StepDetails.svelte',
+		'/src/lib/components/documents/StreamView.svelte',
+		'/src/lib/components/system/AutomationTab.svelte',
+		'/src/lib/components/system/ClassifierTab.svelte',
+		'/src/lib/components/system/SearchTab.svelte',
+		'/src/routes/(app)/documents/+page.svelte'
+	]),
+	// A colour as a value: the fingerprint of a file from its hash, the start of a tag's own
+	// colour and the themes' grounds its contrast is computed against, the browser's bars.
+	colourValue: new Set([
+		'/src/lib/components/ColorPicker.svelte',
+		'/src/lib/components/document/DocumentFiles.svelte',
+		'/src/lib/colors.ts',
+		'/src/lib/theme-color.ts'
 	]),
 	// Paper, logos and the QR code are drawn for white; the overlays of shadcn's dialogs.
 	palette: new Set([
@@ -113,8 +142,84 @@ const PANELS = new Set([
 const PROGRESS = new Set([
 	'/src/lib/components/DocumentsBulkBar.svelte',
 	'/src/lib/components/rules/RuleApplyBar.svelte',
-	'/src/lib/components/UploadSummary.svelte'
+	'/src/lib/components/UploadSummary.svelte',
+	// The living style guide shows every part once.
+	'/src/routes/(app)/dev/components/+page.svelte'
 ]);
+/** Components DESIGN.md names that the living style guide does not show for themselves: parts
+ * of one feature (the document view, the rule editor, the system page, the app's frame), which
+ * need that feature's data, and parts it shows inside another. This list may only shrink; a new
+ * component is added to `/dev/components` first (DESIGN.md, "Enforcement"). */
+const NOT_IN_STYLE_GUIDE = [
+	'AppShell',
+	'AssignmentList',
+	'AsyncForm',
+	'AutomationTab',
+	'BackLink',
+	'Beam',
+	'CandidateSources',
+	'CardFields',
+	'ClassifierTab',
+	'CodeThumb',
+	'ConditionGroup',
+	'ConditionTree',
+	'ConfirmFooter',
+	'CreateOffer',
+	'DocumentFiles',
+	'DocumentLink',
+	'DocumentPages',
+	'DocumentPlace',
+	'DocumentThumb',
+	'DocumentVersions',
+	'DocumentsBulkBar',
+	'FacetChips',
+	'FactFilter',
+	'FilingBox',
+	'FilterPanel',
+	'GroupChips',
+	'InboxMark',
+	'InboxRow',
+	'LanguageChoices',
+	'LensEditor',
+	'MailboxLines',
+	'Mascot',
+	'MasterPages',
+	'ModeSelect',
+	'NamesLine',
+	'OriginCard',
+	'PageEditor',
+	'PageImages',
+	'PageTitle',
+	'PageViewer',
+	'PdfViewer',
+	'PeriodFacet',
+	'PhoneEditorBar',
+	'PickerShell',
+	'ProcessingBand',
+	'ProcessingGraph',
+	'ReferencePicker',
+	'RuleApplyBar',
+	'RuleEffectChange',
+	'RuleHeader',
+	'RuleListRow',
+	'RuleRow',
+	'RuleView',
+	'SearchTab',
+	'SeparationDetails',
+	'SteadyText',
+	'StepDetails',
+	'StreamView',
+	'TagChips',
+	'TagPickerDialog',
+	'TagPickerList',
+	'TagsPanel',
+	'TemplateEditor',
+	'ThemeChoices',
+	'TitlePatternBadge',
+	'TotpCard',
+	'UnsavedGuard',
+	'VersionUpload'
+];
 /** Popovers drawn outside `ui/`: they use the component's shadow (DESIGN.md, "Radius, borders,
  * shadows"). This list may only shrink. */
 const POPOVERS = new Set([
@@ -214,6 +319,22 @@ describe('the design system (web/DESIGN.md)', () => {
 		expect(offenders((source) => line(source, /\brounded-(?:3xl|4xl|\[)/))).toEqual([]);
 	});
 
+	it('uses only the radii DESIGN.md gives a role (WY-04)', async () => {
+		// `rounded-lg` stood fifty times and had no row: the most used radius after `full`.
+		const design = (await import('../DESIGN.md?raw')).default;
+		const table = design.slice(
+			design.indexOf('## Radius, borders, shadows'),
+			design.indexOf('All radii come from')
+		);
+		const named = new Set([...table.matchAll(/`rounded-([a-z0-9]+)`/g)].map((match) => match[1]));
+		expect([...named].toSorted()).toEqual(['2xl', 'full', 'lg', 'md', 'sm', 'xl', 'xs']);
+		const without = ['xs', 'sm', 'md', 'lg', 'xl', '2xl', '3xl', '4xl', 'full'].filter(
+			(step) => !named.has(step)
+		);
+		const outside = new RegExp(`\\brounded(?:-[trblse]{1,2})?-(?:${without.join('|')})\\b`);
+		expect(offenders((source) => line(source, outside))).toEqual([]);
+	});
+
 	it('takes shadows from the tokens only, and the few DESIGN.md names', () => {
 		expect(offenders((source) => line(source, /\bshadow-\[/))).toEqual([]);
 		expect(
@@ -225,14 +346,24 @@ describe('the design system (web/DESIGN.md)', () => {
 		).toEqual([]);
 	});
 
-	it('moves only where motion is wanted: spins, pulses and turns are motion-safe', () => {
+	it('moves only where motion is wanted: spins, pulses, turns and what opens are motion-safe', () => {
 		// DESIGN.md, "Motion"; the shadcn primitives in ui/ too.
 		const spins = /(?<![\w:-])animate-(?:spin|pulse|ping|bounce)\b/;
 		// A turn may instead be stopped for reduced motion in the same string.
 		const turns = /(?<![\w:-])transition-transform\b(?![^'"\n]*motion-reduce:transition-none)/;
-		const found = offenders((source) => line(source, spins) ?? line(source, turns));
+		// What opens (a dialog, a sheet, a menu, a popover) may fade in any case; it grows or
+		// slides in only where motion is wanted.
+		const enters =
+			/(?<![\w:-])(?:data-\[[^\]\s]*\]:)*(?:zoom-(?:in|out)|slide-(?:in-from|out-to))-/;
+		expect(enters.test('data-[state=open]:zoom-in-95')).toBe(true);
+		expect(enters.test('data-[side=left]:data-[state=open]:slide-in-from-left-10')).toBe(true);
+		expect(enters.test('motion-safe:data-[state=open]:zoom-in-95')).toBe(false);
+		expect(enters.test('data-[state=open]:fade-in-0')).toBe(false);
+		const moves = (source: string) =>
+			line(source, spins) ?? line(source, turns) ?? line(source, enters);
+		const found = offenders(moves);
 		for (const [path, source] of Object.entries(scripts)) {
-			const hit = line(source, spins) ?? line(source, turns);
+			const hit = moves(source);
 			if (hit !== null) found.push(`${path}: ${hit.trim().slice(0, 120)}`);
 		}
 		expect(found).toEqual([]);
@@ -479,6 +610,12 @@ describe('the design system (web/DESIGN.md)', () => {
 
 	it('keeps fields in the order the API lists them, never sorts them again', () => {
 		const sorted = /fields?\w*\]?\)?\??\.(?:sort|toSorted)\(/i;
+		// The list of what is assigned (a type's fields) sorts by the place among the candidates.
+		const byName = /\.(?:sort|toSorted)\(.*localeCompare/;
+		expect(
+			byName.test('[...assigned].sort((a, b) => nameOf(a.id).localeCompare(nameOf(b.id)))')
+		).toBe(true);
+		expect(line(sources['/src/lib/components/AssignmentList.svelte'], byName)).toBeNull();
 		const found = offenders((source) => line(source, sorted));
 		for (const [path, source] of Object.entries(scripts)) {
 			const hit = line(source, sorted);
@@ -592,16 +729,20 @@ describe('the design system (web/DESIGN.md)', () => {
 	});
 
 	it('draws a box of tone only as an Alert', () => {
-		// A hint with a tone, its radius and its padding: `ui/alert` (DESIGN.md, "Alerts").
-		const classes = /\sclass=(?:"[^"]*"|\{[^}]*\})/g;
+		// A hint with a tone, its radius and its padding: `ui/alert` (DESIGN.md, "Alerts"); the
+		// yellow card of what waits for an answer is `Card tone="open"` ("Cards"). Every string
+		// of classes counts, also one inside an expression, and padding on all sides at once.
+		const classes = /"[^"\n]*"|'[^'\n]*'/g;
 		const tone = /\bbg-(?:lane-yellow|lane-red|note)\b/;
 		const box = (value: string) =>
-			/\brounded-(?:lg|xl|2xl)\b/.test(value) && /\bpx-\d/.test(value) && /\bpy-\d/.test(value);
+			/\brounded-(?:lg|xl|2xl)\b/.test(value) &&
+			(/\bp-\d/.test(value) || (/\bpx-\d/.test(value) && /\bpy-\d/.test(value)));
+		expect(box('rounded-2xl border bg-lane-yellow/25 p-4')).toBe(true);
+		expect(box('rounded-lg bg-note px-3 py-2')).toBe(true);
+		expect(box('rounded-full bg-lane-yellow px-2')).toBe(false);
 		expect(
 			offenders((source, path) => {
-				// The search check's figures are tiles in the lanes' tones, no hints.
-				if (path.includes('/components/ui/') || path.endsWith('/system/SearchTab.svelte'))
-					return null;
+				if (path.includes('/components/ui/')) return null;
 				return (
 					[...source.matchAll(classes)]
 						.map(([found]) => found)
@@ -609,6 +750,348 @@ describe('the design system (web/DESIGN.md)', () => {
 				);
 			})
 		).toEqual([]);
+	});
+
+	// An inline style in markup: `style="…"`, `style={…}` and Svelte's `style:width={…}`.
+	const INLINE_STYLE = /\sstyle(?:=["{]|:[-\w]+)/;
+	// A colour as a value: hex (three digits only as a whole string or in a class), or a function.
+	const COLOUR_VALUE =
+		/#(?:[0-9a-f]{8}|[0-9a-f]{6})\b|['"[]#[0-9a-f]{3}['"\]]|\b(?:rgba?|hsla?|oklch|oklab)\(/i;
+
+	it('makes a badge a button only for the title pattern of a rule', () => {
+		// "Badges": a badge shows a state and is never a button, with this one exception.
+		const inside = /<Badge\b[^>]*>(?:(?!<\/Badge\b)[\s\S])*?<(?:button|a)\b/;
+		expect(
+			offenders((source, path) =>
+				path.endsWith('/rules/TitlePatternBadge.svelte') ? null : (inside.exec(source)?.[0] ?? null)
+			)
+		).toEqual([]);
+		expect(inside.test('<Badge variant="note"><button type="button">x</button></Badge>')).toBe(
+			true
+		);
+		expect(inside.test('<Badge>a</Badge> <button type="button">x</button>')).toBe(false);
+	});
+
+	it('hands a message the number it counts with through formatNumber', () => {
+		// "Formats": numbers follow the language ("12.345 Mails"). Paraglide puts in what it
+		// gets, so the call formats: `count: formatNumber(n)`, never the number, a shorthand or
+		// `String(n)`. A quoted text is a sample.
+		const counted = new Set([
+			'count',
+			'total',
+			'done',
+			'least',
+			'most',
+			'min',
+			'max',
+			'seconds',
+			'mails'
+		]);
+		/** The end of the bracket that opens before `from`, and the commas at its top level. */
+		const walk = (source: string, from: number) => {
+			const commas: number[] = [];
+			let depth = 1;
+			let quote = '';
+			let at = from;
+			for (; at < source.length && depth > 0; at++) {
+				const char = source[at];
+				if (quote) {
+					if (char === '\\') at++;
+					else if (char === quote) quote = '';
+				} else if (char === "'" || char === '"' || char === '`') quote = char;
+				else if ('([{'.includes(char)) depth++;
+				else if (')]}'.includes(char)) depth--;
+				else if (char === ',' && depth === 1) commas.push(at);
+			}
+			return { end: at - 1, commas };
+		};
+		const raw = (source: string): string | null => {
+			for (const call of source.matchAll(/\bm\.(\w+)\(\s*\{/g)) {
+				const start = call.index + call[0].length;
+				const { end, commas } = walk(source, start);
+				const cuts = [start - 1, ...commas, end];
+				for (let index = 0; index < cuts.length - 1; index++) {
+					const part = source.slice(cuts[index] + 1, cuts[index + 1]);
+					const [, key, colon, value = ''] = /^\s*(\w+)(\s*:\s*)?([\s\S]*)$/.exec(part) ?? [];
+					if (!counted.has(key)) continue;
+					if (!colon || !/^(?:formatNumber\(|['"`])/.test(value.trim()))
+						return `m.${call[1]}: ${part.trim()}`;
+				}
+			}
+			return null;
+		};
+		expect(raw('m.mails({ count: mails.length })')).toBe('m.mails: count: mails.length');
+		expect(raw('m.mails({ name, count })')).toBe('m.mails: count');
+		expect(raw('m.mails({ count: String(found) })')).toBe('m.mails: count: String(found)');
+		expect(raw('m.mails({ count: formatNumber(pick(a, b)), name: a })')).toBeNull();
+		expect(
+			[...Object.entries(sources), ...Object.entries(scripts)]
+				.filter(([path]) => path !== '/src/routes/(app)/dev/components/+page.svelte')
+				.map(([path, source]) => [path, raw(source)])
+				.filter(([, found]) => found !== null)
+		).toEqual([]);
+	});
+
+	it('leaves the checking of a form to the API, not to the browser', () => {
+		// The browser words what it refuses in its own language, not in the UI's ("Texts"): a
+		// form with a field the browser would check says `novalidate`, and the API's reason shows.
+		const checked = /\stype="(?:email|url)"|\srequired\b|\sminlength=|\spattern=/;
+		expect(
+			offenders((source) =>
+				checked.test(source)
+					? ((source.match(/<form\b[^>]*>/g) ?? []).find((tag) => !/\bnovalidate\b/.test(tag)) ??
+						null)
+					: null
+			)
+		).toEqual([]);
+	});
+
+	it('names every list of a picker, which its search field controls', () => {
+		// WCAG 4.1.2: bits-ui calls a command's list "Suggestions..." in every language and
+		// links the search to it only through a viewport nobody uses. `ui/command` links them;
+		// each list says what it offers.
+		expect(
+			offenders((source, path) =>
+				path.includes('/components/ui/')
+					? null
+					: (tags(source, 'Command.List').find((tag) => !/\saria-label=/.test(tag)) ?? null)
+			)
+		).toEqual([]);
+		expect(sources['/src/lib/components/ui/command/command-input.svelte']).toMatch(
+			/aria-controls=\{list\}/
+		);
+		expect(sources['/src/lib/components/Select.svelte']).toMatch(/aria-controls=\{listId\}/);
+	});
+
+	it('keeps state and focus visible in a contrast theme, by edges and outlines', () => {
+		// "Principles" 4, with `forced-colors` (a contrast theme of the system): grounds and
+		// shadows are dropped there, edges and outlines stay, also transparent ones. So what
+		// tells a state by its ground alone has an edge, and what shows the focus by a ring
+		// (a shadow) keeps the outline for that theme (`outline-hidden`, never `outline-none`).
+		const knob = sources['/src/lib/components/ui/switch/switch.svelte'];
+		expect(knob).toMatch(/block rounded-full border border-transparent bg-background/);
+		const box = sources['/src/lib/components/ui/choice/choice-box.svelte'];
+		expect(box).toMatch(/checked:before:border-3 checked:before:border-primary-foreground/);
+		expect(box).not.toMatch(/checked:before:bg-primary-foreground/);
+		expect(sources['/src/lib/components/Segmented.svelte']).toMatch(
+			/data-pill[\s\S]*?rounded-full border border-transparent bg-card/
+		);
+		for (const path of [
+			'/src/lib/components/ui/switch/switch.svelte',
+			'/src/lib/components/ui/choice/choice-box.svelte'
+		]) {
+			expect(sources[path]).toContain('focus-visible:outline-hidden');
+			expect(sources[path]).not.toMatch(/(?<![\w:-])outline-none\b/);
+		}
+		// The account's button in the header.
+		expect(sources['/src/lib/components/AppShell.svelte']).toMatch(
+			/rounded-full bg-primary[^"]*focus-visible:ring-3[^"]*focus-visible:outline-hidden/
+		);
+	});
+
+	it('asks in one place whether a script may move things', () => {
+		// "Motion": who asked for less motion gets a place at once. A scroll that code starts
+		// takes its behavior from `lib/motion.ts`; nobody writes `smooth` or asks the system.
+		const own = /behavior:\s*'smooth'|\? 'smooth'|prefers-reduced-motion/;
+		expect(own.test("el.scrollIntoView({ block: 'nearest', behavior: 'smooth' })")).toBe(true);
+		expect(own.test('window.scrollTo({ top: 0, behavior: scrollBehavior() })')).toBe(false);
+		expect(
+			[...Object.entries(sources), ...Object.entries(scripts)]
+				.filter(([path, source]) => path !== '/src/lib/motion.ts' && own.test(source))
+				.map(([path]) => path)
+		).toEqual([]);
+	});
+
+	it('writes a moment through formatMoment', () => {
+		// "Formats": one way each. Nobody builds a date with a time of their own.
+		expect(
+			[...Object.entries(sources), ...Object.entries(scripts)]
+				.filter(([path, source]) => path !== '/src/lib/i18n.ts' && /\btimeStyle\b/.test(source))
+				.map(([path]) => path)
+		).toEqual([]);
+	});
+
+	it('writes a list through formatList', () => {
+		// "Formats": one way each. A list of names is "A, B und C" in the user's language.
+		const own = /new Intl\.ListFormat\(/;
+		expect(
+			[...Object.entries(sources), ...Object.entries(scripts)]
+				.filter(([path, source]) => path !== '/src/lib/i18n.ts' && own.test(source))
+				.map(([path]) => path)
+		).toEqual([]);
+		// The texts of the filing name people: no list of them joined by hand.
+		expect(scripts['/src/lib/filing.ts']).not.toMatch(/\.join\(', '\)/);
+	});
+
+	it('shows in the living style guide every component DESIGN.md names', () => {
+		// "Living style guide": `/dev/components` shows every component; one DESIGN.md names in
+		// backticks and that has its file in `lib/components` is imported there, or listed.
+		const named = new Set([...design.matchAll(/`([A-Z][A-Za-z]+)`/g)].map(([, name]) => name));
+		const files = new Set(
+			Object.keys(sources)
+				.filter(
+					(path) => path.startsWith('/src/lib/components/') && !path.includes('/components/ui/')
+				)
+				.map((path) => path.slice(path.lastIndexOf('/') + 1, -'.svelte'.length))
+		);
+		const page = sources['/src/routes/(app)/dev/components/+page.svelte'];
+		const shown = new Set(
+			[...page.matchAll(/import (\w+) from '#lib\/components\/[^']+\.svelte'/g)].map(
+				([, name]) => name
+			)
+		);
+		const missing = [...named].filter((name) => files.has(name) && !shown.has(name)).sort();
+		expect(missing).toEqual(NOT_IN_STYLE_GUIDE);
+		// The primitive that fills as a run goes on stands there too.
+		expect(page).toMatch(/<Progress\b/);
+	});
+
+	it('says on every detail page that its address names nothing, without a retry', () => {
+		// "States": not found is a `LoadProblem` with the way back, in the page's words; trying
+		// again would change nothing. A page below a parameter loads through `describeLoad`
+		// (the rule pages through `RuleLoader`), the document's page says it itself.
+		const own = new Set(['/src/routes/(app)/documents/[id]/+page.svelte']);
+		const through = /\bdescribeLoad\(|\bnew RuleLoader\b|<MailRulePage\b/;
+		expect(
+			Object.entries(sources)
+				.filter(([path]) => /^\/src\/routes\/.*\[[^\]]+\].*\/\+page\.svelte$/.test(path))
+				.filter(([path, source]) => !own.has(path) && !through.test(source))
+				.map(([path]) => path)
+		).toEqual([]);
+		expect(sources['/src/lib/components/rules/MailRulePage.svelte']).toMatch(/\bdescribeLoad\(/);
+		// And no retry beside it that ignores what the loader found.
+		expect(offenders((source) => line(source, /onretry=\{\(\) => loader\.retry\(\)\}/))).toEqual(
+			[]
+		);
+	});
+
+	it('keeps no part of a primitive that nobody uses', () => {
+		// DESIGN.md, "Living style guide": what `ui/` offers is in use and shown there. A part is
+		// what an `index.ts` exports under its names; it counts as used when a file reaches one
+		// of them, through the namespace (`Card.Title`) or by name (`{ Button }`).
+		const all = { ...sources, ...scripts };
+		const names = (block: string) =>
+			block
+				.split(',')
+				.map((part) => part.replace(/\/\/.*/, '').trim())
+				.filter((part) => part && !part.startsWith('type '))
+				.map((part) => /^(\w+)(?: as (\w+))?$/.exec(part))
+				.filter((hit) => hit !== null)
+				.map((hit) => ({ part: hit[1], name: hit[2] ?? hit[1] }));
+		const unused = Object.entries(scripts)
+			.filter(([path]) => /^\/src\/lib\/components\/ui\/[^/]+\/index\.ts$/.test(path))
+			.flatMap(([index, source]) => {
+				const folder = index.slice(0, index.lastIndexOf('/'));
+				const kind = folder.slice(folder.lastIndexOf('/') + 1);
+				const from = `'[^']*ui/${kind}(?:/index\\.(?:ts|js))?'`;
+				const used = new Set<string>();
+				for (const [path, text] of Object.entries(all)) {
+					if (path === index) continue;
+					const spaces = [...text.matchAll(new RegExp(`import \\* as (\\w+) from ${from}`, 'g'))];
+					if (path.startsWith(`${folder}/`))
+						spaces.push(...text.matchAll(/import \* as (\w+) from '\.\/index\.(?:ts|js)'/g));
+					for (const [, space] of spaces)
+						for (const [, name] of text.matchAll(new RegExp(`\\b${space}\\.(\\w+)`, 'g')))
+							used.add(name);
+					for (const [, block] of text.matchAll(
+						new RegExp(`import (?:type )?\\{([^}]*)\\} from ${from}`, 'g')
+					))
+						for (const part of block.split(','))
+							used.add(part.replace('type ', '').split(' as ')[0].trim());
+				}
+				const parts = new Map<string, string[]>();
+				for (const [, block] of source.matchAll(/export \{([^}]*)\}/g))
+					for (const { part, name } of names(block))
+						parts.set(part, [...(parts.get(part) ?? []), name]);
+				return [...parts]
+					.filter(([, known]) => !known.some((name) => used.has(name)))
+					.map(([part]) => `${kind}: ${part}`);
+			});
+		expect(unused).toEqual([]);
+	});
+
+	it('draws no box by hand in a tab of the system page', () => {
+		// "Cards": a figure with its word is `StatTile`, every other box a `Card`.
+		const classes = /"[^"\n]*"|'[^'\n]*'/g;
+		const box = (value: string) =>
+			/\brounded-(?:lg|xl|2xl)\b/.test(value) &&
+			(/\bp-\d/.test(value) || (/\bpx-\d/.test(value) && /\bpy-\d/.test(value)));
+		expect(box('flex flex-col gap-0.5 rounded-xl bg-surface px-3.5 py-3')).toBe(true);
+		expect(box('flex flex-col gap-1 rounded-xl border p-4')).toBe(true);
+		expect(box('h-3 overflow-hidden rounded-full bg-muted')).toBe(false);
+		expect(
+			offenders((source, path) =>
+				path.includes('/components/system/')
+					? ([...source.matchAll(classes)].map(([found]) => found).find(box) ?? null)
+					: null
+			)
+		).toEqual([]);
+		// The tiles are cards: no `cardVariants` on a `div` there either.
+		expect(
+			offenders((source, path) =>
+				path.includes('/components/system/') ? line(source, /cardVariants\(/) : null
+			)
+		).toEqual([]);
+	});
+
+	it('draws a lane with LaneBadge, never with a bare badge in its tone', () => {
+		// "Badges": a lane is its icon and its word; `LaneBadge` alone hands a lane to `Badge`.
+		const bare = /<Badge\b[^>]*\bvariant=\{[^}]*\blane\b[^}]*\}/i;
+		expect(
+			offenders((source, path) =>
+				path.endsWith('/components/LaneBadge.svelte') ? null : (bare.exec(source)?.[0] ?? null)
+			)
+		).toEqual([]);
+		expect(bare.test('<Badge variant={flow.lane} size="md">')).toBe(true);
+		expect(bare.test('<LaneBadge lane={flow.lane} size="md" />')).toBe(false);
+	});
+
+	it('marks a target as small only where DESIGN.md names the exception', () => {
+		// "Touch targets": the layout spec skips what carries the mark. This list may only shrink.
+		const SMALL = new Set([
+			'/src/lib/components/document/ProcessingBand.svelte',
+			'/src/lib/components/PeriodFacet.svelte'
+		]);
+		expect(
+			offenders((source, path) => (SMALL.has(path) ? null : line(source, /data-small-target/)))
+		).toEqual([]);
+		for (const path of SMALL) expect(sources[path]).toContain('data-small-target');
+	});
+
+	it('sets an inline style only where DESIGN.md names the file', () => {
+		// Classes carry the look; a style of its own is for a size or a place that comes from
+		// data (DESIGN.md, "Exceptions").
+		expect(
+			offenders((source, path) =>
+				path.includes('/components/ui/') || EXCEPTIONS.inlineStyle.has(path)
+					? null
+					: line(source, INLINE_STYLE)
+			)
+		).toEqual([]);
+	});
+
+	it('writes a colour as a value only where DESIGN.md names the file', () => {
+		const all = { ...sources, ...scripts };
+		expect(
+			Object.entries(all)
+				.filter(([path, source]) => !EXCEPTIONS.colourValue.has(path) && COLOUR_VALUE.test(source))
+				.map(([path]) => path)
+		).toEqual([]);
+	});
+
+	it('notices an inline style and a colour as a value', () => {
+		expect(INLINE_STYLE.test('<div style="width: 3px">')).toBe(true);
+		expect(INLINE_STYLE.test('<div style={crop}>')).toBe(true);
+		expect(INLINE_STYLE.test('<div class="bar" style:width="{share}%">')).toBe(true);
+		expect(INLINE_STYLE.test("formatNumber(value, { style: 'percent' })")).toBe(false);
+		expect(INLINE_STYLE.test('const style = shown ? a : b;')).toBe(false);
+		expect(COLOUR_VALUE.test('class="bg-[#b45309]"')).toBe(true);
+		expect(COLOUR_VALUE.test("const ground = '#fff';")).toBe(true);
+		expect(COLOUR_VALUE.test('fill="hsl({hue} 55% 42%)"')).toBe(true);
+		expect(COLOUR_VALUE.test('// The facts the documents have (#145)')).toBe(false);
+		expect(
+			COLOUR_VALUE.test('hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)]')
+		).toBe(false);
 	});
 
 	it('says that nothing is there only with EmptyNote', () => {
@@ -623,6 +1106,32 @@ describe('the design system (web/DESIGN.md)', () => {
 				path.endsWith('/EmptyNote.svelte')
 					? null
 					: ([...source.matchAll(classes)].map(([found]) => found).find(empty) ?? null)
+			)
+		).toEqual([]);
+	});
+
+	it('says that a card or list holds nothing only with EmptyNote', () => {
+		// A paragraph of muted words with its own measure and grade at every place (DESIGN.md,
+		// "States"): in a dense card it is `EmptyNote size="line"`. What stands here is no empty
+		// card: a search inside a picker that found nothing, and a value that reads "none". This
+		// list may only shrink.
+		const OTHER: ReadonlySet<string> = new Set([
+			'assignment_none_found',
+			'icon_search_none',
+			'pick_document_empty',
+			'lens_filter_none',
+			'signal_none',
+			'summary_neighbours_none'
+		]);
+		const paragraph =
+			/<p\b[^>]*\bclass="[^"]*\btext-muted-foreground\b[^"]*"[^>]*>\s*\{m\.(\w+)\([^<]*\)\}\s*<\/p>/g;
+		const nothing = /(?:^|_)(?:none|empty|nothing)(?:_|$)/;
+		expect(
+			offenders(
+				(source) =>
+					[...source.matchAll(paragraph)].find(
+						([, key]) => nothing.test(key) && !OTHER.has(key)
+					)?.[0] ?? null
 			)
 		).toEqual([]);
 	});
@@ -694,6 +1203,107 @@ describe('the design system (web/DESIGN.md)', () => {
 				);
 			})
 		).toEqual([]);
+	});
+
+	it('names every table, for the region it is while it scrolls sideways', () => {
+		// "Tables": a table wider than its room scrolls in a region the keyboard reaches, which
+		// needs a name (`label` of `Table.Root`).
+		expect(
+			offenders((source) => tags(source, 'Table.Root').find((tag) => !/\slabel=/.test(tag)) ?? null)
+		).toEqual([]);
+	});
+
+	it('names its error at every field it marks as invalid', () => {
+		// "Fields": the error below a field is tied to it with `aria-describedby` (`describedby`
+		// at `DateInput` and `PeriodInput`), so that who lands on the field hears it. Not yet
+		// where the error stands at a row of a rule or is the form's own. This list may only shrink.
+		const NOT_YET = new Set([
+			'/src/lib/components/CodeDialog.svelte',
+			'/src/lib/components/ColorPicker.svelte',
+			'/src/lib/components/SearchSelect.svelte',
+			'/src/lib/components/SpaceDialog.svelte',
+			'/src/lib/components/WebhookForm.svelte',
+			'/src/lib/components/rules/ActionRow.svelte',
+			'/src/lib/components/rules/ConditionRow.svelte',
+			'/src/lib/components/rules/MailRuleForm.svelte',
+			'/src/lib/components/rules/MailValueInput.svelte',
+			'/src/lib/components/rules/ValueInput.svelte',
+			'/src/lib/components/templates/TemplateEditor.svelte',
+			'/src/lib/components/templates/TemplateInput.svelte'
+		]);
+		const FIELDS = [
+			'Input',
+			'Select',
+			'SearchSelect',
+			'DateInput',
+			'PeriodInput',
+			'CodeEditor',
+			'input',
+			'select',
+			'textarea',
+			'button'
+		];
+		const untied = (tag: string) =>
+			/\s(?:aria-)?invalid=/.test(tag) && !/\s(?:aria-)?describedby=/.test(tag);
+		expect(untied('<Input id="a" aria-invalid={error ? true : undefined} />')).toBe(true);
+		expect(untied('<DateInput invalid={!!error} describedby={errorId} />')).toBe(false);
+		const found = offenders((source, path) =>
+			NOT_YET.has(path) || path.includes('/components/ui/') || path.includes('/testing/')
+				? null
+				: (FIELDS.flatMap((name) => tags(source, name)).find(untied) ?? null)
+		);
+		expect(found).toEqual([]);
+		// And none stands in the list that needs it no longer.
+		for (const path of NOT_YET)
+			expect(FIELDS.flatMap((name) => tags(sources[path], name)).some(untied), path).toBe(true);
+	});
+
+	it('scrolls a row sideways with its fade only through lib/sideways.ts', () => {
+		// "Tabs and switches": measured, marked and faded in one place, not once per component.
+		const own = /mask-image:linear-gradient|data-more-(?:start|end)=/;
+		expect(
+			Object.entries({ ...sources, ...scripts })
+				.filter(([path, source]) => !path.endsWith('/lib/sideways.ts') && own.test(source))
+				.map(([path]) => path)
+		).toEqual([]);
+	});
+
+	it('keeps the marks of a tone in the one map, with the one width of a dot', () => {
+		// "Colour roles", lane tones: `tones.ts` alone knows mark, dot and stripe. A file that
+		// says how a step looks (`step-look.ts`) names icon and word, no class of a lane.
+		expect(scripts['/src/lib/step-look.ts']).not.toMatch(/\b(?:bg|ring|border|text)-lane-/);
+		// A dot's ground with its edge is `TONE_DOT`, never written out again.
+		const dot = /border-dot border-(lane-\w+|note)-foreground bg-\1\b/;
+		expect(dot.test('border-dot border-lane-yellow-foreground bg-lane-yellow')).toBe(true);
+		expect(dot.test('border-dot border-dashed border-muted-foreground')).toBe(false);
+		expect(
+			Object.entries({ ...sources, ...scripts })
+				.filter(([path, source]) => path !== '/src/lib/tones.ts' && dot.test(source))
+				.map(([path]) => path)
+		).toEqual([]);
+		// No border around a box in a free width: `border-dot` is the one beyond the scale. (A
+		// line drawn with one side of a box, a rail or a legend's sample, is no such border.)
+		const free = /(?<![\w-])border-\[[\d.]+px\]/;
+		expect(free.test('size-4 rounded-full border-[1.5px] border-muted-foreground')).toBe(true);
+		expect(free.test('w-0 border-l-[3px] border-dashed')).toBe(false);
+		expect(
+			Object.entries({ ...sources, ...scripts })
+				.filter(([, source]) => free.test(source))
+				.map(([path]) => path)
+		).toEqual([]);
+	});
+
+	it('draws no action on the colour of a lane', () => {
+		// "Lane colours mean state, nothing else" (DESIGN.md, "Principles"): what one presses
+		// takes a variant of `Button`. A hover on a lane's ground is the mark of such an action.
+		const action = /\bhover:bg-lane-/;
+		expect(
+			Object.entries({ ...sources, ...scripts })
+				.filter(([, source]) => action.test(source))
+				.map(([path]) => path)
+		).toEqual([]);
+		expect(action.test('bg-lane-yellow ring-1 hover:bg-lane-yellow/70')).toBe(true);
+		expect(action.test('bg-lane-yellow text-lane-yellow-foreground')).toBe(false);
 	});
 
 	it('keeps the buttons in an alert in their variant, never in its tone', () => {
@@ -878,11 +1488,17 @@ describe('the design system (web/DESIGN.md)', () => {
 
 	it("gives the date picker's arrows and days and the rows of choice lists a finger's size", () => {
 		const picker = sources['/src/lib/components/DateInput.svelte'];
-		for (const part of ['PrevButton', 'NextButton', 'Day'])
-			expect(picker).toMatch(new RegExp(`<DatePicker\\.${part}\\b[^>]*\\bmax-sm:size-11\\b`));
+		expect(picker).toMatch(/<DatePicker\.Day\b[^>]*\bmax-sm:size-11\b/);
+		// The arrows are drawn by the field itself, inside the library's part (their names, WY-03).
+		for (const part of ['PrevButton', 'NextButton']) {
+			const [, inside = ''] =
+				new RegExp(`<DatePicker\\.${part}>([\\s\\S]*?)</DatePicker\\.${part}>`).exec(picker) ?? [];
+			expect(inside).toMatch(/<button\b[^>]*\bmax-sm:size-11\b/);
+		}
 		for (const list of ['MultiPicker', 'FacetList', 'FacetPicker'])
 			expect(sources[`/src/lib/components/${list}.svelte`]).toMatch(
-				/<label\b[^>]*\bmax-sm:min-h-11\b/
+				// 44 px, or the 48 px of a row in a sheet from the bottom.
+				/<label\b[^>]*\bmax-sm:min-h-1[12]\b/
 			);
 	});
 
@@ -907,9 +1523,97 @@ describe('the design system (web/DESIGN.md)', () => {
 				.filter(
 					([, source]) =>
 						/\bfunction json\(/.test(source) ||
-						/Response\.json\(|new Response\(JSON\.stringify\(/.test(source)
+						/Response\.json\(|new Response\(\s*JSON\.stringify\(/.test(source)
 				)
 				.map(([path]) => path)
+		).toEqual([]);
+	});
+
+	it('builds a problem in tests as the API does, through lib/testing/api.ts (WT2-02)', () => {
+		// By hand they lacked what the API sends: the reason with its code, the parts of a 422;
+		// so no test saw the words a person reads.
+		const tests = import.meta.glob<string>('/src/**/*.test.ts', {
+			query: '?raw',
+			import: 'default',
+			eager: true
+		});
+		// The fakes of a stale CSRF token, which WG-08 gives their reason; the builder's own test.
+		const byHand = new Set([
+			'/src/lib/session.test.ts',
+			'/src/lib/api/fetch.test.ts',
+			'/src/lib/testing/api.test.ts'
+		]);
+		const PROBLEM =
+			/type: 'about:blank'|\btitle: '[^']*',\s*status: [45]\d\d|\bdetail: [^,}]+,\s*status: [45]\d\d|json\(\{\s*detail: [^}]*\},\s*[45]\d\d\)/;
+		expect(PROBLEM.test("json({\n\ttitle: 'Conflict',\n\tstatus: 409\n}, 409)")).toBe(true);
+		expect(PROBLEM.test("json({ detail: 'down' }, 500)")).toBe(true);
+		expect(PROBLEM.test("problem(409, { detail: 'taken' })")).toBe(false);
+		expect(
+			Object.entries(tests)
+				.filter(([path, source]) => !byHand.has(path) && PROBLEM.test(source))
+				.map(([path]) => path)
+		).toEqual([]);
+	});
+
+	it('answers in a fake API only what a test routes, never everything (WT1-05)', () => {
+		// An answer to everything gave a wrong path or method a plausible answer.
+		const tests = import.meta.glob<string>('/src/**/*.test.ts', {
+			query: '?raw',
+			import: 'default',
+			eager: true
+		});
+		// The client's own tests: one call each, its answer in order.
+		const inOrder = new Set(['/src/lib/api/fetch.test.ts', '/src/lib/session.test.ts']);
+		const EVERYTHING =
+			/\bfetchMock\.mock(?:Implementation|ResolvedValue)\(|vi\.fn\(async \(\) =>\s*json\(/;
+		expect(EVERYTHING.test('fetchMock.mockImplementation(async () => json({}));')).toBe(true);
+		expect(EVERYTHING.test('vi.fn(async () =>\n\tjson({}))')).toBe(true);
+		expect(EVERYTHING.test('fetchMock.mockResolvedValueOnce(json({}));')).toBe(false);
+		expect(
+			Object.entries(tests)
+				.filter(([path, source]) => !inOrder.has(path) && EVERYTHING.test(source))
+				.map(([path]) => path)
+		).toEqual([]);
+	});
+
+	it('takes what every test needs from lib/testing and the setup, never from a copy', () => {
+		// The sign-in, the stand-ins for `$app`, the globals a test replaced and the pointer a
+		// dialog took stood in every file anew and had drifted apart (`web/README.md`, "Layout").
+		const tests = import.meta.glob<string>('/src/**/*.test.ts', {
+			query: '?raw',
+			import: 'default',
+			eager: true
+		});
+		const COPIES: Record<string, RegExp> = {
+			'signIn (lib/testing/session.ts)': /session\.start\(\{\s*user:/,
+			'navigation.ts (lib/testing)':
+				/vi\.mock\('\$app\/navigation', \(\) => \(\{\s*(?:(?:goto|beforeNavigate|afterNavigate): vi\.fn\(\),?\s*)+\}\)\)/,
+			'app-state.ts, app-navigation.ts (lib/testing)':
+				/import\('#lib\/testing\/page-state\.svelte\.ts'\)\)\.(?:testPage|fakeGoto)/,
+			'unstubGlobals (vite.config.ts)':
+				/(?:after|before)Each\((?:async )?\(\) => (?:\{[^}]*)?vi\.unstubAllGlobals\(\)/,
+			'the pointer (tests/setup.ts)': /pointerEventsCheck|body\.style\.pointerEvents = /,
+			// WT3-08: the master data, the log and the browser stood in many files anew.
+			'lookupOf (lib/testing/master-data.ts)': /as unknown as Lookup\b/,
+			'logEntry (lib/testing/pipeline.ts)': /\bpipeline_version: 'test'/,
+			'withoutStorage (lib/testing/browser.ts)': /throw new Error\('blocked'\)/,
+			'deviceOf (lib/testing/browser.ts)': /defineProperty\(navigator, 'maxTouchPoints'/,
+			// WT2-11: a mailbox, a webhook, a lens, the jobs, the event stream, the page, a user.
+			'mailboxOf (lib/testing/system.ts)': /\bstep_failed_at: null,\s*step_failed: null,/,
+			'webhookOf (lib/testing/system.ts)': /\bmax_open_tasks: \d+,\s*model_call:/,
+			'jobsSummaryOf (lib/testing/system.ts)': /\bkinds: \[\s*\{ kind: '[a-z_.]+', running:/,
+			'lensOf (lib/testing/documents.ts)': /\bsort_field_id: null,\s*grouping:/,
+			'FakeEventSource, streamEvents (lib/testing/events.ts)': /\bevents\.useFactory\(\s*\(\)/,
+			'testPage (lib/testing/app-state.ts)':
+				/vi\.mock\('\$app\/state', \(\) => \(\{\s*page: \{[^}]*\burl\b/,
+			'signIn (lib/testing/session.ts) for a user': /\bsession\.user = \{/
+		};
+		expect(
+			Object.entries(tests).flatMap(([path, source]) =>
+				Object.entries(COPIES)
+					.filter(([, copy]) => copy.test(source))
+					.map(([shared]) => `${path}: ${shared}`)
+			)
 		).toEqual([]);
 	});
 

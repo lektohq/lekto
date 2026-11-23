@@ -1,4 +1,6 @@
 <script lang="ts">
+	import CircleCheck from '@lucide/svelte/icons/circle-check';
+	import OctagonX from '@lucide/svelte/icons/octagon-x';
 	import RotateCw from '@lucide/svelte/icons/rotate-cw';
 	import Wrench from '@lucide/svelte/icons/wrench';
 	import { onMount } from 'svelte';
@@ -6,6 +8,9 @@
 	import { api } from '#lib/api/client.ts';
 	import { unwrap } from '#lib/api/call.ts';
 	import type { components } from '#lib/api/schema.ts';
+	import StatTile from '#lib/components/StatTile.svelte';
+	import StatusBadge from '#lib/components/StatusBadge.svelte';
+	import EmptyNote from '#lib/components/EmptyNote.svelte';
 	import LoadProblem from '#lib/components/LoadProblem.svelte';
 	import Pagination from '#lib/components/Pagination.svelte';
 	import Segmented from '#lib/components/Segmented.svelte';
@@ -36,10 +41,8 @@
 	import { m } from '#lib/paraglide/messages.js';
 	import { cn } from '#lib/utils.ts';
 	import * as Card from '#lib/components/ui/card/index.ts';
-	import { cardVariants } from '#lib/components/ui/card/index.ts';
 	import SectionTitle from '#lib/components/page/SectionTitle.svelte';
 	import type { Tone } from '#lib/tones.ts';
-	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import Loading from '#lib/components/Loading.svelte';
 	import MaintenanceDialog from '#lib/components/system/MaintenanceDialog.svelte';
 	import { session } from '#lib/session.svelte.ts';
@@ -204,10 +207,20 @@
 		failed: 'red',
 		done: 'green'
 	};
+	// A state in a lane's tone says it with an icon too, never by colour alone (web/DESIGN.md,
+	// "Badges"); the others are plain facts.
+	const STATE_ICONS: Partial<Record<JobState, typeof CircleCheck>> = {
+		failed: OctagonX,
+		done: CircleCheck
+	};
 	const NUMBER = 'text-right tabular-nums';
 </script>
 
 <div class="flex flex-col gap-6">
+	<!-- A failed reload: said above what was read before, which stays (web/DESIGN.md, "States"). -->
+	{#if problem && summary}
+		<LoadProblem {problem} onretry={loadSummary} />
+	{/if}
 	{#if problem && !summary}
 		<LoadProblem {problem} onretry={loadSummary} />
 	{:else if !summary || !all}
@@ -234,22 +247,12 @@
 
 		<div class="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-3">
 			{#each [['running', m.jobs_hint_running()], ['due', m.jobs_hint_due()], ['planned', m.jobs_hint_planned()], ['failed', m.jobs_hint_kept( { date: keptSince } )], ['done', m.jobs_hint_kept( { date: keptSince } )]] as const as [state, hint] (state)}
-				<div
-					class={cn(
-						cardVariants({ size: 'sm' }),
-						'flex flex-col gap-0.5',
-						state === 'failed' &&
-							all.failed > 0 &&
-							'border-lane-red-foreground/35 bg-lane-red text-lane-red-foreground',
-						state === 'done' && 'bg-surface'
-					)}
-				>
-					<span class="text-figure tabular-nums">
-						{formatNumber(all[state])}
-					</span>
-					<span class="text-meta font-medium">{STATE_LABELS[state]()}</span>
-					<span class="text-xs text-muted-foreground">{hint}</span>
-				</div>
+				<StatTile
+					value={formatNumber(all[state])}
+					label={STATE_LABELS[state]()}
+					{hint}
+					tone={state === 'failed' && all.failed > 0 ? 'red' : state === 'done' ? 'quiet' : 'plain'}
+				/>
 			{/each}
 		</div>
 
@@ -296,15 +299,17 @@
 					</span>
 				{/if}
 			</div>
-			{#if jobs.error && !jobs.loaded}
+			<!-- Also above a page read before: another page that failed leaves its rows. -->
+			{#if jobs.error}
 				<div class="mt-3">
 					<LoadProblem problem={describeError(jobs.error)} onretry={() => jobs.reload()} />
 				</div>
-			{:else if jobs.empty}
+			{/if}
+			{#if jobs.empty}
 				<p class="mt-3 text-muted-foreground">{none}</p>
 			{:else if jobs.items.length}
 				<div class="mt-3">
-					<Table.Root class="min-w-[760px] text-meta">
+					<Table.Root label={m.system_tab_jobs()} class="min-w-[760px] text-meta">
 						<Table.Header>
 							<Table.Row class="text-xs text-muted-foreground">
 								<Table.Head class="pl-0">{m.jobs_col_kind()}</Table.Head>
@@ -330,7 +335,11 @@
 										{job.node ? NODE_LABELS[job.node]() : kindLabel(job.kind)}
 									</Table.Cell>
 									<Table.Cell>
-										<Badge variant={TONES[job.state]}>{STATE_LABELS[job.state]()}</Badge>
+										<StatusBadge
+											tone={TONES[job.state]}
+											label={STATE_LABELS[job.state]()}
+											icon={STATE_ICONS[job.state]}
+										/>
 									</Table.Cell>
 									<Table.Cell class="max-w-[22rem]">
 										{#if job.document}
@@ -368,7 +377,7 @@
 												<Button
 													size="sm"
 													variant="outline"
-													disabled={busy !== null}
+													busy={busy !== null}
 													onclick={() => retry(job)}
 												>
 													<RotateCw aria-hidden="true" />{m.jobs_retry()}
@@ -419,10 +428,10 @@
 					</span>
 				</div>
 				{#if done.length === 0}
-					<p class="mt-3 text-muted-foreground">{m.jobs_none_done({ date: keptSince })}</p>
+					<EmptyNote size="line">{m.jobs_none_done({ date: keptSince })}</EmptyNote>
 				{:else}
 					<div class="mt-3">
-						<Table.Root class="min-w-[560px] text-meta">
+						<Table.Root label={m.jobs_durations_title()} class="min-w-[560px] text-meta">
 							<Table.Header>
 								<Table.Row class="text-xs text-muted-foreground">
 									<Table.Head class="pl-0">{m.jobs_col_kind()}</Table.Head>

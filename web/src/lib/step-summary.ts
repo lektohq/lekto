@@ -4,7 +4,7 @@
  */
 import type { components } from '#lib/api/schema.ts';
 import { describeValue, fieldLabel } from '#lib/describe.ts';
-import { formatDate, formatNumber, listLocale } from '#lib/i18n.ts';
+import { formatNumber, formatList, formatMoment } from '#lib/i18n.ts';
 import type { Lookup } from '#lib/masterdata.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { labelled, outputReasonText, reasonsText } from '#lib/reasons.ts';
@@ -99,7 +99,7 @@ export function stepSummary(
 	}
 	switch (node) {
 		case 'receive':
-			return formatDate(entry.started_at, { dateStyle: 'short', timeStyle: 'short' });
+			return formatMoment(entry.started_at);
 		case 'separate':
 			return separated(output);
 		case 'ocr':
@@ -160,9 +160,7 @@ function separated(output: Json): string | null {
 
 /** The separator sheets on `sheets` (pages): "2 Trennblätter (S. 4 und 8)". */
 export function summaryOfSheets(sheets: readonly number[]): string {
-	const pages = new Intl.ListFormat(listLocale(), { type: 'conjunction' }).format(
-		sheets.map((page) => formatNumber(page))
-	);
+	const pages = formatList(sheets.map((page) => formatNumber(page)));
 	return sheets.length === 1
 		? m.summary_sheets_one({ pages })
 		: m.summary_sheets({ count: formatNumber(sheets.length), pages });
@@ -219,7 +217,7 @@ function alike(output: Json, lookup: Lookup | null): string {
 	}
 	const [contact, share] = [...tally].sort((a, b) => b[1] - a[1])[0] ?? [null, 0];
 	const documents =
-		total === 1 ? m.summary_neighbours_one() : m.summary_neighbours({ count: String(total) });
+		total === 1 ? m.summary_neighbours_one() : m.summary_neighbours({ count: formatNumber(total) });
 	if (contact === null || share < 2) return documents;
 	const name = named(contact, lookup);
 	return share === total
@@ -288,9 +286,9 @@ function read(output: Json): string {
 	if (found === checks.length) {
 		return found === 1
 			? m.summary_fields_read_one()
-			: m.summary_fields_read({ count: String(found) });
+			: m.summary_fields_read({ count: formatNumber(found) });
 	}
-	return m.summary_fields_partly({ read: String(found), count: String(checks.length) });
+	return m.summary_fields_partly({ read: String(found), count: formatNumber(checks.length) });
 }
 
 /** How many relations the step set and suggested (#145). */
@@ -324,9 +322,11 @@ function ruled(entry: LogEntry, lookup: Lookup | null): string {
 		looked === 0
 			? m.summary_rules_absent()
 			: matched === 0
-				? m.summary_rules_none({ count: String(looked) })
+				? looked === 1
+					? m.summary_rules_none_one()
+					: m.summary_rules_none({ count: formatNumber(looked) })
 				: matched === 1
-					? m.summary_rules_matched_one({ count: String(looked) })
-					: m.summary_rules_matched({ matched: String(matched), count: String(looked) });
+					? m.summary_rules_matched_one({ count: formatNumber(looked) })
+					: m.summary_rules_matched({ matched: String(matched), count: formatNumber(looked) });
 	return [where, took].filter(Boolean).join(SEPARATOR);
 }

@@ -37,7 +37,7 @@ from lekto.core.domain.ids import (
 )
 from lekto.core.domain.links import Links
 from lekto.core.domain.permissions import can_file_into, space_role
-from lekto.core.domain.reasons import Action, ReasonCode, because
+from lekto.core.domain.reasons import Action, Reason, ReasonCode, because
 from lekto.core.domain.rights import Actor, TokenRight
 from lekto.core.domain.rules import (
     MAX_TEXT,
@@ -99,6 +99,7 @@ class TemplatePreview:
     rendered: str | None = None
     missing: str | None = None
     error: str | None = None
+    error_reason: Reason | None = None
     values: Mapping[str, str] | None = None
     read: FieldValue | None = None
     unreadable: bool = False
@@ -261,7 +262,10 @@ class RuleService:
         names = WEBHOOK_NAMES if webhook else (*NAMES, STEPS)
         unknown = unknown_values(used, {item.key for item in applying}, names)
         if unknown:
-            return TemplatePreview(used=paths, error=f"unknown value {unknown[0]}", values=written)
+            reason = because(ReasonCode.TEMPLATE_UNKNOWN_VALUE, value=unknown[0])
+            return TemplatePreview(
+                used=paths, error=reason.text, error_reason=reason, values=written
+            )
         if values is None and (target is None or used):
             return TemplatePreview(used=paths)
         values = values or {}
@@ -451,10 +455,14 @@ async def check_templates(
             path for path in steps if path.partition(".")[2].split(".")[0] not in asked
         )
         if unknown:
-            known = ", ".join(name for name in NAMES if name != FIELD)
+            known = tuple(name for name in NAMES if name != FIELD)
             raise ValidationError(
-                f"actions[{index}]: unknown value {unknown[0]}; templates know {known}, "
-                "field.<key> of an existing field and steps.<name> of a step before that asks"
+                because(
+                    ReasonCode.TEMPLATE_UNKNOWN_VALUE_AT,
+                    at=f"actions[{index}]",
+                    value=unknown[0],
+                    known=known,
+                )
             )
 
 

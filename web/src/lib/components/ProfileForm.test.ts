@@ -2,14 +2,15 @@ import { render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { m } from '#lib/paraglide/messages.js';
+import { signIn } from '#lib/testing/session.ts';
 import type { ProfileData } from '#lib/profile.ts';
 import { session } from '#lib/session.svelte.ts';
 import ProfileForm from './ProfileForm.svelte';
-import { fakeApi, json } from '#lib/testing/api.ts';
+import { fakeApi, masterData } from '#lib/testing/api.ts';
 
-vi.mock('$app/navigation', () => ({ beforeNavigate: vi.fn(), goto: vi.fn() }));
+vi.mock('$app/navigation', () => import('#lib/testing/navigation.ts'));
 
-let fetchMock = fakeApi();
+let fetchMock: ReturnType<typeof fakeApi>;
 const sent: { path: string; body: unknown }[] = [];
 
 const stored = {
@@ -52,31 +53,25 @@ const contacts = [
 const data = { profile: stored, contacts, topics: [] } as unknown as ProfileData;
 
 beforeEach(() => {
-	session.start({
-		user: { id: 'erika', username: 'erika', role: 'user' },
-		method: 'password',
-		expires_at: '2026-10-14T12:00:00Z',
-		csrf_token: 'token'
-	});
+	signIn('user', { id: 'erika', username: 'erika' });
 	sent.length = 0;
-	fetchMock = fakeApi();
-	fetchMock.mockImplementation(async (request) => {
-		const path = new URL(request.url).pathname;
-		if (request.method === 'PATCH') {
-			const body = await request.json();
-			sent.push({ path, body });
-			return json({ ...stored, ...body });
-		}
-		if (path.endsWith('/profile')) return json(stored);
-		if (path.endsWith('/contacts')) return json(contacts);
-		return json([]);
+	const save = async (request: Request, url: URL) => {
+		const body = await request.json();
+		sent.push({ path: url.pathname, body });
+		return { ...stored, ...body };
+	};
+	fetchMock = fakeApi({
+		...masterData({ contacts }),
+		'GET /api/v1/auth/me/profile': () => stored,
+		'PATCH /api/v1/auth/me/profile': save,
+		'GET /api/v1/users/john/profile': () => stored,
+		'PATCH /api/v1/users/john/profile': save
 	});
 	vi.stubGlobal('fetch', fetchMock);
 });
 
 afterEach(() => {
 	session.clear();
-	vi.unstubAllGlobals();
 });
 
 describe('ProfileForm', () => {
@@ -129,10 +124,10 @@ describe('ProfileForm', () => {
 	});
 
 	it('edits another user’s profile for an admin', async () => {
-		render(ProfileForm, { data, userId: 'bob' });
+		render(ProfileForm, { data, userId: 'john' });
 		await screen.findByLabelText(m.profile_display_name());
 		await userEvent.click(screen.getByRole('button', { name: m.save() }));
-		expect(sent.map((item) => item.path)).toEqual(['/api/v1/users/bob/profile']);
+		expect(sent.map((item) => item.path)).toEqual(['/api/v1/users/john/profile']);
 	});
 
 	it('saves only the part it shows', async () => {

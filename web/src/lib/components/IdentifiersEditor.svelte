@@ -356,6 +356,7 @@
 							bind:value={rows[index].value}
 							aria-label={m.identifier_value()}
 							aria-invalid={errors[item.key] ? true : undefined}
+							aria-describedby={errors[item.key] ? `${uid}-${item.key}-error` : undefined}
 							maxlength={IDENTIFIER_VALUE_MAX}
 							class="font-mono"
 							onkeydown={closeOnEnter}
@@ -388,7 +389,9 @@
 						</div>
 					{/if}
 					{#if errors[item.key]}
-						<p class="mt-2 text-sm text-destructive" role="alert">{errors[item.key]}</p>
+						<p id="{uid}-{item.key}-error" class="mt-2 text-sm text-destructive" role="alert">
+							{errors[item.key]}
+						</p>
 					{/if}
 				{:else}
 					<div class="flex flex-wrap items-center gap-x-3 gap-y-2">
@@ -453,8 +456,10 @@
 				class="max-sm:w-full"
 			/>
 		{/if}
-		<!-- Search, help and adding wrap as one, under the source where the row is narrow. -->
-		<div class="flex min-w-72 flex-1 items-center gap-2">
+		<!-- Search, help and adding wrap as one, under the source where the row is narrow. On a
+		     phone they take the row's width, whatever it is: a width of their own (288 px) stuck
+		     out of the card at 320 px, and the page scrolled sideways. -->
+		<div class="flex min-w-0 flex-1 items-center gap-2 max-sm:basis-full sm:min-w-72">
 			<SearchField bind:value={query} label={m.identifier_search()} class="flex-1" />
 			{#if hint}<InfoHint text={hint} about={m.master_identifiers()} />{/if}
 			{#if phone.current}
@@ -514,7 +519,7 @@
 							<span class="sr-only"
 								>{group.rows.length === 1
 									? m.master_identifier_one()
-									: m.master_identifiers_many({ count: group.rows.length })}</span
+									: m.master_identifiers_many({ count: formatNumber(group.rows.length) })}</span
 							>
 						</button>
 						{#if open}

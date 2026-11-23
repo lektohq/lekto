@@ -72,7 +72,7 @@
 	{#if value > 0}
 		<button
 			type="button"
-			class="relative -mx-1.5 rounded-md px-1.5 tabular-nums underline decoration-dotted underline-offset-4 hover:bg-secondary max-sm:after:absolute max-sm:after:-inset-2.5"
+			class="relative -mx-1.5 inline-flex min-h-6 min-w-6 items-center justify-center rounded-md px-1.5 tabular-nums underline decoration-dotted underline-offset-4 hover:bg-secondary max-sm:after:absolute max-sm:after:-inset-2.5"
 			aria-label={m.holders_cases_open({
 				count: formatNumber(value),
 				measure: measureLabel(measure),
@@ -130,7 +130,7 @@
 		<Loading />
 	{:else}
 		<div class="overflow-x-auto">
-			<Table.Root>
+			<Table.Root label={m.holders_title()}>
 				<Table.Header>
 					<Table.Row>
 						<Table.Head>{m.holders_kind()}</Table.Head>

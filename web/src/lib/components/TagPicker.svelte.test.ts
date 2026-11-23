@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/sve
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fakeApi } from '#lib/testing/api.ts';
+import { signIn } from '#lib/testing/session.ts';
 import { masterDataDialogs } from '#lib/masterdata-dialog.svelte.ts';
 import type { Tag } from '#lib/masterdata.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
@@ -43,18 +44,7 @@ afterEach(() => {
 	phone.override(null);
 	session.clear();
 	masterDataDialogs.finishAll();
-	vi.unstubAllGlobals();
-	document.body.style.pointerEvents = '';
 });
-
-function signIn(role: 'admin' | 'user') {
-	session.start({
-		user: { id: 'u1', username: 'tobi', role },
-		method: 'password',
-		expires_at: '2026-10-17T23:00:00Z',
-		csrf_token: 'token'
-	});
-}
 
 function picker(selected: string[] = ['g1']) {
 	const made: Tag[] = [];
@@ -221,6 +211,21 @@ describe('TagPicker wider than a phone', () => {
 		await waitFor(() => expect(screen.queryByRole('dialog', hidden)).toBeNull());
 	});
 
+	// After the focus scope started over (see "keeps the focus in its search"), bits-ui's own way
+	// back led to the search, gone with the popover: the focus fell onto the page.
+	it('gives the focus back to its button when it closes', async () => {
+		const user = userEvent.setup();
+		picker();
+		const add = screen.getByRole('button', { name: m.picker_add_group_label() });
+		await user.click(add);
+		await popoverNamed(m.master_contact_groups());
+		const wrapper = document.querySelector<HTMLElement>('[data-bits-floating-content-wrapper]')!;
+		await waitFor(() => expect(wrapper.style.zIndex).not.toBe(''));
+		await user.keyboard('{Escape}');
+		await waitFor(() => expect(screen.queryByRole('dialog', hidden)).toBeNull());
+		await waitFor(() => expect(document.activeElement).toBe(add));
+	});
+
 	it('offers a document only what may be chosen, as the form says', async () => {
 		const user = userEvent.setup();
 		const documentTags = [
@@ -297,6 +302,23 @@ describe('TagPicker with one choice', () => {
 	}
 	const radios = () => [...document.querySelectorAll<HTMLInputElement>('input[type="radio"]')];
 	const field = () => screen.getByRole('group', { name: m.field_topic() });
+
+	// Once it has measured the open popover (its z-index), bits-ui attaches the content anew: the
+	// focus scope ends and starts again while the popover stays open. That end is no closing; the
+	// focus stayed on the opener and, in jsdom 31, on the popover's frame, and keys were lost.
+	it('keeps the focus in its search while the popover stays open', async () => {
+		const user = userEvent.setup();
+		single();
+		await user.click(screen.getByRole('button', { name: m.picker_add_topic_label() }));
+		const search = await screen.findByLabelText(m.assignment_search());
+		await waitFor(() => expect(document.activeElement).toBe(search));
+		const wrapper = document.querySelector<HTMLElement>('[data-bits-floating-content-wrapper]')!;
+		await waitFor(() => expect(wrapper.style.zIndex).not.toBe(''));
+		await new Promise((resolve) => setTimeout(resolve));
+		expect(document.activeElement).toBe(search);
+		await user.keyboard('He');
+		expect(radios().map((radio) => radio.getAttribute('aria-label'))).toEqual(['Health']);
+	});
 
 	it('chooses with a click, then shows the chip alone; its name changes it, × clears it', async () => {
 		const user = userEvent.setup();

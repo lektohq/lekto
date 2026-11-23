@@ -2,20 +2,16 @@ import { cleanup, render, screen, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { usageLabel } from '#lib/components/UsageCount.svelte';
+import { signIn } from '#lib/testing/session.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { phone } from '#lib/phone.svelte.ts';
 import { session } from '#lib/session.svelte.ts';
 import { fakeBack, goTo, testPage } from '#lib/testing/page-state.svelte.ts';
 import IdentifiersPanel from './IdentifiersPanel.svelte';
-import { fakeApi, json } from '#lib/testing/api.ts';
+import { type Routes, fakeApi, problem } from '#lib/testing/api.ts';
 
-vi.mock('$app/navigation', async () => ({
-	beforeNavigate: vi.fn(),
-	goto: (await import('#lib/testing/page-state.svelte.ts')).fakeGoto
-}));
-vi.mock('$app/state', async () => ({
-	page: (await import('#lib/testing/page-state.svelte.ts')).testPage
-}));
+vi.mock('$app/navigation', () => import('#lib/testing/app-navigation.ts'));
+vi.mock('$app/state', () => import('#lib/testing/app-state.ts'));
 
 const UTILITY = { id: '0199a6c4-0000-7000-8000-0000000000c1', name: 'Stadtwerke Nord' };
 const LOGO = `/api/v1/contacts/${UTILITY.id}/logo`;
@@ -53,112 +49,112 @@ const SUGGESTION = {
 	written: 'DE89 3704 0044 0532 0130 00',
 	source: 'suggested',
 	contacts: [],
-	person: { id: '0199a6c4-0000-7000-8000-0000000000a1', name: 'Max Nord' },
+	person: { id: '0199a6c4-0000-7000-8000-0000000000a1', name: 'John Doe' },
 	documents: 6,
 	last: '2026-10-31'
 };
 
-let fetchMock = fakeApi();
+let fetchMock: ReturnType<typeof fakeApi>;
 let decisions: unknown[] = [];
 let confirmedRecommended = 0;
+
+/** A page of the open identifiers: of the source and advice the address asks for. */
+function openPage(_request: Request, url: URL) {
+	const source = url.searchParams.get('source');
+	const advised = url.searchParams.get('recommended') === 'true';
+	const items =
+		source === 'suggested'
+			? [SUGGESTION]
+			: [DOMAIN, CUSTOMER].filter(
+					(item) => (!source || item.source === source) && (!advised || 'recommendation' in item)
+				);
+	return {
+		items,
+		total: items.length,
+		counts: { learned: 1, suggested: 2 },
+		kinds: { customer_number: 1, iban: 1 },
+		recommended: 1,
+		to_confirm: confirmedRecommended > 0 ? 0 : 1
+	};
+}
+
+/** The API of the panel: the open identifiers with their places, the contacts, deciding;
+ * `more` before these. */
+function serve(more: Routes = {}) {
+	const detail = (item: typeof CUSTOMER | typeof DOMAIN | typeof SUGGESTION) => [
+		`GET /api/v1/identifiers/open/${item.kind}/${item.ref}`,
+		() => ({ identifier: item, places: [] })
+	];
+	fetchMock = fakeApi({
+		'GET /api/v1/identifiers/open': openPage,
+		'POST /api/v1/identifiers/open/search': openPage,
+		'GET /api/v1/contacts': () => [
+			{
+				...UTILITY,
+				logo: { url: LOGO, source: 'uploaded', domain: null, stored_at: '2026-10-01T00:00:00Z' }
+			},
+			BANK
+		],
+		...Object.fromEntries([DOMAIN, SUGGESTION].map(detail)),
+		[`GET /api/v1/identifiers/open/${CUSTOMER.kind}/${CUSTOMER.ref}`]: () => ({
+			identifier: CUSTOMER,
+			places: [
+				{
+					document_id: '0199a6c4-0000-7000-8000-0000000000d1',
+					title: 'Rechnung Oktober',
+					date: '2026-10-12',
+					role: 'contact',
+					excerpt: { before: 'Kundennummer ', match: '1234 5678', after: ' bitte angeben' }
+				}
+			]
+		}),
+		'POST /api/v1/identifiers/open/recommended': () => {
+			confirmedRecommended += 1;
+			return [{ kind: CUSTOMER.kind, value: CUSTOMER.value, done: true, reason: null }];
+		},
+		'POST /api/v1/identifiers/open/decisions': async (request) => {
+			const body = (await request.json()) as { decisions: { kind: string; value: string }[] };
+			decisions.push(...body.decisions);
+			return body.decisions.map((item) => ({
+				kind: item.kind,
+				value: item.value,
+				done: true,
+				reason: null
+			}));
+		},
+		...more
+	});
+	vi.stubGlobal('fetch', fetchMock);
+}
 
 beforeEach(() => {
 	goTo('/ui/admin/master-data?tab=identifiers');
 	vi.spyOn(history, 'back').mockImplementation(fakeBack);
-	session.start({
-		user: { id: 'admin', username: 'admin', role: 'admin' },
-		method: 'password',
-		expires_at: '2026-10-14T12:00:00Z',
-		csrf_token: 'token'
-	});
+	signIn('admin', { id: 'admin', username: 'admin' });
 	decisions = [];
 	confirmedRecommended = 0;
-	fetchMock = fakeApi();
-	fetchMock.mockImplementation(async (request) => {
-		const url = new URL(request.url);
-		const searched =
-			request.method === 'POST' && url.pathname === '/api/v1/identifiers/open/search';
-		if ((request.method === 'GET' && url.pathname === '/api/v1/identifiers/open') || searched) {
-			const source = url.searchParams.get('source');
-			const advised = url.searchParams.get('recommended') === 'true';
-			const items =
-				source === 'suggested'
-					? [SUGGESTION]
-					: [DOMAIN, CUSTOMER].filter(
-							(item) =>
-								(!source || item.source === source) && (!advised || 'recommendation' in item)
-						);
-			return json({
-				items,
-				total: items.length,
-				counts: { learned: 1, suggested: 2 },
-				kinds: { customer_number: 1, iban: 1 },
-				recommended: 1,
-				to_confirm: confirmedRecommended > 0 ? 0 : 1
-			});
-		}
-		if (request.method === 'GET' && url.pathname === '/api/v1/contacts') {
-			return json([
-				{
-					...UTILITY,
-					logo: { url: LOGO, source: 'uploaded', domain: null, stored_at: '2026-10-01T00:00:00Z' }
-				},
-				BANK
-			]);
-		}
-		const detailed = [CUSTOMER, DOMAIN, SUGGESTION].find(
-			(item) => url.pathname === `/api/v1/identifiers/open/${item.kind}/${item.ref}`
-		);
-		if (request.method === 'GET' && detailed && detailed !== CUSTOMER) {
-			return json({ identifier: detailed, places: [] });
-		}
-		if (request.method === 'GET' && detailed === CUSTOMER) {
-			return json({
-				identifier: CUSTOMER,
-				places: [
-					{
-						document_id: '0199a6c4-0000-7000-8000-0000000000d1',
-						title: 'Rechnung Oktober',
-						date: '2026-10-12',
-						role: 'contact',
-						excerpt: { before: 'Kundennummer ', match: '1234 5678', after: ' bitte angeben' }
-					}
-				]
-			});
-		}
-		if (request.method === 'POST' && url.pathname === '/api/v1/identifiers/open/recommended') {
-			confirmedRecommended += 1;
-			return json([{ kind: CUSTOMER.kind, value: CUSTOMER.value, done: true, reason: null }]);
-		}
-		if (request.method === 'POST' && url.pathname === '/api/v1/identifiers/open/decisions') {
-			const body = (await request.json()) as { decisions: { kind: string; value: string }[] };
-			decisions.push(...body.decisions);
-			return json(
-				body.decisions.map((item) => ({
-					kind: item.kind,
-					value: item.value,
-					done: true,
-					reason: null
-				}))
-			);
-		}
-		return json({}, 404);
-	});
-	vi.stubGlobal('fetch', fetchMock);
+	serve();
 });
 
 afterEach(() => {
 	phone.override(null);
 	session.clear();
-	vi.unstubAllGlobals();
 	vi.useRealTimers();
-	window.document.body.style.pointerEvents = '';
 });
 
 /** The rows of the table (wider than a phone), its head left out. */
 async function rows() {
 	const table = await screen.findByRole('table', { name: m.master_identifiers() });
 	return within(table).getAllByRole('row').slice(1);
+}
+
+/** The panel with the dialog of the open customer number 12345678. */
+async function openCustomerNumber() {
+	const user = userEvent.setup();
+	render(IdentifiersPanel);
+	await rows();
+	await user.click(screen.getByRole('button', { name: m.open_open({ value: '12345678' }) }));
+	return { user, dialog: await screen.findByRole('dialog') };
 }
 
 describe('IdentifiersPanel', () => {
@@ -305,11 +301,7 @@ describe('IdentifiersPanel', () => {
 	});
 
 	it('opens one with where it stands and takes it over', async () => {
-		const user = userEvent.setup();
-		render(IdentifiersPanel);
-		await rows();
-		await user.click(screen.getByRole('button', { name: m.open_open({ value: '12345678' }) }));
-		const dialog = await screen.findByRole('dialog');
+		const { user, dialog } = await openCustomerNumber();
 		expect(await within(dialog).findByText('1234 5678')).toBeTruthy();
 		expect(dialog.textContent).toContain('Rechnung Oktober');
 		await user.click(within(dialog).getByRole('button', { name: m.open_confirm() }));
@@ -321,11 +313,7 @@ describe('IdentifiersPanel', () => {
 	});
 
 	it('keeps the dialog in the history entry, and opens a place in the Beam', async () => {
-		const user = userEvent.setup();
-		render(IdentifiersPanel);
-		await rows();
-		await user.click(screen.getByRole('button', { name: m.open_open({ value: '12345678' }) }));
-		const dialog = await screen.findByRole('dialog');
+		const { user, dialog } = await openCustomerNumber();
 		// The address names nothing; the entry holds the identifier by its reference.
 		expect(testPage.url.search).toBe('?tab=identifiers');
 		expect(testPage.state.identifier).toEqual({ kind: 'customer_number', ref: CUSTOMER.ref });
@@ -359,6 +347,14 @@ describe('IdentifiersPanel', () => {
 		const dialog = await screen.findByRole('dialog');
 		expect(await within(dialog).findByText('Rechnung Oktober')).toBeTruthy();
 		cleanup();
+		serve({
+			'GET /api/v1/identifiers/open/customer_number/gone': () =>
+				problem(404, {
+					detail: "'gone' is no longer open",
+					code: 'identifier_not_open',
+					params: { value: 'gone' }
+				})
+		});
 		goTo(
 			'/ui/admin/master-data?tab=identifiers',
 			{},
@@ -378,6 +374,38 @@ describe('IdentifiersPanel', () => {
 		await vi.waitFor(async () => expect(await rows()).toHaveLength(1));
 	});
 
+	it('keeps the numbers of the newest request when an older answer comes late (WB-11)', async () => {
+		let late: (() => void) | null = null;
+		serve({
+			'GET /api/v1/identifiers/open': async (request, url) => {
+				if (url.searchParams.get('source') !== 'learned') return openPage(request, url);
+				// The learned ones answer late, with numbers of their own.
+				await new Promise<void>((resolve) => (late = resolve));
+				return {
+					items: [CUSTOMER],
+					total: 1,
+					counts: { learned: 100, suggested: 200 },
+					kinds: { customer_number: 90 },
+					recommended: 50,
+					to_confirm: 50
+				};
+			}
+		});
+		const user = userEvent.setup();
+		render(IdentifiersPanel);
+		await rows();
+		const learned = () => screen.getByRole('button', { name: new RegExp(`^${m.open_learned()}`) });
+		await user.click(learned());
+		await vi.waitFor(() => expect(late).not.toBeNull());
+		await user.click(screen.getByRole('button', { name: new RegExp(`^${m.open_suggested()}`) }));
+		await vi.waitFor(async () => expect(await rows()).toHaveLength(1));
+		late!();
+		await new Promise((resolve) => setTimeout(resolve, 30));
+		// The late answer's 100 would stand beside the list of the suggestions.
+		expect(learned().textContent).not.toContain('100');
+		expect(learned().textContent).toContain('1');
+	});
+
 	it('shows a suggestion for a profile and takes it over there', async () => {
 		const user = userEvent.setup();
 		render(IdentifiersPanel);
@@ -385,7 +413,7 @@ describe('IdentifiersPanel', () => {
 		await user.click(screen.getByRole('button', { name: new RegExp(`^${m.open_suggestions()}`) }));
 		await vi.waitFor(() => expect(screen.getByText(m.open_column_target())).toBeTruthy());
 		const [row] = await rows();
-		expect(row.textContent).toContain('Max Nord');
+		expect(row.textContent).toContain('John Doe');
 		expect(row.textContent).toContain(m.open_target_profile());
 		expect(row.textContent).toContain(m.open_suggested());
 		await user.click(
@@ -393,7 +421,7 @@ describe('IdentifiersPanel', () => {
 		);
 		const dialog = await screen.findByRole('dialog');
 		await user.click(
-			within(dialog).getByRole('button', { name: m.open_confirm_profile({ person: 'Max Nord' }) })
+			within(dialog).getByRole('button', { name: m.open_confirm_profile({ person: 'John Doe' }) })
 		);
 		await vi.waitFor(() =>
 			expect(decisions).toEqual([
@@ -415,12 +443,12 @@ describe('IdentifiersPanel', () => {
 		const dialog = await screen.findByRole('dialog');
 		// The text names whose profile takes it.
 		expect(
-			within(dialog).getByText(m.open_suggested_person({ person: 'Max Nord', count: '6' }))
+			within(dialog).getByText(m.open_suggested_person({ person: 'John Doe', count: '6' }))
 		).toBeTruthy();
 		expect(within(dialog).getByRole('button', { name: m.open_confirm() })).toBeTruthy();
 		expect(
 			within(dialog).queryByRole('button', {
-				name: m.open_confirm_profile({ person: 'Max Nord' })
+				name: m.open_confirm_profile({ person: 'John Doe' })
 			})
 		).toBeNull();
 	});

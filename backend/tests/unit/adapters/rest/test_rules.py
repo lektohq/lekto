@@ -150,6 +150,11 @@ async def test_a_template_that_does_not_fit_is_refused(api: Api) -> None:
     response = await api.client.post(f"{PREFIX}/rules", json=body, headers=auth(user))
     assert response.status_code == 422, response.text
     assert "actions[0]: unknown value sender" in response.text
+    reason = response.json()["reason"]
+    assert reason["code"] == "template_unknown_value_at"
+    assert (reason["params"]["at"], reason["params"]["value"]) == ("actions[0]", "sender")
+    assert "contact" in reason["params"]["known"]
+    assert "field" not in reason["params"]["known"]  # a field goes by its key, as the text says
     body["actions"] = [{"type": "set_title", "template": "{{ contact"}]
     response = await api.client.post(f"{PREFIX}/rules", json=body, headers=auth(user))
     assert response.status_code == 422, response.text
@@ -309,6 +314,8 @@ async def test_a_rule_is_applied_to_existing_documents(api: Api) -> None:
     }
     assert items[first]["page_count"] == 1 and items[first]["created_at"]
     assert preview["total"] == 2
+    # How many documents one application takes: a client selects no more.
+    assert preview["max_documents"] == api.services.rule_applications.max_documents > 0
 
     response = await api.client.post(
         f"{PREFIX}/rules/{rule['id']}/apply",
@@ -586,6 +593,15 @@ async def test_a_template_is_previewed_with_a_document(api: Api) -> None:
     assert (await preview(gross, u))["missing"] == "field.la_brutto"
     unknown = {"template": "{{ field.netto }}", "document_type_id": kind["id"]}
     assert (await preview(unknown, u))["error"] == "unknown value field.netto"
+    # Lekto's own message has a code a client translates; the engine's (above) is text.
+    assert (await preview(unknown, u))["error_reason"] == {
+        "code": "template_unknown_value",
+        "params": {"value": "field.netto"},
+        "subject": None,
+        "field": None,
+        "rule": None,
+    }
+    assert invalid["error_reason"] is None
     assert (await preview(unknown, u))["values"] is None  # without a document
     # Single braces are text like any other.
     plain = await preview({"template": "{document_date}", "document_id": id}, u)

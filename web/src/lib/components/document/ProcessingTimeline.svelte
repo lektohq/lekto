@@ -3,7 +3,8 @@
 	import StepCard from '#lib/components/document/StepCard.svelte';
 	import { m } from '#lib/paraglide/messages.js';
 	import { isAtWork, type Node } from '#lib/pipeline.ts';
-	import { DOT, stepLook, type Tone } from '#lib/step-look.ts';
+	import { stepLook, type Tone } from '#lib/step-look.ts';
+	import { TONE_DOT } from '#lib/tones.ts';
 	import { PHASE_LABELS, type Phase, type Step } from '#lib/steps.ts';
 	import { cn } from '#lib/utils.ts';
 	import SectionTitle from '#lib/components/page/SectionTitle.svelte';
@@ -66,11 +67,10 @@
 	});
 
 	const dots: Record<Line, string> = {
-		green: DOT.green,
-		yellow: DOT.yellow,
-		red: DOT.red,
-		running:
-			'motion-safe:animate-pulse border-[1.5px] border-lane-running-foreground bg-lane-running',
+		green: TONE_DOT.green,
+		yellow: TONE_DOT.yellow,
+		red: TONE_DOT.red,
+		running: cn('motion-safe:animate-pulse', TONE_DOT.running),
 		waiting: 'border-2 border-dashed border-muted-foreground'
 	};
 	const rails: Record<Line, string> = {

@@ -19,14 +19,14 @@ _run = partial(node_run, why="space")
 
 
 async def _scene(world: World) -> tuple[User, User, User, Document]:
-    """Tobi's document in a space he shares with Erika and Bob, editors both. The facts found
+    """John's document in a space he shares with Erika and Bob, editors both. The facts found
     Erika by her tax ID and display name, Bob by his birth date, Carla (no member) by an alias;
     the judge also had Bob as the recipient, by his display name."""
-    tobi, erika, bob, carla = [await world.user() for _ in range(4)]
-    shared = await world.spaces.create(Actor(tobi.id), "Shared")
+    john, erika, bob, carla = [await world.user() for _ in range(4)]
+    shared = await world.spaces.create(Actor(john.id), "Shared")
     for member in (erika, bob):
-        await world.spaces.set_member(Actor(tobi.id), shared.id, member.id, SpaceRole.EDIT)
-    document = builders.processed(tobi, shared, content="letter")
+        await world.spaces.set_member(Actor(john.id), shared.id, member.id, SpaceRole.EDIT)
+    document = builders.processed(john, shared, content="letter")
     facts: dict[str, object] = {
         "persons": [
             {"user_id": str(erika.id), "strength": "hard", "evidence": ["tax_id", "name"]},

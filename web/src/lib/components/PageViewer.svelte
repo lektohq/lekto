@@ -1,11 +1,13 @@
 <script lang="ts">
+	import { scrollBehavior } from '#lib/motion.ts';
+	import { formatNumber } from '#lib/i18n.ts';
 	import { cardVariants } from '#lib/components/ui/card/index.ts';
 	import Columns2 from '@lucide/svelte/icons/columns-2';
 	import File from '@lucide/svelte/icons/file';
 	import LayoutGrid from '@lucide/svelte/icons/layout-grid';
 	import Minus from '@lucide/svelte/icons/minus';
 	import Plus from '@lucide/svelte/icons/plus';
-	import { onMount, tick, type Snippet } from 'svelte';
+	import { getContext, onMount, tick, type Snippet } from 'svelte';
 	import Segmented from '#lib/components/Segmented.svelte';
 	import type { Mark, Place } from '#lib/document-view.ts';
 	import { m } from '#lib/paraglide/messages.js';
@@ -24,6 +26,7 @@
 		type Point,
 		type Room
 	} from '#lib/viewer/zoom.ts';
+	import { TEXT_HINT, type TextHint } from '#lib/viewer/text-hint.ts';
 	import { Separator } from '#lib/components/ui/separator/index.ts';
 	import IconButton from '#lib/components/IconButton.svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
@@ -39,17 +42,24 @@
 	// tells when a page comes near the view, `onsettle` when
 	// the zoom has come to rest, with the pages in view (to be drawn anew at their size);
 	// `onpage` the page in the upper third of the view, as the toolbar counts it.
+	// Where the text of these pages stands, said by whoever shows the viewer (`text-hint.ts`).
+	const uid = $props.id();
+	const whereText = getContext<TextHint | undefined>(TEXT_HINT);
+	const textHint = $derived(whereText?.() ?? null);
+
 	let {
 		sizes,
 		label,
 		marks = [],
 		loading = false,
 		problem = null,
+		onretry,
 		note = null,
 		start = null,
 		page,
 		end,
 		onshow,
+		onhide,
 		onsettle,
 		onpage
 	}: {
@@ -59,6 +69,8 @@
 		marks?: readonly Mark[];
 		loading?: boolean;
 		problem?: string | null;
+		/** Reads the pages again: "Erneut versuchen" below the problem. */
+		onretry?: () => void;
 		/** Said in the toolbar beside the page count. */
 		note?: string | null;
 		/** How it starts; else two pages in a row, one on a narrow screen. */
@@ -67,6 +79,8 @@
 		/** At the end of the toolbar (the switch of a pane). */
 		end?: Snippet;
 		onshow?: (number: number, node: HTMLElement) => void;
+		/** A page left the view (and its margin). */
+		onhide?: (number: number) => void;
 		onsettle?: (pages: { number: number; node: HTMLElement }[]) => void;
 		onpage?: (current: number, total: number) => void;
 	} = $props();
@@ -185,7 +199,7 @@
 	 * every Beam that revealed a place (Tobi, 11.11.2026). */
 	function scrollOutside(top: number, smooth: boolean) {
 		if (!container) return;
-		const behavior = smooth ? 'smooth' : 'auto';
+		const behavior = smooth ? scrollBehavior() : 'auto';
 		const dialog = container.closest('[role="dialog"]');
 		if (!dialog) {
 			window.scrollBy({ top, behavior });
@@ -200,6 +214,8 @@
 			if (node === dialog) return;
 		}
 	}
+
+	const percent = (factor: number) => `${Math.round(factor * 100)} %`;
 
 	function choose(next: Layout) {
 		if (next !== 'one') back = next;
@@ -251,9 +267,9 @@
 			container.scrollWidth > container.clientWidth + 1 ? x - (seen.left + seen.width / 2) : 0;
 		if (scrollsItself()) {
 			const top = y - (container.getBoundingClientRect().top + container.clientHeight / 3);
-			container.scrollBy({ left, top, behavior: 'smooth' });
+			container.scrollBy({ left, top, behavior: scrollBehavior() });
 		} else {
-			if (left) container.scrollBy({ left, behavior: 'smooth' });
+			if (left) container.scrollBy({ left, behavior: scrollBehavior() });
 			scrollOutside(y - window.innerHeight / 3, true);
 		}
 	}
@@ -274,7 +290,10 @@
 			const node = entry.target as HTMLElement;
 			const number = Number(node.dataset.page);
 			if (!entry.isIntersecting) {
+				// Also for a page a new observer finds outside at once: whoever keeps count of
+				// the pages near the view must not keep one that never came.
 				inView.delete(number);
+				onhide?.(number);
 				continue;
 			}
 			inView.add(number);
@@ -356,7 +375,8 @@
 		<IconButton onclick={() => zoomTo(zoom / 1.25, center())} label={m.pdf_zoom_out()}>
 			<Minus aria-hidden="true" />
 		</IconButton>
-		<!-- The zoom as a button that resets it: its name as tooltip, the percent as its face. -->
+		<!-- The zoom as a button that resets it: what it does as tooltip, the percent as its face
+		     and first in its name, so that who steers by voice says what they read. -->
 		<Tooltip.Root>
 			<Tooltip.Trigger>
 				{#snippet child({ props })}
@@ -364,10 +384,10 @@
 						{...props}
 						variant="ghost"
 						class="min-w-14 px-2 tabular-nums"
-						aria-label={m.pdf_zoom_reset()}
+						aria-label={m.pdf_zoom_reset_at({ percent: percent(zoom) })}
 						onclick={() => choose('two')}
 					>
-						{Math.round(zoom * 100)} %
+						{percent(zoom)}
 					</Button>
 				{/snippet}
 			</Tooltip.Trigger>
@@ -393,17 +413,23 @@
 		<span class="ml-auto text-sm text-muted-foreground">
 			{#if note}{note} ·{/if}
 			{last > current
-				? m.pdf_pages({ first: current, last, total: sizes.length })
-				: m.pdf_page({ current, total: sizes.length })}
+				? m.pdf_pages({
+						first: formatNumber(current),
+						last: formatNumber(last),
+						total: formatNumber(sizes.length)
+					})
+				: m.pdf_page({ current: formatNumber(current), total: formatNumber(sizes.length) })}
 		</span>
 		{@render end?.()}
 	</div>
+	{#if textHint}<span id="{uid}-text" class="sr-only">{textHint}</span>{/if}
 	<!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
 	<div
 		bind:this={container}
 		role="document"
 		tabindex="0"
 		aria-label={label}
+		aria-describedby={textHint ? `${uid}-text` : undefined}
 		onkeydown={keydown}
 		onscroll={follow}
 		ondblclick={enlarge}
@@ -413,11 +439,17 @@
 		{#if loading}
 			<Loading class="w-full py-16 text-center" />
 		{:else if problem}
-			<div class="w-full p-6"><LoadProblem {problem} /></div>
+			<div class="w-full p-6"><LoadProblem {problem} {onretry} /></div>
 		{:else}
 			{#each sizes as size, index (index)}
+				<!-- A page is an image of the document; its name says which one. -->
 				<div
 					use:watch={index + 1}
+					role="img"
+					aria-label={m.pdf_page({
+						current: formatNumber(index + 1),
+						total: formatNumber(sizes.length)
+					})}
 					class="relative shrink-0 bg-white shadow-sm select-none"
 					style:width={`${size.width * zoom}px`}
 					style:height={`${size.height * zoom}px`}

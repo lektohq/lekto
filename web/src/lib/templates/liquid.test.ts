@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { filterChipsFor, filtersFor } from './liquid.ts';
 import {
 	completionSpot,
 	insertFilter,
@@ -125,5 +126,16 @@ describe('inserting', () => {
 		expect(insertFilter('{{ contact | upcase }}', 22, 22, 'truncate: 30').text).toBe(
 			'{{ contact | upcase | truncate: 30 }}'
 		);
+	});
+});
+
+describe('the filters an editor offers (WD-14)', () => {
+	it('offers json for the body of a webhook, and nowhere else', () => {
+		// docs/templates.md, "Webhook bodies": every value is written with it.
+		expect(filtersFor('webhook').map((filter) => filter.name)).toContain('json');
+		expect(filtersFor('rule').map((filter) => filter.name)).not.toContain('json');
+		expect(filterChipsFor('webhook')[0]).toEqual({ name: 'json', insert: 'json' });
+		expect(filterChipsFor('rule').map((filter) => filter.name)).not.toContain('json');
+		expect(filterChipsFor('rule').every(Boolean)).toBe(true);
 	});
 });

@@ -8,15 +8,19 @@
 		type Reference
 	} from '#lib/components/templates/ReferencePicker.svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Card } from '#lib/components/ui/card/index.ts';
 	import * as Sheet from '#lib/components/ui/sheet/index.ts';
+	import ConfirmDialog from '#lib/components/ConfirmDialog.svelte';
+	import { CloseGuard } from '#lib/close-guard.svelte.ts';
 	import { latest } from '#lib/latest.ts';
 	import { fieldText } from '#lib/card-fields.ts';
 	import { fieldTypeLabel } from '#lib/fields.ts';
 	import type { FieldDefinition } from '#lib/masterdata.svelte.ts';
 	import { m } from '#lib/paraglide/messages.js';
+	import { previewError } from '#lib/templates/preview.ts';
 	import type { EditorHandle } from '#lib/templates/codemirror.ts';
 	import { TEMPLATES_GUIDE } from '#lib/templates/guide.ts';
-	import { FILTERS, FILTER_CHIPS, insertFilter, insertValue } from '#lib/templates/liquid.ts';
+	import { filterChipsFor, insertFilter, insertValue } from '#lib/templates/liquid.ts';
 	import {
 		factNames,
 		LIST_NAMES,
@@ -71,8 +75,15 @@
 	let reference = $state<Reference | null>(null);
 	let preview = $state<Preview | null>(null);
 
+	// Escape, a click beside the sheet and its X ask before a changed draft is dropped
+	// (`lib/close-guard.svelte.ts`); "Abbrechen" drops it at once.
+	const guard = new CloseGuard();
+
 	$effect(() => {
-		if (open) draft = untrack(() => value);
+		if (open) {
+			draft = untrack(() => value);
+			guard.start();
+		}
 	});
 
 	// The template with the reference document, a moment after typing stops; the answer to an
@@ -108,7 +119,7 @@
 		return () => clearTimeout(timer);
 	});
 
-	const chips = FILTER_CHIPS.map((name) => FILTERS.find((filter) => filter.name === name)!);
+	const chips = $derived(filterChipsFor(purpose));
 
 	// The facts the reference document has, with their names (the preview gives their values).
 	const factLabels = new Map(factNames().map((fact) => [fact.name, fact.label]));
@@ -132,10 +143,12 @@
 	}
 </script>
 
-<Sheet.Root bind:open>
+<Sheet.Root
+	bind:open={() => open, (next) => (next || guard.wants(draft !== value)) && (open = next)}
+>
 	<Sheet.Content
 		side="right"
-		class="gap-0 data-[side=right]:w-full data-[side=right]:sm:max-w-2xl"
+		class="gap-0 pt-[env(safe-area-inset-top)] data-[side=right]:w-full data-[side=right]:sm:max-w-2xl"
 		onOpenAutoFocus={(event) => event.preventDefault()}
 	>
 		<Sheet.Header class="border-b">
@@ -157,7 +170,8 @@
 					large
 					autofocus
 				/>
-				<div class="flex flex-wrap items-center gap-1">
+				<!-- Wrapped rows stand apart on a phone, where each button's hit area is taller than it. -->
+				<div class="flex flex-wrap items-center gap-1 max-sm:gap-y-3">
 					<span class="mr-1 text-xs text-muted-foreground">{m.template_filters()}</span>
 					{#each chips as chip (chip.name)}
 						<!-- What it inserts, on hover. -->
@@ -167,7 +181,7 @@
 									<Button
 										{...mergeProps(props, { onclick: () => filter(chip.insert) })}
 										variant="outline"
-										size="xs"
+										size="sm"
 										class="font-mono"
 									>
 										{chip.name}
@@ -195,7 +209,7 @@
 
 			<section class="flex flex-col gap-1.5" aria-labelledby="{id}-values">
 				<SectionTitle size="card" level={3} id="{id}-values">{m.template_values()}</SectionTitle>
-				<ul class="divide-y rounded-lg border">
+				<Card as="ul" size="flush" class="divide-y overflow-hidden">
 					{#each TEMPLATE_NAMES as name (name)}
 						{@render row(name, TEMPLATE_NAME_LABELS[name]())}
 					{/each}
@@ -213,34 +227,34 @@
 							)}
 						{/each}
 					{/if}
-				</ul>
+				</Card>
 			</section>
 			<section class="flex flex-col gap-1.5" aria-labelledby="{id}-facts">
 				<SectionTitle size="card" level={3} id="{id}-facts">{m.template_facts()}</SectionTitle>
 				<!-- Those the document shows; all of them by typing `facts.` in the editor. -->
-				<ul class="divide-y rounded-lg border">
+				<Card as="ul" size="flush" class="divide-y overflow-hidden">
 					{#each shownFacts as fact (fact.name)}
 						{@render row(fact.name, fact.label)}
 					{/each}
 					<!-- A list: no value to show. -->
 					{@render row('fact_list', m.template_value_fact_list(), true)}
-				</ul>
+				</Card>
 			</section>
 			{#if fields.length > 0}
 				<section class="flex flex-col gap-1.5" aria-labelledby="{id}-fields">
 					<SectionTitle size="card" level={3} id="{id}-fields">{m.template_fields()}</SectionTitle>
-					<ul class="divide-y rounded-lg border">
+					<Card as="ul" size="flush" class="divide-y overflow-hidden">
 						{#each fields as field (field.id)}
 							{@render row(`field.${field.key}`, field.name)}
 						{/each}
-					</ul>
+					</Card>
 				</section>
 			{/if}
 		</div>
-		<Sheet.Footer class="gap-3 border-t">
+		<Sheet.Footer class="gap-3 border-t pb-[max(1rem,env(safe-area-inset-bottom))]">
 			<div class="min-h-5 text-sm break-words" aria-live="polite">
 				{#if preview?.error}
-					<span class="text-destructive">{preview.error}</span>
+					<span class="text-destructive">{previewError(preview)}</span>
 				{:else if !reference}
 					<span class="text-muted-foreground">{m.template_preview_none()}</span>
 				{:else if preview?.missing}
@@ -272,19 +286,29 @@
 				{/if}
 			</div>
 			<div class="flex justify-end gap-2">
-				<Button variant="outline" onclick={() => (open = false)}>{m.cancel()}</Button>
+				<Button variant="ghost" onclick={() => (open = false)}>{m.cancel()}</Button>
 				<Button onclick={apply}>{m.template_editor_apply()}</Button>
 			</div>
 		</Sheet.Footer>
 	</Sheet.Content>
 </Sheet.Root>
 
+<ConfirmDialog
+	bind:open={guard.asking}
+	title={m.unsaved_title()}
+	description={m.unsaved_hint()}
+	confirmLabel={m.unsaved_discard()}
+	onconfirm={async () => {
+		open = false;
+	}}
+/>
+
 {#snippet row(path: string, name: string, unknown = false)}
 	{@const shown = preview?.values && !unknown ? (preview.values[path] ?? null) : undefined}
 	<li>
 		<button
 			type="button"
-			class="grid w-full grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-3 px-3 py-1.5 text-left text-sm hover:bg-accent focus-visible:bg-accent focus-visible:outline-none sm:grid-cols-[9rem_minmax(0,11rem)_minmax(0,1fr)]"
+			class="grid w-full grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-3 px-3 py-1.5 text-left text-sm hover:bg-accent focus-visible:bg-accent focus-visible:-outline-offset-2 max-sm:min-h-11 max-sm:content-center sm:grid-cols-[9rem_minmax(0,11rem)_minmax(0,1fr)]"
 			aria-label={m.template_insert({ name })}
 			onclick={() => insert(path)}
 		>

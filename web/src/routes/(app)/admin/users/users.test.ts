@@ -2,8 +2,9 @@ import { render, screen, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { m } from '#lib/paraglide/messages.js';
+import { signIn } from '#lib/testing/session.ts';
 import { session } from '#lib/session.svelte.ts';
-import { fakeApi } from '#lib/testing/api.ts';
+import { fakeApi, masterData } from '#lib/testing/api.ts';
 import Page from './+page.svelte';
 
 const USERS = [
@@ -15,19 +16,15 @@ const USERS = [
 		active: true,
 		created_at: '2026-10-01T08:00:00Z'
 	},
-	{ id: 'u2', username: 'bob', display_name: null, role: 'user', active: false, created_at: null }
+	{ id: 'u2', username: 'john', display_name: null, role: 'user', active: false, created_at: null }
 ];
 
 beforeEach(() => {
-	session.start({
-		user: { id: 'u1', username: 'erika', role: 'admin' },
-		method: 'password',
-		expires_at: '2026-10-21T12:00:00Z',
-		csrf_token: 'token'
-	} as never);
+	signIn('admin', { username: 'erika' });
 	vi.stubGlobal(
 		'fetch',
 		fakeApi({
+			...masterData(),
 			'GET /api/v1/users': () => USERS,
 			'GET /api/v1/users/u2/profile': () => ({
 				user_id: 'u2',
@@ -50,7 +47,6 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-	vi.unstubAllGlobals();
 	session.clear();
 });
 
@@ -64,7 +60,7 @@ describe('the users', () => {
 		expect(rows[0].textContent).toContain('erika');
 		expect(rows[0].textContent).toContain(m.role_admin());
 		// Without a display name the username is the name.
-		await userEvent.click(within(rows[1]).getByRole('button', { name: 'bob' }));
+		await userEvent.click(within(rows[1]).getByRole('button', { name: 'john' }));
 		expect(await screen.findByRole('dialog')).toBeTruthy();
 	});
 });

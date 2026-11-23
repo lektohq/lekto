@@ -4,9 +4,10 @@ import { render, screen, waitFor, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { formatDuration } from '#lib/duration.ts';
+import { signIn } from '#lib/testing/session.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { session } from '#lib/session.svelte.ts';
-import { calls, fakeApi, json } from '#lib/testing/api.ts';
+import { calls, fakeApi, problem } from '#lib/testing/api.ts';
 import SearchTab from './SearchTab.svelte';
 
 const status = {
@@ -23,20 +24,10 @@ const status = {
 	since: '2026-10-17T12:00:00Z'
 };
 
-function signIn(role: 'admin' | 'user') {
-	session.start({
-		user: { id: role, username: role, role },
-		method: 'password',
-		expires_at: '2026-10-25T12:00:00Z',
-		csrf_token: 'token'
-	});
-}
-
 beforeEach(() => signIn('admin'));
 
 afterEach(() => {
 	session.clear();
-	vi.unstubAllGlobals();
 });
 
 describe('the search index tab', () => {
@@ -119,16 +110,7 @@ describe('the search index tab', () => {
 			'fetch',
 			fakeApi({
 				'GET /api/v1/search/status': () =>
-					json(
-						{
-							type: 'about:blank',
-							title: 'Unavailable',
-							status: 503,
-							detail: 'no search',
-							reason: { code: 'search_not_configured', params: {} }
-						},
-						503
-					)
+					problem(503, { detail: 'no search', code: 'search_not_configured' })
 			})
 		);
 		render(SearchTab);

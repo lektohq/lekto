@@ -21,7 +21,7 @@
 		<button
 			type="button"
 			id="{id}-title"
-			class="flex h-10 w-full items-center gap-2 text-left"
+			class="flex h-10 w-full items-center gap-2 text-left max-sm:h-11"
 			aria-expanded={open}
 			aria-controls="{id}-body"
 			onclick={() => (open = !open)}

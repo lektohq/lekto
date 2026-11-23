@@ -69,6 +69,8 @@
 	let search = $state<HTMLInputElement | null>(null);
 	let field = $state<HTMLElement | null>(null);
 	let content = $state<HTMLElement | null>(null);
+	// What had the focus before the popover took it: where it goes back when the popover closes.
+	let opener: HTMLElement | null = null;
 	// Tags made here, until `tags` holds them too.
 	let made = $state<Tag[]>([]);
 	const known = $derived([
@@ -190,20 +192,27 @@
 					customAnchor={single ? field : undefined}
 					onOpenAutoFocus={(event) => {
 						event.preventDefault();
+						const at = document.activeElement;
+						if (at instanceof HTMLElement && !content?.contains(at)) opener = at;
 						search?.focus();
 					}}
 					onInteractOutside={(event) => {
 						if (single && field?.contains(event.target as Node)) event.preventDefault();
 					}}
 					onCloseAutoFocus={(event) => {
-						if (!single) return;
+						// bits-ui also ends the focus scope while the popover stays open: it attaches the
+						// content anew once it has measured it. Its own way back then went to the opener
+						// for a moment and, afterwards, to the search that had the focus (gone when the
+						// popover closes). So the picker leads the focus back itself, once closed, and
+						// only where it would be lost with the popover (not taken by a click elsewhere).
 						event.preventDefault();
-						// After the chip of the choice made with the closing click is there, and only
-						// where the focus would be lost with the popover (not taken by a click elsewhere).
 						void tick().then(() => {
+							if (open) return;
 							const at = document.activeElement;
-							if (at === document.body || content?.contains(at))
-								field?.querySelector('button')?.focus();
+							if (at !== document.body && !content?.contains(at)) return;
+							// One chosen: the chip of the choice made with the closing click.
+							const back = single ? field?.querySelector('button') : opener;
+							if (back?.isConnected) back.focus();
 						});
 					}}
 				>

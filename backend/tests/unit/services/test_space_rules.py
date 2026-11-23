@@ -34,26 +34,26 @@ from tests.unit.services.support import World
 
 
 async def household(rules: RuleWorld) -> tuple[User, User, Space]:
-    """Tobi and Erika edit "Haushalt"."""
+    """John and Erika edit "Haushalt"."""
     world = rules.world
-    tobi, erika = await world.user("tobi"), await world.user("erika")
-    space = await world.spaces.create(Actor(tobi.id), "Haushalt")
-    space = await world.spaces.set_member(Actor(tobi.id), space.id, erika.id, SpaceRole.EDIT)
-    return tobi, erika, space
+    john, erika = await world.user("john"), await world.user("erika")
+    space = await world.spaces.create(Actor(john.id), "Haushalt")
+    space = await world.spaces.set_member(Actor(john.id), space.id, erika.id, SpaceRole.EDIT)
+    return john, erika, space
 
 
 async def test_the_rules_of_the_space_a_rule_files_into_run_next(world: World) -> None:
     rules = await rule_world(world)
-    tobi, erika, shared = await household(rules)
+    john, erika, shared = await household(rules)
     tag = await rules.tag("Haushalt")
-    home = await world.personal_space(tobi)
-    await rules.personal_rule(tobi, files_into(shared))
+    home = await world.personal_space(john)
+    await rules.personal_rule(john, files_into(shared))
     await rules.space_rule(
         erika,
         shared.id,
         definition("Tag", channel_api(), add_tags(tag.id), triggers=(Trigger.INGEST,)),
     )
-    document = await rules.arrive(tobi)
+    document = await rules.arrive(john)
     assert document.space_id == shared.id
     assert tag.id in document.tag_ids
     assert document.lane is Lane.GREEN
@@ -64,15 +64,15 @@ async def test_the_rules_of_the_space_a_rule_files_into_run_next(world: World) -
 
 async def test_rules_that_move_it_back_stop_the_chain(world: World) -> None:
     rules = await rule_world(world)
-    tobi, erika, shared = await household(rules)
-    home = await world.personal_space(tobi)
-    await rules.personal_rule(tobi, files_into(shared))
-    await rules.space_rule(tobi, shared.id, files_into(home, "Back"))
-    document = await rules.arrive(tobi)
+    john, erika, shared = await household(rules)
+    home = await world.personal_space(john)
+    await rules.personal_rule(john, files_into(shared))
+    await rules.space_rule(john, shared.id, files_into(home, "Back"))
+    document = await rules.arrive(john)
     assert document.space_id == shared.id  # the move back is not applied
     assert document.lane is Lane.YELLOW
     (entry,) = await rules.rule_entries(document, RULES)
-    assert "rules move it back and forth: tobi → Haushalt → tobi" in (entry.result.reason or "")
+    assert "rules move it back and forth: john → Haushalt → john" in (entry.result.reason or "")
     del erika
 
 
@@ -81,7 +81,7 @@ async def test_a_person_s_move_runs_the_target_s_rules_which_leave_the_space(
 ) -> None:
     """As change rules: nothing turns yellow, and the space the person chose stays."""
     rules = await rule_world(world)
-    tobi, erika, shared = await household(rules)
+    john, erika, shared = await household(rules)
     tag = await rules.tag("Haushalt")
     erikas = await world.personal_space(erika)
     await rules.space_rule(
@@ -95,9 +95,9 @@ async def test_a_person_s_move_runs_the_target_s_rules_which_leave_the_space(
             triggers=(Trigger.INGEST,),
         ),
     )
-    document = await rules.arrive(tobi)
+    document = await rules.arrive(john)
     assert document.lane is Lane.GREEN
-    await rules.documents.move(Actor(tobi.id), document.id, shared.id)
+    await rules.documents.move(Actor(john.id), document.id, shared.id)
     moved = await rules.stored(document)
     assert moved.space_id == shared.id
     assert tag.id in moved.tag_ids
@@ -114,12 +114,12 @@ async def test_a_move_by_rules_outside_processing_chains_and_stops_going_back(
     """After a rule applied to existing documents: the target's rules, then those of the next
     space, and a move back is reported, not applied."""
     rules = await rule_world(world)
-    tobi, erika, shared = await household(rules)
+    john, erika, shared = await household(rules)
     erikas = await world.personal_space(erika)
-    home = await world.personal_space(tobi)
+    home = await world.personal_space(john)
     await rules.space_rule(erika, shared.id, files_into(erikas, "To Erika"))
     await rules.space_rule(erika, erikas.id, files_into(shared, "Back"))
-    document = await rules.arrive(tobi)
+    document = await rules.arrive(john)
     change = ChangeRules(
         world.object_store, rules.matcher, TEMPLATES, max_text=MAX_TEXT, pipeline_version="test"
     )
@@ -143,22 +143,22 @@ async def test_a_move_by_rules_outside_processing_chains_and_stops_going_back(
     assert first.result.input["space_id"] == str(shared.id)
     assert second.result.input["space_id"] == str(erikas.id)
     assert second.result.output["problem"] == (
-        "rules move it back and forth: tobi → Haushalt → erika → Haushalt"
+        "rules move it back and forth: john → Haushalt → erika → Haushalt"
     )
     assert all(entry.node is Node.APPLY_RULES for entry in (first, second))
 
 
 async def test_a_chain_keeps_values_set_on_unconfirmed_values_unconfirmed(world: World) -> None:
-    """Tobi's rule sets the type on the model's unconfirmed contact and files into his archive
+    """John's rule sets the type on the model's unconfirmed contact and files into his archive
     (no one new sees it there); the archive's rule files on that type into Haushalt. The type
     rests on the unconfirmed contact, so the move that shows it to Erika waits for a click."""
     rules = await rule_world(world)
-    tobi, erika, shared = await household(rules)
-    archive = await world.spaces.create(Actor(tobi.id), "Archiv")
+    john, erika, shared = await household(rules)
+    archive = await world.spaces.create(Actor(john.id), "Archiv")
     utility = await rules.contact("Stadtwerke")
     bill = await world.master_data.create_document_type(Actor(rules.admin.id), "Rechnung")
     await rules.personal_rule(
-        tobi,
+        john,
         definition(
             "Utility to archive",
             contact_is(utility.id),
@@ -169,11 +169,11 @@ async def test_a_chain_keeps_values_set_on_unconfirmed_values_unconfirmed(world:
     )
     is_bill = Condition(field=ConditionField.DOCUMENT_TYPE, op=Operator.IS, value=str(bill.id))
     await rules.space_rule(
-        tobi,
+        john,
         archive.id,
         definition("Bills to household", is_bill, SetSpace(shared.id), triggers=(Trigger.INGEST,)),
     )
-    document = await rules.arrive(tobi, classify=Classifies(contact=utility.id))
+    document = await rules.arrive(john, classify=Classifies(contact=utility.id))
     assert document.space_id == archive.id
     assert document.lane is Lane.YELLOW
     assert document.document_type_id == bill.id
@@ -184,31 +184,31 @@ async def test_the_loop_guard_remembers_the_chain_across_a_click(world: World) -
     """Personal → Archiv by itself, Archiv → Haushalt waits for a click (an unconfirmed
     contact), Haushalt → Personal: after the click the chain still stops at going back."""
     rules = await rule_world(world)
-    tobi, _, shared = await household(rules)
-    archive = await world.spaces.create(Actor(tobi.id), "Archiv")
-    home = await world.personal_space(tobi)
+    john, _, shared = await household(rules)
+    archive = await world.spaces.create(Actor(john.id), "Archiv")
+    home = await world.personal_space(john)
     utility = await rules.contact("Stadtwerke")
-    await rules.personal_rule(tobi, files_into(archive, "To archive"))
+    await rules.personal_rule(john, files_into(archive, "To archive"))
     await rules.space_rule(
-        tobi,
+        john,
         archive.id,
         definition(
             "To household", contact_is(utility.id), SetSpace(shared.id), triggers=(Trigger.INGEST,)
         ),
     )
-    await rules.space_rule(tobi, shared.id, files_into(home, "Back home"))
-    document = await rules.arrive(tobi, classify=Classifies(contact=utility.id))
+    await rules.space_rule(john, shared.id, files_into(home, "Back home"))
+    document = await rules.arrive(john, classify=Classifies(contact=utility.id))
     assert document.space_id == archive.id
     assert document.lane is Lane.YELLOW
 
     pipeline = rules.pipeline()
-    await pipeline.confirm(Actor(tobi.id), document.id, DocumentChanges())
+    await pipeline.confirm(Actor(john.id), document.id, DocumentChanges())
     await world.drain(pipeline)
     after = await rules.stored(document)
     assert after.space_id == shared.id  # not back home: it was there in this chain
     entries = await rules.rule_entries(document, RULES)
     assert entries[-1].result.input["chain"] == [str(home.id)]  # before the archive
-    assert "rules move it back and forth: tobi → Archiv → Haushalt → tobi" in (
+    assert "rules move it back and forth: john → Archiv → Haushalt → john" in (
         entries[-1].result.reason or ""
     )
 
@@ -217,11 +217,11 @@ async def test_change_rules_that_file_it_run_the_target_s_rules(world: World) ->
     """A person sets the contact; a change rule files the document into Haushalt, whose own
     rules run on it there."""
     rules = await rule_world(world)
-    tobi, erika, shared = await household(rules)
+    john, erika, shared = await household(rules)
     tag = await rules.tag("Haushalt")
     utility = await rules.contact("Stadtwerke")
     await rules.personal_rule(
-        tobi,
+        john,
         definition(
             "Utility to household",
             contact_is(utility.id),
@@ -234,10 +234,10 @@ async def test_change_rules_that_file_it_run_the_target_s_rules(world: World) ->
         shared.id,
         definition("Tag", channel_api(), add_tags(tag.id), triggers=(Trigger.INGEST,)),
     )
-    document = await rules.arrive(tobi)
+    document = await rules.arrive(john)
     assert document.lane is Lane.GREEN
     await rules.documents.change_metadata(
-        Actor(tobi.id), document.id, DocumentChanges(contact_id=utility.id)
+        Actor(john.id), document.id, DocumentChanges(contact_id=utility.id)
     )
     changed = await rules.stored(document)
     assert changed.space_id == shared.id
@@ -253,10 +253,10 @@ async def test_deleting_a_user_runs_the_rules_of_the_space_their_documents_move_
     """The admin's move when deleting a user is a person's move (Tobi, 22.10.2026): the rules
     of the space the documents go into run, and the space is decided."""
     rules = await rule_world(world)
-    tobi, erika, shared = await household(rules)
+    john, erika, shared = await household(rules)
     tag = await rules.tag("Haushalt")
     await rules.space_rule(
-        tobi,
+        john,
         shared.id,
         definition("Tag", channel_api(), add_tags(tag.id), triggers=(Trigger.INGEST,)),
     )
@@ -277,18 +277,18 @@ async def test_the_preview_of_applying_a_rule_shows_the_chain_and_stores_nothing
     """The preview plays the rule as applying does: the rules of the space it files into run
     next, and the item shows their steps and where the document ends up."""
     rules = await rule_world(world)
-    tobi, erika, shared = await household(rules)
+    john, erika, shared = await household(rules)
     tag = await rules.tag("Haushaltskosten")
-    home = await world.personal_space(tobi)
-    document = await rules.arrive(tobi)
-    rule = await rules.personal_rule(tobi, files_into(shared, "Versorger"))
+    home = await world.personal_space(john)
+    document = await rules.arrive(john)
+    rule = await rules.personal_rule(john, files_into(shared, "Versorger"))
     tagging = await rules.space_rule(
         erika,
         shared.id,
         definition("Rechnungen", channel_api(), add_tags(tag.id), triggers=(Trigger.INGEST,)),
     )
 
-    (item,) = (await rules.applications.preview(Actor(tobi.id), rule.id)).items
+    (item,) = (await rules.applications.preview(Actor(john.id), rule.id)).items
 
     assert [effect.field for effect in item.effects] == ["space"]
     assert item.outcome.space_id == shared.id
@@ -328,17 +328,17 @@ async def test_the_preview_shows_where_a_chain_stops_going_back(world: World) ->
 
 
 async def test_the_preview_ends_where_the_caller_hands_the_document_over(world: World) -> None:
-    """Whoever does not edit a space does not learn that its rules exist: tobi's preview shows
+    """Whoever does not edit a space does not learn that its rules exist: john's preview shows
     that the document goes into erika's space, not what her rules do there."""
     rules = await rule_world(world)
-    tobi, erika, shared = await household(rules)
+    john, erika, shared = await household(rules)
     erikas = await world.personal_space(erika)
-    await rules.arrive(tobi)
-    rule = await rules.personal_rule(tobi, files_into(shared))
+    await rules.arrive(john)
+    rule = await rules.personal_rule(john, files_into(shared))
     await rules.space_rule(erika, shared.id, files_into(erikas, "To Erika"))
     await rules.space_rule(erika, erikas.id, files_into(shared, "Back"))
 
-    (item,) = (await rules.applications.preview(Actor(tobi.id), rule.id)).items
+    (item,) = (await rules.applications.preview(Actor(john.id), rule.id)).items
 
     first, second = item.outcome.chain
     assert (first.space_id, first.moved_to) == (shared.id, erikas.id)
@@ -356,13 +356,13 @@ async def test_the_preview_shows_the_chain_of_an_accepted_conflict(world: World)
     """Filing on the model's unconfirmed contact is a conflict: applied as it is, the document
     stays; accepted, it goes into Haushalt, whose rules run next."""
     rules = await rule_world(world)
-    tobi, erika, shared = await household(rules)
+    john, erika, shared = await household(rules)
     tag = await rules.tag("Haushaltskosten")
     acme = await rules.contact("ACME")
-    home = await world.personal_space(tobi)
-    await rules.arrive(tobi, classify=Classifies(contact=acme.id))
+    home = await world.personal_space(john)
+    await rules.arrive(john, classify=Classifies(contact=acme.id))
     rule = await rules.personal_rule(
-        tobi, definition("ACME", contact_is(acme.id), SetSpace(shared.id))
+        john, definition("ACME", contact_is(acme.id), SetSpace(shared.id))
     )
     await rules.space_rule(
         erika,
@@ -370,7 +370,7 @@ async def test_the_preview_shows_the_chain_of_an_accepted_conflict(world: World)
         definition("Rechnungen", channel_api(), add_tags(tag.id), triggers=(Trigger.INGEST,)),
     )
 
-    (item,) = (await rules.applications.preview(Actor(tobi.id), rule.id)).items
+    (item,) = (await rules.applications.preview(Actor(john.id), rule.id)).items
 
     assert [(note.field, note.kind) for note in item.conflicts] == [("space", "conflict")]
     assert (item.outcome.space_id, item.outcome.chain) == (home.id, ())

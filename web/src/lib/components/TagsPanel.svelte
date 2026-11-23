@@ -25,6 +25,7 @@
 	import { api } from '#lib/api/client.ts';
 	import { unwrap } from '#lib/api/call.ts';
 	import { BASE } from '#lib/base.ts';
+	import EmptyNote from '#lib/components/EmptyNote.svelte';
 	import MasterRow, { type Usage } from '#lib/components/MasterRow.svelte';
 	import PanelState from '#lib/components/PanelState.svelte';
 	import TagChip from '#lib/components/TagChip.svelte';
@@ -277,9 +278,9 @@
 				</div>
 				{#if open}
 					{#if rows.length === 0}
-						<p id="tags-{kind}-list" class="border-t px-4 py-3 text-sm text-muted-foreground">
+						<EmptyNote size="line" id="tags-{kind}-list" class="border-t px-4">
 							{m.master_none()}
-						</p>
+						</EmptyNote>
 					{:else}
 						<ul id="tags-{kind}-list" class="divide-y border-t" aria-label={title}>
 							{#each rows as { tag, depth, hasChildren } (tag.id)}
@@ -330,7 +331,7 @@
 										{/each}
 										{#if !phone.current && hasChildren}
 											<span class="text-sm text-muted-foreground">
-												{m.tag_below({ count: childCount.get(tag.id) ?? 0 })}
+												{m.tag_below({ count: formatNumber(childCount.get(tag.id) ?? 0) })}
 											</span>
 										{/if}
 										{#if !phone.current && kind === 'type-groups'}

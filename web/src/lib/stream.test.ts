@@ -45,6 +45,17 @@ const lookup = {
 } as never;
 
 describe('the stream', () => {
+	it('puts a document without a date on the day it came in, in UTC as the server sorts', () => {
+		// Half past one at night on 01.10. here: still September, where the server has it.
+		const late = {
+			...doc('n', '2026-09-30'),
+			document_date: null,
+			created_at: '2026-09-30T23:30:00Z'
+		};
+		expect(inMonth(lane({ documents: [late] }), '2026-09')).toEqual([late]);
+		expect(inMonth(lane({ documents: [late] }), '2026-10')).toEqual([]);
+	});
+
 	it('lays the months from the oldest to the expected one', () => {
 		const found = stream([
 			lane({

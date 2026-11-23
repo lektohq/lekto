@@ -3,6 +3,7 @@
 import { render, screen } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { m } from '#lib/paraglide/messages.js';
+import { signIn } from '#lib/testing/session.ts';
 import { session } from '#lib/session.svelte.ts';
 import { fakeApi, json } from '#lib/testing/api.ts';
 import UpdateNotice from './UpdateNotice.svelte';
@@ -20,18 +21,8 @@ function version(update_available: boolean) {
 	};
 }
 
-function signIn(role: 'admin' | 'user') {
-	session.start({
-		user: { id: role, username: role, role },
-		method: 'password',
-		expires_at: '2026-11-20T12:00:00Z',
-		csrf_token: 'token'
-	});
-}
-
 afterEach(() => {
 	session.clear();
-	vi.unstubAllGlobals();
 });
 
 describe('the note of a newer Lekto', () => {
@@ -52,6 +43,9 @@ describe('the note of a newer Lekto', () => {
 		vi.stubGlobal('fetch', fetchMock);
 		render(UpdateNotice);
 		await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled());
+		// Once the answer is read and drawn: asking alone shows nothing yet either way.
+		await fetchMock.mock.results[0].value;
+		await new Promise((resolve) => setTimeout(resolve, 0));
 		expect(screen.queryByRole('status')).toBeNull();
 	});
 

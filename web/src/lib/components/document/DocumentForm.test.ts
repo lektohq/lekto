@@ -2,7 +2,9 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/sve
 import userEvent from '@testing-library/user-event';
 import { tick } from 'svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fakeApi, json } from '#lib/testing/api.ts';
+import { fakeApi, json, type Routes } from '#lib/testing/api.ts';
+import { documentOf as documentWith } from '#lib/testing/documents.ts';
+import { signIn } from '#lib/testing/session.ts';
 import type { components } from '#lib/api/schema.ts';
 import type { Mark, Review } from '#lib/document-view.ts';
 import type { Item } from '#lib/masterdata-api.ts';
@@ -12,12 +14,13 @@ import { m } from '#lib/paraglide/messages.js';
 import { session } from '#lib/session.svelte.ts';
 import { choose, selectedValue } from '#lib/testing/select.ts';
 import { toast } from 'svelte-sonner';
-import { beforeNavigate } from '$app/navigation';
+import { beforeNavigate, goto } from '$app/navigation';
 import DocumentForm from './DocumentForm.svelte';
+import { fieldOf, lookupOf, tagOf } from '#lib/testing/master-data.ts';
 
 type Document = components['schemas']['DocumentDetails'];
 
-vi.mock('$app/navigation', () => ({ beforeNavigate: vi.fn(), goto: vi.fn() }));
+vi.mock('$app/navigation', () => import('#lib/testing/navigation.ts'));
 
 const OWNER = '0199a6c4-0000-7000-8000-000000000001';
 const SPACE = '0199a6c4-0000-7000-8000-0000000000d1';
@@ -30,8 +33,8 @@ const NOTE = '0199a6c4-0000-7000-8000-0000000000f2';
 
 const named = (id: string, name: string) => ({ id, name }) as Lookup['contacts'][number];
 
-const lookup = {
-	contacts: [named(CONTACT, 'Stadtwerke Musterstadt'), named(BANK, 'Beispielbank')],
+const lookup = lookupOf({
+	contacts: [named(CONTACT, 'Stadtwerke Musterstadt'), named(BANK, 'Muster Bank')],
 	documentTypes: [named(INVOICE, 'Rechnung')],
 	tags: [],
 	fields: [
@@ -61,27 +64,26 @@ const lookup = {
 			name: 'Haushalt',
 			personal_of: null,
 			role: 'edit',
-			members: [{ user_id: OWNER, role: 'edit' }]
+			members: [{ user_id: OWNER, role: 'edit', username: 'john', active: true }]
 		}
 	],
 	users: []
-} as unknown as Lookup;
+});
 
-function documentOf(status: string, lane: string | null = 'yellow'): Document {
-	return {
+function documentOf(
+	status: Document['processing']['status'],
+	lane: Document['lane'] = 'yellow'
+): Document {
+	return documentWith({
 		lane,
-		id: 'doc-1',
 		title: 'Stromrechnung März 2026',
 		uploaded_by: OWNER,
 		space_id: SPACE,
-		access: 'edit',
-		contact_id: null,
 		document_type_id: INVOICE,
-		tag_ids: [],
 		document_date: '2026-03-12',
 		fields: { [NUMBER]: 'R-2026-03-1182' },
-		processing: { status, run: 1, nodes: [] }
-	} as unknown as Document;
+		processing: { status, run: 1, vision: false, nodes: [] }
+	});
 }
 
 const place = { page: 1, boxes: [{ x: 0.1, y: 0.2, width: 0.3, height: 0.02 }] };
@@ -145,7 +147,22 @@ const review = {
 	]
 } as unknown as Review;
 
-let fetchMock = fakeApi();
+let fetchMock: ReturnType<typeof fakeApi>;
+
+/** No change, as a dry run says it: the dialog shows no rows. */
+const NOTHING = { changed: [], rules: null, visibility: null, document: null };
+
+/** The API of the form for doc-1: confirming answers 202 with the document as it is then, a dry
+ * run that nothing would change, saving with the document; `more` before these. */
+function serve(more: Routes = {}) {
+	fetchMock = fakeApi({
+		'POST /api/v1/documents/doc-1/confirm': () => json(documentOf('completed', 'green'), 202),
+		'POST /api/v1/documents/doc-1/dry-run': () => NOTHING,
+		'PATCH /api/v1/documents/doc-1': () => documentOf('completed', 'green'),
+		...more
+	});
+	vi.stubGlobal('fetch', fetchMock);
+}
 
 // A popover moves the focus into itself a moment after it opened (in jsdom onto its frame, as
 // jsdom lays nothing out), and one that closed leaves a moment later, its focus trap holding the
@@ -179,30 +196,25 @@ function props(overrides: Record<string, unknown> = {}) {
 
 beforeEach(async () => {
 	await waitFor(() => expect(popovers()).toHaveLength(0));
-	session.start({
-		user: { id: OWNER, username: 'tobi', role: 'user' },
-		method: 'password',
-		expires_at: '2026-10-09T12:00:00Z',
-		csrf_token: 'token'
-	});
-	fetchMock = fakeApi();
-	vi.stubGlobal('fetch', fetchMock);
+	signIn('user', { id: OWNER });
+	serve();
 });
 
 afterEach(() => {
 	session.clear();
 	masterDataDialogs.finishAll();
-	vi.unstubAllGlobals();
-	// A dialog makes the page unclickable until it has closed; the next test must not wait.
-	globalThis.document.body.style.pointerEvents = '';
 });
 
 describe('DocumentForm', () => {
 	it('groups the fields: basics, global ones and those of the type', () => {
 		render(DocumentForm, props());
-		expect(screen.getByRole('heading', { name: m.group_basics() })).toBeTruthy();
-		expect(screen.getByRole('heading', { name: m.group_global() })).toBeTruthy();
-		expect(screen.getByRole('heading', { name: m.group_type({ type: 'Rechnung' }) })).toBeTruthy();
+		// Below the page's h1 they are the next level, none skipped (WA-06).
+		const level = 2;
+		expect(screen.getByRole('heading', { name: m.group_basics(), level })).toBeTruthy();
+		expect(screen.getByRole('heading', { name: m.group_global(), level })).toBeTruthy();
+		expect(
+			screen.getByRole('heading', { name: m.group_type({ type: 'Rechnung' }), level })
+		).toBeTruthy();
 		const global = screen.getByRole('region', { name: m.group_global() });
 		expect(within(global).getByLabelText('Notiz', { selector: 'input' })).toBeTruthy();
 	});
@@ -252,10 +264,8 @@ describe('DocumentForm', () => {
 	it('tells under a field what belongs in it', () => {
 		render(DocumentForm, props());
 		const number = screen.getByRole('group', { name: /Rechnungsnummer/ });
-		expect(number.getAttribute('aria-describedby')).toBeTruthy();
-		expect(
-			within(number).getByText('Die Nummer, unter der die Rechnung geführt wird')
-		).toBeTruthy();
+		const hint = within(number).getByText('Die Nummer, unter der die Rechnung geführt wird');
+		expect(number.getAttribute('aria-describedby')?.split(' ')).toContain(hint.id);
 		const note = screen.getByRole('group', { name: 'Notiz' });
 		expect(note.getAttribute('aria-describedby')).toBeNull();
 	});
@@ -297,7 +307,7 @@ describe('DocumentForm', () => {
 								},
 								{
 									value: BANK,
-									label: 'Beispielbank',
+									label: 'Muster Bank',
 									contradicted: true,
 									sources: [
 										{
@@ -343,7 +353,7 @@ describe('DocumentForm', () => {
 		const select = screen.getByRole('combobox', { name: m.field_contact() });
 		expect(selectedValue(select)).toBe(CONTACT);
 		await userEvent.click(
-			within(card).getByRole('button', { name: m.candidate_pick({ name: 'Beispielbank' }) })
+			within(card).getByRole('button', { name: m.candidate_pick({ name: 'Muster Bank' }) })
 		);
 		expect(selectedValue(select)).toBe(BANK);
 	});
@@ -423,10 +433,6 @@ describe('DocumentForm', () => {
 	});
 
 	it('confirms every open field at once and goes on to the next document', async () => {
-		// The dry run says nothing would change: the dialog shows no rows.
-		fetchMock.mockResolvedValue(
-			json({ changed: [], rules: null, visibility: null, document: null })
-		);
 		const onconfirmed = vi.fn();
 		render(DocumentForm, props({ onconfirmed }));
 		await userEvent.click(screen.getByRole('button', { name: m.review_confirm() }));
@@ -453,12 +459,8 @@ describe('DocumentForm', () => {
 	});
 
 	it('does not save while a period is written in a way it cannot read', async () => {
-		// The dry run says nothing would change: the dialog shows no rows.
-		fetchMock.mockResolvedValue(
-			json({ changed: [], rules: null, visibility: null, document: null })
-		);
 		const PERIOD = '0199a6c4-0000-7000-8000-0000000000f3';
-		const withPeriod = {
+		const withPeriod = lookupOf({
 			...lookup,
 			fields: [
 				...lookup.fields,
@@ -472,7 +474,7 @@ describe('DocumentForm', () => {
 					choices: []
 				}
 			]
-		} as unknown as Lookup;
+		});
 		render(
 			DocumentForm,
 			props({
@@ -508,7 +510,7 @@ describe('DocumentForm', () => {
 		const ERIKA = '0199a6c4-0000-7000-8000-000000000002';
 		const MINE = '0199a6c4-0000-7000-8000-0000000000d3';
 		const ERIKAS = '0199a6c4-0000-7000-8000-0000000000d2';
-		const household = {
+		const household = lookupOf({
 			...lookup,
 			spaces: [
 				{
@@ -516,7 +518,7 @@ describe('DocumentForm', () => {
 					name: 'Personal',
 					personal_of: OWNER,
 					role: 'edit',
-					members: [{ user_id: OWNER, role: 'edit', username: 'tobi', active: true }]
+					members: [{ user_id: OWNER, role: 'edit', username: 'john', active: true }]
 				},
 				{
 					id: SPACE,
@@ -524,16 +526,16 @@ describe('DocumentForm', () => {
 					personal_of: null,
 					role: 'edit',
 					members: [
-						{ user_id: OWNER, role: 'edit', username: 'tobi', active: true },
+						{ user_id: OWNER, role: 'edit', username: 'john', active: true },
 						{ user_id: ERIKA, role: 'read', username: 'erika', active: true }
 					]
 				}
 			],
 			users: [
-				{ id: OWNER, username: 'tobi', role: 'user', personal_space_id: MINE },
+				{ id: OWNER, username: 'john', role: 'user', personal_space_id: MINE },
 				{ id: ERIKA, username: 'erika', role: 'user', personal_space_id: ERIKAS }
 			]
-		} as unknown as Lookup;
+		});
 		const waitingOn = (fields: Record<string, unknown>) =>
 			({
 				document: {},
@@ -598,12 +600,11 @@ describe('DocumentForm', () => {
 				}
 			]
 		});
-		const mine = (lane: string | null = 'yellow') =>
-			({ ...documentOf('review', lane), space_id: MINE }) as unknown as Document;
-		const ok = () =>
-			fetchMock.mockResolvedValue(
-				new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } })
-			);
+		const mine = (lane: Document['lane'] = 'yellow') => ({
+			...documentOf('review', lane),
+			space_id: MINE
+		});
+		const ok = () => serve();
 		const radio = (name: string) => screen.getByRole('radio', { name: new RegExp(name) });
 		const confirmButton = () =>
 			screen.getByRole('button', { name: m.review_confirm() }) as HTMLButtonElement;
@@ -663,7 +664,9 @@ describe('DocumentForm', () => {
 		});
 
 		it('suggests the hand-over with what speaks for it, and warns above "Confirm"', async () => {
-			fetchMock.mockResolvedValue(json({ id: 'doc-1', access: null }, 202));
+			serve({
+				'POST /api/v1/documents/doc-1/confirm': () => json({ id: 'doc-1', access: null }, 202)
+			});
 			const success = vi.spyOn(toast, 'success');
 			render(
 				DocumentForm,
@@ -741,7 +744,9 @@ describe('DocumentForm', () => {
 		});
 
 		it('hands over through "Another space" and says whom it went to', async () => {
-			fetchMock.mockResolvedValue(json({ id: 'doc-1', access: null }, 202));
+			serve({
+				'POST /api/v1/documents/doc-1/confirm': () => json({ id: 'doc-1', access: null }, 202)
+			});
 			const success = vi.spyOn(toast, 'success');
 			const onconfirmed = vi.fn();
 			render(
@@ -749,7 +754,7 @@ describe('DocumentForm', () => {
 				props({ document: mine(), review: suggesting, lookup: household, next: null, onconfirmed })
 			);
 			await choose(
-				userEvent.setup({ pointerEventsCheck: 0 }),
+				userEvent.setup(),
 				screen.getByRole('combobox', { name: m.filing_other() }),
 				ERIKAS
 			);
@@ -769,13 +774,13 @@ describe('DocumentForm', () => {
 				...documentOf('completed', 'green'),
 				space_id: SPACE,
 				space_confirmed_at: '2026-10-22T09:50:00Z'
-			} as unknown as Document;
+			};
 			render(DocumentForm, props({ document: decided, review: null, lookup: household, onmove }));
 			const calm = screen.getByTestId('filing-calm');
 			expect(within(calm).getByText('Haushalt')).toBeTruthy();
 			expect(within(calm).getByText(m.filing_you_edit())).toBeTruthy();
 			expect(within(calm).getByText(m.filing_member_read({ name: 'erika' }))).toBeTruthy();
-			expect(within(calm).getByText(m.filing_uploader_you({ name: 'tobi' }))).toBeTruthy();
+			expect(within(calm).getByText(m.filing_uploader_you({ name: 'john' }))).toBeTruthy();
 			expect(within(calm).queryByText(m.filing_decided_lekto())).toBeNull();
 			await userEvent.click(within(calm).getByRole('button', { name: m.filing_move_action() }));
 			expect(onmove).toHaveBeenCalled();
@@ -783,11 +788,11 @@ describe('DocumentForm', () => {
 
 		it('offers no move while there is nowhere to move the document', () => {
 			// The caller edits the document's space only and nobody else has a personal space.
-			const alone = {
+			const alone = lookupOf({
 				...household,
 				spaces: [household.spaces[1]],
 				users: [household.users[0]]
-			} as unknown as Lookup;
+			});
 			const decided = { ...documentOf('completed', 'green'), space_id: SPACE } as Document;
 			render(
 				DocumentForm,
@@ -802,7 +807,7 @@ describe('DocumentForm', () => {
 			render(
 				DocumentForm,
 				props({
-					document: { ...documentOf('processing', null), space_id: SPACE } as unknown as Document,
+					document: { ...documentOf('processing', null), space_id: SPACE },
 					review: null,
 					lookup: household
 				})
@@ -849,10 +854,6 @@ describe('DocumentForm', () => {
 	});
 
 	it("after a corrected type sends no suggestion of the old type as the person's value", async () => {
-		// The dry run says nothing would change: the dialog shows no rows.
-		fetchMock.mockResolvedValue(
-			json({ changed: [], rules: null, visibility: null, document: null })
-		);
 		const OTHER = '0199a6c4-0000-7000-8000-0000000000e2';
 		const typed = {
 			document: {},
@@ -883,22 +884,14 @@ describe('DocumentForm', () => {
 	});
 
 	it('keeps a value entered by hand when the type is corrected', async () => {
-		// The dry run says nothing would change: the dialog shows no rows.
-		fetchMock.mockResolvedValue(
-			json({ changed: [], rules: null, visibility: null, document: null })
-		);
 		const OTHER = '0199a6c4-0000-7000-8000-0000000000e2';
 		const ASN = '0199a6c4-0000-7000-8000-0000000000f9';
-		const asn = {
+		const asn = fieldOf({
 			id: ASN,
 			name: 'Ablagenummer',
-			data_type: 'text',
-			document_type_ids: null,
 			required: true,
-			required_document_type_ids: [],
-			choices: [],
 			assignment: 'manual'
-		};
+		});
 		const typed = {
 			document: {},
 			open: [
@@ -911,11 +904,11 @@ describe('DocumentForm', () => {
 			],
 			nodes: []
 		} as unknown as Review;
-		const withOther = {
+		const withOther = lookupOf({
 			...lookup,
 			documentTypes: [...lookup.documentTypes, named(OTHER, 'Vertrag')],
 			fields: [...lookup.fields, asn]
-		} as unknown as Lookup;
+		});
 		render(DocumentForm, props({ review: typed, lookup: withOther, next: null }));
 		expect(screen.getByText(m.review_by_hand())).toBeTruthy();
 		await userEvent.type(document.getElementById(`field-${ASN}`) as HTMLInputElement, 'A-17');
@@ -930,24 +923,15 @@ describe('DocumentForm', () => {
 describe('the topic', () => {
 	const WORK = '0199a6c4-0000-7000-8000-0000000000b1';
 	const HEALTH = '0199a6c4-0000-7000-8000-0000000000b2';
-	const topic = (id: string, name: string) => ({
-		id,
-		name,
-		path: [name],
-		parent_id: null,
-		scope: 'topic',
-		assignment: 'auto',
-		shown: true,
-		created_at: '2026-10-17T12:00:00Z'
-	});
-	const topics = {
+	const topic = (id: string, name: string) => tagOf({ id, name, scope: 'topic' });
+	const topics = lookupOf({
 		...lookup,
 		contacts: [
 			{ ...named(CONTACT, 'Stadtwerke Musterstadt'), topic_ids: [WORK, HEALTH] },
-			{ ...named(BANK, 'Beispielbank'), topic_ids: [WORK] }
+			{ ...named(BANK, 'Muster Bank'), topic_ids: [WORK] }
 		],
 		tags: [topic(WORK, 'Arbeit'), topic(HEALTH, 'Krankenversicherung')]
-	} as unknown as Lookup;
+	});
 	const filed = {
 		...documentOf('completed', 'green'),
 		contact_id: CONTACT,
@@ -997,12 +981,6 @@ describe('the topic', () => {
 	};
 
 	it('offers the contact’s topics and leaves one the next contact does not have', async () => {
-		fetchMock.mockResolvedValue(
-			new Response('{"changed": [], "rules": null, "visibility": null, "document": null}', {
-				status: 200,
-				headers: { 'content-type': 'application/json' }
-			})
-		);
 		render(DocumentForm, props({ document: filed, lookup: topics, review: null }));
 		expect(topicName()).toBe('Krankenversicherung');
 		expect(await topicChoices()).toEqual(['Arbeit', 'Krankenversicherung']);
@@ -1022,10 +1000,10 @@ describe('the topic', () => {
 
 	it('has the field only for a contact with topics, and keeps a topic the document has', async () => {
 		const PLAIN = '0199a6c4-0000-7000-8000-0000000000c3';
-		const plain = {
+		const plain = lookupOf({
 			...topics,
 			contacts: [...topics.contacts, named(PLAIN, 'Ohne Themen')]
-		} as unknown as Lookup;
+		});
 		const field = topicField;
 		const unknown = { ...filed, contact_id: null, topic_id: null } as Document;
 		const view = render(DocumentForm, props({ document: unknown, lookup: plain, review: null }));
@@ -1042,12 +1020,7 @@ describe('the topic', () => {
 	});
 
 	it('offers an admin, too, only the topics of the chosen contact', async () => {
-		session.start({
-			user: { id: OWNER, username: 'admin', role: 'admin' },
-			method: 'password',
-			expires_at: '2026-10-09T12:00:00Z',
-			csrf_token: 'token'
-		});
+		signIn('admin', { id: OWNER, username: 'admin' });
 		const bank = { ...filed, contact_id: BANK, topic_id: null } as Document;
 		const view = render(DocumentForm, props({ document: bank, lookup: topics, review: null }));
 		expect(await topicChoices()).toEqual(['Arbeit']);
@@ -1099,7 +1072,6 @@ describe('the topic', () => {
 		// Taken, it is no suggestion any more.
 		expect(within(topicCard()).queryByText('only one signal names it')).toBeNull();
 	});
-	const PREVIEW = { changed: [], rules: null, visibility: null, document: null };
 	// The dry run of the form's change: what it sends; the dialog is closed again.
 	const sentPatch = async () => {
 		const calls = fetchMock.mock.calls.length;
@@ -1111,7 +1083,6 @@ describe('the topic', () => {
 	};
 
 	it('leaves a topic the next contact does not enable to the API to clear', async () => {
-		fetchMock.mockImplementation(async () => json(PREVIEW));
 		render(DocumentForm, props({ document: filed, lookup: topics, review: null }));
 		await choose(userEvent, select(m.field_contact()), BANK);
 		expect(topicName()).toBe('');
@@ -1120,7 +1091,6 @@ describe('the topic', () => {
 	});
 
 	it('keeps a topic the next contact enables, unless the person clears it', async () => {
-		fetchMock.mockImplementation(async () => json(PREVIEW));
 		const working = { ...filed, topic_id: WORK } as Document;
 		render(DocumentForm, props({ document: working, lookup: topics, review: null }));
 		await choose(userEvent, select(m.field_contact()), BANK);
@@ -1131,17 +1101,10 @@ describe('the topic', () => {
 	});
 
 	it('lets an admin create a topic named as searched in its dialog; saving enables it at the contact', async () => {
-		session.start({
-			user: { id: OWNER, username: 'admin', role: 'admin' },
-			method: 'password',
-			expires_at: '2026-10-09T12:00:00Z',
-			csrf_token: 'token'
-		});
+		signIn('admin', { id: OWNER, username: 'admin' });
 		const DENTAL = '0199a6c4-0000-7000-8000-0000000000b9';
 		const bank = { ...filed, contact_id: BANK, topic_id: null } as Document;
-		fetchMock.mockImplementation(async (request) =>
-			json(request.method === 'PATCH' ? { ...bank, topic_id: DENTAL } : PREVIEW)
-		);
+		serve({ 'PATCH /api/v1/documents/doc-1': () => ({ ...bank, topic_id: DENTAL }) });
 		const onenabled = vi.fn();
 		render(DocumentForm, props({ document: bank, lookup: topics, review: null, onenabled }));
 		await userEvent.click(topicOpener());
@@ -1159,20 +1122,32 @@ describe('the topic', () => {
 		await waitFor(() => expect(onenabled).toHaveBeenCalledOnce());
 	});
 
+	it('leaves the way the page says when the rules file the document out of reach (WA-08)', async () => {
+		signIn('admin', { id: OWNER, username: 'admin' });
+		const bank = { ...filed, contact_id: BANK, topic_id: null } as Document;
+		// The answer of a save that took the document away: its id, and no access.
+		serve({ 'PATCH /api/v1/documents/doc-1': () => ({ id: bank.id, access: null }) });
+		const onleave = vi.fn();
+		const onsaved = vi.fn();
+		vi.mocked(goto).mockClear();
+		render(DocumentForm, props({ document: bank, lookup: topics, review: null, onleave, onsaved }));
+		await chooseTopic('Arbeit');
+		await userEvent.click(screen.getByRole('button', { name: m.edit_review() }));
+		await userEvent.click(await screen.findByRole('button', { name: m.edit_save() }));
+		await waitFor(() => expect(onleave).toHaveBeenCalledOnce());
+		// Not to the list without its place, as before.
+		expect(goto).not.toHaveBeenCalled();
+		expect(onsaved).not.toHaveBeenCalled();
+	});
+
 	it('lets an admin create a contact or type named as searched in its dialog, chosen after', async () => {
-		session.start({
-			user: { id: OWNER, username: 'admin', role: 'admin' },
-			method: 'password',
-			expires_at: '2026-10-09T12:00:00Z',
-			csrf_token: 'token'
-		});
+		signIn('admin', { id: OWNER, username: 'admin' });
 		const BAKERY = '0199a6c4-0000-7000-8000-0000000000c9';
 		const REMINDER = '0199a6c4-0000-7000-8000-0000000000e9';
-		fetchMock.mockImplementation(async () => json(PREVIEW));
 		const bank = { ...filed, contact_id: BANK, topic_id: null } as Document;
 		render(DocumentForm, props({ document: bank, lookup: topics, review: null }));
 		for (const [label, kind, name, id] of [
-			[m.field_contact(), 'contacts', 'Bäckerei Korn', BAKERY],
+			[m.field_contact(), 'contacts', 'Bäckerei Muster', BAKERY],
 			[m.field_document_type(), 'document-types', 'Mahnung', REMINDER]
 		] as const) {
 			// The popover of the field before closes as the dialog takes over: it must be gone.
@@ -1197,7 +1172,6 @@ describe('the topic', () => {
 	});
 
 	it('confirms a topic the rules left open, also as none', async () => {
-		fetchMock.mockImplementation(async () => json({}));
 		const conflict = {
 			document: {},
 			open: [

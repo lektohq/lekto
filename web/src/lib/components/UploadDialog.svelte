@@ -3,7 +3,6 @@
 	import Download from '@lucide/svelte/icons/download';
 	import Upload from '@lucide/svelte/icons/upload';
 	import Zap from '@lucide/svelte/icons/zap';
-	import { api } from '#lib/api/client.ts';
 	import { BASE } from '#lib/base.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import * as Dialog from '#lib/components/ui/dialog/index.ts';
@@ -12,6 +11,7 @@
 	import { ACCEPT, intakeOf, readDrop, type Intake } from '#lib/intake.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import { session } from '#lib/session.svelte.ts';
+	import { tokens } from '#lib/tokens.svelte.ts';
 	import { uploads } from '#lib/upload.svelte.ts';
 	import { cn } from '#lib/utils.ts';
 
@@ -27,13 +27,10 @@
 	// iPhone, iPad and Mac: the shortcut, if the server names one, until the person has a token
 	// that only uploads.
 	const apple = $derived(appleDevice() !== null && session.shortcutUrl !== null);
-	let shortcutReady = $state(true);
+	// Not known (not read, or the read failed) reads as set up: the dialog offers nothing then.
+	const shortcutReady = $derived(tokens.hasUploadToken ?? true);
 	$effect(() => {
-		if (!open || !apple) return;
-		api.GET('/api/v1/auth/tokens').then(
-			(answer) => (shortcutReady = answer.data?.some((token) => token.scope === 'upload') ?? true),
-			() => (shortcutReady = true)
-		);
+		if (open && apple) void tokens.load();
 	});
 	let input = $state<HTMLInputElement | null>(null);
 

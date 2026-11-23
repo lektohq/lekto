@@ -5,22 +5,14 @@ import { masterDataDialogs } from '#lib/masterdata-dialog.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { phone } from '#lib/phone.svelte.ts';
 import MasterDataList from './MasterDataList.svelte';
-import { fakeApi, json } from '#lib/testing/api.ts';
+import { fakeApi, masterData } from '#lib/testing/api.ts';
+import { testPage } from '#lib/testing/page-state.svelte.ts';
+import { goto } from '$app/navigation';
 
-const nav = vi.hoisted(() => ({
-	url: new URL('http://lekto/ui/admin/master-data?tab=contacts'),
-	goto: vi.fn()
-}));
-vi.mock('$app/state', () => ({
-	page: {
-		get url() {
-			return nav.url;
-		}
-	}
-}));
-vi.mock('$app/navigation', () => ({ beforeNavigate: vi.fn(), goto: nav.goto }));
+vi.mock('$app/state', () => import('#lib/testing/app-state.ts'));
+vi.mock('$app/navigation', () => import('#lib/testing/navigation.ts'));
 
-let fetchMock = fakeApi();
+let fetchMock: ReturnType<typeof fakeApi>;
 
 const tag = (id: string, path: string[], parent: string | null, scope: string) => ({
 	id,
@@ -50,8 +42,8 @@ const contact = (id: string, name: string, extra: object = {}) => ({
 });
 
 const CONTACTS = [
-	contact('c1', 'Nord Versicherungsgruppe', {
-		aliases: ['Nord Krankenversicherung AG', 'Nord Leben AG'],
+	contact('c1', 'Nord Muster Versicherungsgruppe', {
+		aliases: ['Nord Muster Krankenversicherung AG', 'Nord Muster Leben AG'],
 		group_ids: ['g2'],
 		topic_ids: ['p1', 'p2', 'p3'],
 		document_count: 104
@@ -65,27 +57,29 @@ const CONTACTS = [
 	contact('c3', 'Stadtwerke', { aliases: ['SWM'] })
 ];
 
-beforeEach(() => {
-	nav.url = new URL('http://lekto/ui/admin/master-data?tab=contacts');
-	nav.goto.mockReset();
-	fetchMock = fakeApi();
-	fetchMock.mockImplementation(async (request) => {
-		const path = new URL(request.url).pathname;
-		if (path === '/api/v1/contacts') return json(CONTACTS);
-		if (path === '/api/v1/tags') {
-			return json([
+/** The master data the list reads: the contacts and their groups, unless `given` says other. */
+function serve(given: Parameters<typeof masterData>[0] = {}) {
+	fetchMock = fakeApi(
+		masterData({
+			contacts: CONTACTS,
+			tags: [
 				tag('g1', ['Insurer'], null, 'contact'),
 				tag('g2', ['Insurer', 'Health insurer'], 'g1', 'contact'),
 				tag('g3', ['Bank'], null, 'contact')
-			]);
-		}
-		return json([]);
-	});
+			],
+			...given
+		})
+	);
 	vi.stubGlobal('fetch', fetchMock);
+}
+
+beforeEach(() => {
+	testPage.url = new URL('http://lekto/ui/admin/master-data?tab=contacts');
+	vi.mocked(goto).mockReset();
+	serve();
 });
 
 afterEach(() => {
-	vi.unstubAllGlobals();
 	phone.override(null);
 	desktop.override(null);
 	localStorage.clear();
@@ -95,11 +89,11 @@ afterEach(() => {
 describe('MasterDataList', () => {
 	it('tells under a contact’s name its groups, aliases, identifiers and topics', async () => {
 		render(MasterDataList, { kind: 'contacts' });
-		const nord = (await screen.findByText('Nord Versicherungsgruppe')).closest('li')!;
+		const nord = (await screen.findByText('Nord Muster Versicherungsgruppe')).closest('li')!;
 		expect(within(nord).getByText('Health insurer')).toBeTruthy();
 		expect(
 			within(nord).getByText(
-				m.master_alias_more({ alias: 'Nord Krankenversicherung AG', count: 1 })
+				m.master_alias_more({ alias: 'Nord Muster Krankenversicherung AG', count: 1 })
 			)
 		).toBeTruthy();
 		expect(within(nord).getByText(m.master_topics_many({ count: 3 }))).toBeTruthy();
@@ -120,38 +114,34 @@ describe('MasterDataList', () => {
 	});
 
 	it('lists the contacts of a group or one below it, as a link from the Tags tab asks', async () => {
-		nav.url = new URL('http://lekto/ui/admin/master-data?tab=contacts&group=g1');
+		testPage.url = new URL('http://lekto/ui/admin/master-data?tab=contacts&group=g1');
 		render(MasterDataList, { kind: 'contacts' });
-		expect(await screen.findByText('Nord Versicherungsgruppe')).toBeTruthy();
+		expect(await screen.findByText('Nord Muster Versicherungsgruppe')).toBeTruthy();
 		expect(screen.queryByText('Sparkasse Musterstadt')).toBeNull();
 		const label = m.master_filter_group({ name: 'Insurer' });
 		await fireEvent.click(
 			screen.getByRole('button', { name: m.master_filter_remove({ name: label }) })
 		);
-		expect(nav.goto).toHaveBeenCalledWith('?tab=contacts', { reset: false });
+		expect(vi.mocked(goto)).toHaveBeenCalledWith('?tab=contacts', { reset: false });
 	});
 
 	it('ignores a filter that names no tag of its kind, and takes it out of the URL', async () => {
-		nav.url = new URL('http://lekto/ui/admin/master-data?tab=contacts&group=gone');
+		testPage.url = new URL('http://lekto/ui/admin/master-data?tab=contacts&group=gone');
 		render(MasterDataList, { kind: 'contacts' });
-		expect(await screen.findByText('Nord Versicherungsgruppe')).toBeTruthy();
+		expect(await screen.findByText('Nord Muster Versicherungsgruppe')).toBeTruthy();
 		expect(screen.getByText('Sparkasse Musterstadt')).toBeTruthy();
 		expect(screen.queryByRole('button', { name: /gone/ })).toBeNull();
 		await waitFor(() =>
-			expect(nav.goto).toHaveBeenCalledWith('?tab=contacts', { replace: true, reset: false })
+			expect(vi.mocked(goto)).toHaveBeenCalledWith('?tab=contacts', { replace: true, reset: false })
 		);
 	});
 
 	it('tells a type’s description under its name, and nothing for a type without one', async () => {
-		fetchMock.mockImplementation(async (request) => {
-			const path = new URL(request.url).pathname;
-			if (path === '/api/v1/document-types') {
-				return json([
-					{ id: 't1', name: 'Rechnung', description: 'Eine Forderung', group_ids: [], icon: null },
-					{ id: 't2', name: 'Kündigung', description: null, group_ids: [], icon: null }
-				]);
-			}
-			return json([]);
+		serve({
+			'document-types': [
+				{ id: 't1', name: 'Rechnung', description: 'Eine Forderung', group_ids: [], icon: null },
+				{ id: 't2', name: 'Kündigung', description: null, group_ids: [], icon: null }
+			]
 		});
 		render(MasterDataList, { kind: 'document-types' });
 		const invoice = (await screen.findByText('Rechnung')).closest('li')!;
@@ -164,9 +154,11 @@ describe('MasterDataList', () => {
 	it('on a phone opens a contact with a tap on its row', async () => {
 		phone.override(true);
 		render(MasterDataList, { kind: 'contacts' });
-		const name = await screen.findByText('Nord Versicherungsgruppe');
+		const name = await screen.findByText('Nord Muster Versicherungsgruppe');
 		expect(
-			screen.queryByRole('button', { name: m.master_edit({ name: 'Nord Versicherungsgruppe' }) })
+			screen.queryByRole('button', {
+				name: m.master_edit({ name: 'Nord Muster Versicherungsgruppe' })
+			})
 		).toBeNull();
 		expect(screen.queryByRole('link')).toBeNull();
 		await fireEvent.click(name.closest('button')!);
@@ -176,11 +168,8 @@ describe('MasterDataList', () => {
 		const many = Array.from({ length: 30 }, (_, index) =>
 			contact(`m${index}`, `Kontakt ${String(index + 1).padStart(2, '0')}`)
 		);
-		fetchMock.mockImplementation(async (request) => {
-			const path = new URL(request.url).pathname;
-			return json(path === '/api/v1/contacts' ? many : []);
-		});
-		nav.url = new URL('http://lekto/ui/admin/master-data?tab=contacts&page=2');
+		serve({ contacts: many, tags: [] });
+		testPage.url = new URL('http://lekto/ui/admin/master-data?tab=contacts&page=2');
 		const { rerender } = render(MasterDataList, { kind: 'contacts' });
 		expect(await screen.findByText('Kontakt 26')).toBeTruthy();
 		expect(screen.queryByText('Kontakt 25')).toBeNull();
@@ -188,23 +177,22 @@ describe('MasterDataList', () => {
 			screen.getByText(m.pagination_range({ from: '26', to: '30', total: '30' }))
 		).toBeTruthy();
 		await fireEvent.click(screen.getByRole('button', { name: m.pagination_page({ page: '1' }) }));
-		expect(nav.goto).toHaveBeenLastCalledWith('?tab=contacts', {});
-		nav.goto.mockReset();
+		expect(vi.mocked(goto)).toHaveBeenLastCalledWith('?tab=contacts', {});
+		vi.mocked(goto).mockReset();
 		await rerender({ query: 'Kontakt 0' });
 		await waitFor(() =>
-			expect(nav.goto).toHaveBeenCalledWith('?tab=contacts', { replace: true, reset: false })
+			expect(vi.mocked(goto)).toHaveBeenCalledWith('?tab=contacts', { replace: true, reset: false })
 		);
 	});
 
 	it('puts the contacts with the most documents first when sorted so', async () => {
-		fetchMock.mockImplementation(async (request) => {
-			const path = new URL(request.url).pathname;
-			if (path !== '/api/v1/contacts') return json([]);
-			return json([
+		serve({
+			tags: [],
+			contacts: [
 				contact('c1', 'Nord', { document_count: 104 }),
 				contact('c2', 'Sparkasse', { document_count: 5 }),
 				contact('c3', 'Stadtwerke', { document_count: 300 })
-			]);
+			]
 		});
 		render(MasterDataList, { kind: 'contacts', sort: 'documents' });
 		await screen.findByText('Nord');
@@ -216,31 +204,25 @@ describe('MasterDataList', () => {
 
 	it('on a desktop lines up a type’s groups and facts, the title pattern in full as tooltip', async () => {
 		desktop.override(true);
-		fetchMock.mockImplementation(async (request) => {
-			const path = new URL(request.url).pathname;
-			if (path === '/api/v1/document-types') {
-				return json([
-					{
-						id: 't1',
-						name: 'Rechnung',
-						description: 'Eine Forderung',
-						group_ids: ['g9'],
-						icon: null,
-						title_pattern: 'Rechnung {{ contact.name }}',
-						relation_target: true,
-						document_count: 3
-					}
-				]);
-			}
-			if (path === '/api/v1/tags') return json([tag('g9', ['Geld'], null, 'document_type')]);
-			if (path === '/api/v1/fields') {
-				return json([
-					{ id: 'f1', document_type_ids: ['t1'], required_document_type_ids: ['t1'] },
-					{ id: 'f2', document_type_ids: ['t1'], required_document_type_ids: [] },
-					{ id: 'f3', document_type_ids: null, required_document_type_ids: [] }
-				]);
-			}
-			return json([]);
+		serve({
+			'document-types': [
+				{
+					id: 't1',
+					name: 'Rechnung',
+					description: 'Eine Forderung',
+					group_ids: ['g9'],
+					icon: null,
+					title_pattern: 'Rechnung {{ contact.name }}',
+					relation_target: true,
+					document_count: 3
+				}
+			],
+			tags: [tag('g9', ['Geld'], null, 'document_type')],
+			fields: [
+				{ id: 'f1', document_type_ids: ['t1'], required_document_type_ids: ['t1'] },
+				{ id: 'f2', document_type_ids: ['t1'], required_document_type_ids: [] },
+				{ id: 'f3', document_type_ids: null, required_document_type_ids: [] }
+			]
 		});
 		render(MasterDataList, { kind: 'document-types' });
 		const row = (await screen.findByText('Rechnung')).closest('li')!;
@@ -261,18 +243,9 @@ describe('MasterDataList', () => {
 
 	it('on a phone tells the first group, how many more, and what the contact is', async () => {
 		phone.override(true);
-		fetchMock.mockImplementation(async (request) => {
-			const path = new URL(request.url).pathname;
-			if (path === '/api/v1/contacts') {
-				return json([contact('c9', 'Finanzamt', { group_ids: ['g1', 'g3'], aliases: ['FA'] })]);
-			}
-			if (path === '/api/v1/tags') {
-				return json([
-					tag('g1', ['Insurer'], null, 'contact'),
-					tag('g3', ['Bank'], null, 'contact')
-				]);
-			}
-			return json([]);
+		serve({
+			contacts: [contact('c9', 'Finanzamt', { group_ids: ['g1', 'g3'], aliases: ['FA'] })],
+			tags: [tag('g1', ['Insurer'], null, 'contact'), tag('g3', ['Bank'], null, 'contact')]
 		});
 		render(MasterDataList, { kind: 'contacts' });
 		const row = (await screen.findByText('Finanzamt')).closest('li')!;

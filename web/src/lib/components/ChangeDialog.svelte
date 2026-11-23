@@ -27,11 +27,19 @@
 		action: () => Promise<void>;
 		children: Snippet;
 	} = $props();
+
+	let saving = $state(false);
 </script>
 
-<Dialog.Root bind:open>
+<!-- While the action runs nothing closes the dialog: the request goes on all the same. -->
+<Dialog.Root bind:open={() => open, (next) => (next || !saving) && (open = next)}>
 	<Dialog.Content size="md">
-		<AsyncForm class="flex min-h-0 flex-col gap-4" {action} ondone={() => (open = false)}>
+		<AsyncForm
+			class="flex min-h-0 flex-col gap-4"
+			{action}
+			bind:busy={saving}
+			ondone={() => (open = false)}
+		>
 			{#snippet children({ busy, error })}
 				<Dialog.Header>
 					<Dialog.Title>{m.dryrun_title()}</Dialog.Title>
@@ -40,10 +48,10 @@
 				<div class="max-h-[60vh] overflow-auto">{@render body()}</div>
 				{#if error}<Field.Error>{error}</Field.Error>{/if}
 				<Dialog.Footer>
-					<Button type="button" variant="ghost" disabled={busy} onclick={() => (open = false)}>
+					<Button type="button" variant="ghost" {busy} onclick={() => (open = false)}>
 						{m.cancel()}
 					</Button>
-					<Button type="submit" variant={destructive ? 'destructive' : 'default'} disabled={busy}>
+					<Button type="submit" variant={destructive ? 'destructive' : 'default'} {busy}>
 						{submitLabel}
 					</Button>
 				</Dialog.Footer>

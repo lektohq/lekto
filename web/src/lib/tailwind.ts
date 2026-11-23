@@ -10,7 +10,17 @@ import { createTV } from 'tailwind-variants/config';
 /** The steps of the type scale beyond Tailwind's own (`--text-*` in `app.css`). */
 export const TEXT_STEPS = ['nano', 'micro', 'meta', 'md', 'figure', 'title'];
 
-const config = { extend: { theme: { text: TEXT_STEPS } } };
+/** The widths of a border beyond Tailwind's own (`@utility border-*` in `app.css`): `border-dot`
+ * is the edge of a small mark, which tailwind-merge takes for a colour otherwise and drops
+ * before the mark's own colour. */
+export const BORDER_WIDTHS = ['dot'];
+
+const config = {
+	extend: {
+		theme: { text: TEXT_STEPS },
+		classGroups: { 'border-w': [{ border: BORDER_WIDTHS }] }
+	}
+};
 
 export const twMerge = extendTailwindMerge(config);
 export const tv = createTV({ twMergeConfig: config });

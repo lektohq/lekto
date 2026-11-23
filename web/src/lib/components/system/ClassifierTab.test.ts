@@ -4,12 +4,14 @@ import { render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { events } from '#lib/events.svelte.ts';
+import { signIn } from '#lib/testing/session.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { session } from '#lib/session.svelte.ts';
 import Page from './ClassifierTab.svelte';
-import { fakeApi, json } from '#lib/testing/api.ts';
+import { fakeApi, problem, type Route, type Routes } from '#lib/testing/api.ts';
+import { streamEvents } from '#lib/testing/events.ts';
 
-let fetchMock = fakeApi();
+let fetchMock: ReturnType<typeof fakeApi>;
 
 const trained = {
 	model: {
@@ -50,36 +52,29 @@ const signals = {
 	]
 };
 
-/** The classifier's endpoints, with `status` as its status. */
-function answer(status: unknown = trained) {
-	return async (request: Request) => {
-		const path = new URL(request.url).pathname;
-		if (request.method === 'POST') return new Response(null, { status: 202 });
-		if (path === '/api/v1/classifier/models') return json(models);
-		if (path === '/api/v1/automation/signals') return json(signals);
-		return json(status);
-	};
+/** The classifier's endpoints, `status` its status; `more` before these. */
+function serve(status: Route = () => trained, more: Routes = {}) {
+	fetchMock = fakeApi({
+		'GET /api/v1/classifier': status,
+		'GET /api/v1/classifier/models': () => models,
+		'GET /api/v1/automation/signals': () => signals,
+		'POST /api/v1/classifier/train': () => new Response(null, { status: 202 }),
+		...more
+	});
+	vi.stubGlobal('fetch', fetchMock);
 }
 
 beforeEach(() => {
-	session.start({
-		user: { id: 'admin', username: 'admin', role: 'admin' },
-		method: 'password',
-		expires_at: '2026-10-14T12:00:00Z',
-		csrf_token: 'token'
-	});
-	fetchMock = fakeApi();
-	vi.stubGlobal('fetch', fetchMock);
+	signIn('admin', { id: 'admin', username: 'admin' });
+	serve();
 });
 
 afterEach(() => {
 	session.clear();
-	vi.unstubAllGlobals();
 });
 
 describe('the classifier tab', () => {
 	it('shows what the model learned and trains on request', async () => {
-		fetchMock.mockImplementation(answer());
 		render(Page);
 		expect(
 			await screen.findByRole('heading', { name: m.classifier_model_title({ number: 2 }) })
@@ -94,13 +89,7 @@ describe('the classifier tab', () => {
 	});
 
 	it('shows a user the model without the training', async () => {
-		session.start({
-			user: { id: 'user', username: 'erika', role: 'user' },
-			method: 'password',
-			expires_at: '2026-10-14T12:00:00Z',
-			csrf_token: 'token'
-		});
-		fetchMock.mockImplementation(answer());
+		signIn('user', { id: 'user', username: 'erika' });
 		render(Page);
 		expect(
 			await screen.findByRole('heading', { name: m.classifier_model_title({ number: 2 }) })
@@ -109,43 +98,49 @@ describe('the classifier tab', () => {
 	});
 
 	it('shows the new model once a training ended', async () => {
-		let emit: ((message: { data: string }) => void) | undefined;
-		events.useFactory(
-			() =>
-				({
-					addEventListener(type: string, handler: (message: { data: string }) => void) {
-						if (type === 'classifier.trained') emit = handler;
-					},
-					close() {}
-				}) as unknown as EventSource
-		);
-		events.start(() => {});
+		const emit = streamEvents();
 		let current: unknown = trained;
-		fetchMock.mockImplementation((request) => answer(current)(request));
+		serve(() => current);
 		render(Page);
 		expect(
 			await screen.findByRole('heading', { name: m.classifier_model_title({ number: 2 }) })
 		).toBeTruthy();
 
 		current = { ...trained, model: { ...trained.model, number: 3 } };
-		emit?.({
-			data: JSON.stringify({ type: 'classifier.trained', id: 'e1', occurred_at: '', number: 3 })
-		});
+		emit('classifier.trained', { number: 3 });
 		expect(
 			await screen.findByRole('heading', { name: m.classifier_model_title({ number: 3 }) })
 		).toBeTruthy();
 		events.stop();
 	});
 
+	it('says so when the model could not be read anew: the one shown is the old one (WE-02)', async () => {
+		const emit = streamEvents();
+		let down = false;
+		// Down, every endpoint fails.
+		const or = (answer: unknown) => () => (down ? problem(500, { detail: 'boom' }) : answer);
+		serve(or(trained), {
+			'GET /api/v1/classifier/models': or(models),
+			'GET /api/v1/automation/signals': or(signals)
+		});
+		render(Page);
+		const model = () =>
+			screen.getByRole('heading', { name: m.classifier_model_title({ number: 2 }) });
+		await screen.findByRole('heading', { name: m.classifier_model_title({ number: 2 }) });
+		down = true;
+		emit('classifier.trained', { number: 3 });
+		expect((await screen.findByRole('alert')).textContent).toContain('boom');
+		expect(model()).toBeTruthy();
+		events.stop();
+	});
+
 	it('draws the accuracy over the models', async () => {
-		fetchMock.mockImplementation(answer());
 		render(Page);
 		expect(await screen.findByRole('img', { name: m.classifier_history_label() })).toBeTruthy();
 		expect(screen.queryByText(m.classifier_history_none())).toBeNull();
 	});
 
 	it('tells the hit rate of each signal and marks the best', async () => {
-		fetchMock.mockImplementation(answer());
 		render(Page);
 		const table = await screen.findByRole('table');
 		const rows = Array.from(table.querySelectorAll('tbody tr'));
@@ -158,9 +153,11 @@ describe('the classifier tab', () => {
 	});
 
 	it('says so when there is no classifier', async () => {
-		fetchMock.mockImplementation(async () =>
-			json({ type: 'about:blank', title: 'Unavailable', status: 503 }, 503)
-		);
+		const missing = () => problem(503, { detail: 'no classifier is configured' });
+		serve(missing, {
+			'GET /api/v1/classifier/models': missing,
+			'GET /api/v1/automation/signals': missing
+		});
 		render(Page);
 		expect(await screen.findByText(m.classifier_not_configured())).toBeTruthy();
 		expect(screen.queryByRole('button', { name: m.classifier_train() })).toBeNull();

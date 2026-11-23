@@ -16,7 +16,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { API_DOCS, BASE } from '#lib/base.ts';
-	import Beam from '#lib/components/Beam.svelte';
+	import OnDemand from '#lib/components/OnDemand.svelte';
 	import HeaderSearch from '#lib/components/HeaderSearch.svelte';
 	import Logo from '#lib/components/Logo.svelte';
 	import Segmented from '#lib/components/Segmented.svelte';
@@ -37,8 +37,10 @@
 	import { THEME_OPTIONS } from '#lib/theme.ts';
 	import { canListAllUsers } from '#lib/permissions.ts';
 	import { phone } from '#lib/phone.svelte.ts';
+	import { leaveDevice } from '#lib/push-device.ts';
 	import { scope } from '#lib/scope.svelte.ts';
 	import { href, isCurrent, SETTINGS, visibleSections, type Section } from '#lib/sections.ts';
+	import { forgetFilters } from '#lib/listing.ts';
 	import { session } from '#lib/session.svelte.ts';
 	import { cn } from '#lib/utils.ts';
 	import { onChange } from '#lib/watch.svelte.ts';
@@ -66,6 +68,10 @@
 
 	async function signOut() {
 		menuOpen = false;
+		// Nothing of the filters stays on the device for the next person, and it shows no more
+		// notifications of this one (while the session still holds).
+		forgetFilters();
+		await leaveDevice();
 		try {
 			await session.logout();
 		} catch (error) {
@@ -241,7 +247,7 @@
 											<button
 												{...mergeProps(menu, tip)}
 												type="button"
-												class="relative grid size-10 shrink-0 place-items-center rounded-full bg-primary text-md font-semibold text-primary-foreground uppercase outline-none select-none hover:bg-primary/80 focus-visible:ring-3 focus-visible:ring-ring/50"
+												class="relative grid size-10 shrink-0 place-items-center rounded-full bg-primary text-md font-semibold text-primary-foreground uppercase select-none hover:bg-primary/80 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-hidden"
 												aria-label={accountName}
 											>
 												{username.slice(0, 1)}
@@ -329,7 +335,7 @@
 					     left the theme's buttons no room on a phone (Tobi, 27.10.2026). -->
 					<Sheet.Content
 						side="right"
-						class="gap-2 overflow-y-auto p-4 pt-[max(1rem,env(safe-area-inset-top))] pr-[max(1rem,env(safe-area-inset-right))] pb-[max(1rem,env(safe-area-inset-bottom))] data-[side=right]:w-80"
+						class="gap-2 overflow-y-auto p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] data-[side=right]:w-80 data-[side=right]:pr-[max(1rem,env(safe-area-inset-right))]"
 					>
 						<Sheet.Header class="px-2">
 							<Sheet.Title><Logo class="text-lg" /></Sheet.Title>
@@ -405,7 +411,7 @@
 								<button
 									type="button"
 									onclick={() => open(SETTINGS)}
-									class="flex h-10 items-center gap-2.5 rounded-xl px-4 text-md transition-colors hover:bg-muted"
+									class="flex h-11 items-center gap-2.5 rounded-xl px-4 text-sm transition-colors hover:bg-muted"
 								>
 									<SETTINGS.icon class="size-4 text-muted-foreground" aria-hidden="true" />
 									{SETTINGS.label()}
@@ -414,7 +420,7 @@
 									href={API_DOCS}
 									target="_blank"
 									rel="noopener noreferrer"
-									class="flex h-10 items-center gap-2.5 rounded-xl px-4 text-md transition-colors hover:bg-muted"
+									class="flex h-11 items-center gap-2.5 rounded-xl px-4 text-sm transition-colors hover:bg-muted"
 								>
 									<BookOpen class="size-4 text-muted-foreground" aria-hidden="true" />
 									{m.api_docs()}
@@ -424,7 +430,7 @@
 								<button
 									type="button"
 									onclick={signOut}
-									class="flex h-10 items-center gap-2.5 rounded-xl px-4 text-md transition-colors hover:bg-muted"
+									class="flex h-11 items-center gap-2.5 rounded-xl px-4 text-sm transition-colors hover:bg-muted"
 								>
 									<LogOut class="size-4 text-muted-foreground" aria-hidden="true" />
 									{m.sign_out()}
@@ -455,4 +461,8 @@
 		</div>
 	</main>
 </div>
-<Beam />
+<!-- The Beam opens over any page, but most never open it (`OnDemand`). -->
+<OnDemand
+	load={() => import('#lib/components/Beam.svelte')}
+	wanted={page.state.beam !== undefined}
+/>

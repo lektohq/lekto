@@ -604,6 +604,11 @@ class TemplatePreviewOut(BaseModel):
     error: str | None = Field(
         description="Why the template is invalid (its syntax, or a value templates do not know)."
     )
+    error_reason: ReasonOut | None = Field(
+        default=None,
+        description="The code of `error` where it has one (`template_unknown_value`: a value "
+        "templates do not know); None for a message of the template engine, which is text.",
+    )
     values: dict[str, str] | None = Field(
         description="The document's values as a template writes them, by path (`contact`, "
         "`field.la_brutto`): each one it has, whatever the template. None without a document.",
@@ -742,6 +747,12 @@ class ApplyPreviewOut(BaseModel):
             "Documents the whole dry run looks at: those the rule's conditions on contact, "
             "document type, their groups, topic, tags and fields do not rule out; the "
             "`looked_at` of all pages add up to it."
+        )
+    )
+    max_documents: int = Field(
+        description=(
+            "Documents one application takes at most (`LEKTO_RULES_APPLY_MAX_DOCUMENTS`): "
+            "applying more answers 422 `rule_apply_too_many`; apply the rest in a further run."
         )
     )
 

@@ -4,7 +4,7 @@
  * API takes it.
  */
 import type { components } from '#lib/api/schema.ts';
-import { formatMoment } from '#lib/i18n.ts';
+import { formatMoment, formatNumber } from '#lib/i18n.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { reasonText } from '#lib/reasons.ts';
 
@@ -22,7 +22,9 @@ export const LIMITS = {
 	host: 255,
 	username: 320,
 	password: 1000,
-	folder: 1000
+	folder: 1000,
+	/** The folders one mailbox looks in. */
+	folders: 20
 } as const;
 
 /** What the mailbox left out or could not do lately, as lines in the lane's yellow
@@ -68,11 +70,11 @@ export function folderLabel(name: string): string {
 /** "every 5 minutes", "every hour", "once a day". */
 export function intervalLabel(minutes: number): string {
 	if (minutes === 1) return m.mail_interval_minute();
-	if (minutes < 60) return m.mail_interval_minutes({ count: minutes });
+	if (minutes < 60) return m.mail_interval_minutes({ count: formatNumber(minutes) });
 	if (minutes === 60) return m.mail_interval_hour();
 	if (minutes === 1440) return m.mail_interval_day();
-	if (minutes % 60 === 0) return m.mail_interval_hours({ count: minutes / 60 });
-	return m.mail_interval_minutes({ count: minutes });
+	if (minutes % 60 === 0) return m.mail_interval_hours({ count: formatNumber(minutes / 60) });
+	return m.mail_interval_minutes({ count: formatNumber(minutes) });
 }
 
 /** The intervals to choose from, with the mailbox's own where it is none of them. */
@@ -103,7 +105,8 @@ export function summaryOf(mailbox: Mailbox): string {
 	const { last_attempt_at: tried, last_success_at: worked, mails, documents } = mailbox.status;
 	if (worked) parts.push(m.mail_last_success({ when: formatMoment(worked) }));
 	else if (tried) parts.push(m.mail_last_attempt({ when: formatMoment(tried) }));
-	if (mails > 0) parts.push(m.mail_counts({ mails, documents }));
+	if (mails > 0)
+		parts.push(m.mail_counts({ mails: formatNumber(mails), documents: formatNumber(documents) }));
 	return parts.join(' · ');
 }
 

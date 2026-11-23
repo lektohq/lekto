@@ -34,3 +34,19 @@ describe('a chip that toggles', () => {
 		expect(link.className).toContain('bg-panel');
 	});
 });
+
+describe('a chip that is removed (WB-09)', () => {
+	it('lets a finger hit its ✕ on a phone: 44 px, over the end of the name too', () => {
+		render(Chip, { children: name, onremove: () => {}, removeLabel: 'Filter entfernen' });
+		// 24 px drawn, 10 px beyond it above, below and on the right, on a phone on the left too.
+		const classes = screen.getByRole('button', { name: 'Filter entfernen' }).className.split(' ');
+		expect(classes).toEqual(
+			expect.arrayContaining([
+				'size-6',
+				'after:-inset-y-2.5',
+				'after:-right-2.5',
+				'max-sm:after:-left-2.5'
+			])
+		);
+	});
+});

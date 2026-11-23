@@ -6,6 +6,7 @@
  */
 import type { components } from '#lib/api/schema.ts';
 import { describeValue, fieldLabel } from '#lib/describe.ts';
+import { isPassing } from '#lib/errors.ts';
 import { formatNumber } from '#lib/i18n.ts';
 import type { JobsSummary } from '#lib/jobs.ts';
 import { spaceNameFor, type Lookup } from '#lib/masterdata.svelte.ts';
@@ -23,9 +24,13 @@ export function hasConflict(item: PreviewItem): boolean {
 	return item.conflicts.length > 0;
 }
 
-/** The documents chosen when they show up: those without a conflict. */
-export function preselected(items: readonly PreviewItem[]): string[] {
-	return items.filter((item) => !hasConflict(item)).map((item) => item.document_id);
+/** The documents chosen when they show up: those without a conflict, at most `room` of them
+ * (what one application still takes, `max_documents` of the preview). */
+export function preselected(items: readonly PreviewItem[], room = Infinity): string[] {
+	return items
+		.filter((item) => !hasConflict(item))
+		.map((item) => item.document_id)
+		.slice(0, Math.max(0, room));
 }
 
 /** The request for the chosen documents, in the order of the preview. A conflict counts only
@@ -152,7 +157,8 @@ export function pollDelay(elapsedMs: number): number {
 
 /**
  * Ask for the progress until the application is finished or `signal` aborts; `update` gets each
- * answer. Resolves with the last one.
+ * answer. Resolves with the last one. An answer that fails for the moment (no connection, the
+ * server restarting) is asked for again after the next pause; what the API refuses is thrown.
  */
 export async function follow(
 	first: Application,
@@ -168,7 +174,12 @@ export async function follow(
 		await wait(delay);
 		elapsed += delay;
 		if (signal.aborted) break;
-		current = await load(current.id);
+		try {
+			current = await load(current.id);
+		} catch (error) {
+			if (!isPassing(error)) throw error;
+			continue;
+		}
 		update(current);
 	}
 	return current;

@@ -1,6 +1,8 @@
 <script lang="ts" module>
-	/** What a condition's row gets from its group: removing it and moving it up or down. */
+	/** What a condition's row gets from its group: which one it is ("Bedingung 2"), removing it
+	 * and moving it up or down. */
 	export interface RowMoves {
+		name: string;
 		onremove: () => void;
 		onup?: () => void;
 		ondown?: () => void;
@@ -17,10 +19,12 @@
 	import ConditionGroup from '#lib/components/rules/ConditionGroup.svelte';
 	import ModeSelect from '#lib/components/rules/ModeSelect.svelte';
 	import IconButton from '#lib/components/IconButton.svelte';
+	import { cardVariants } from '#lib/components/ui/card/index.ts';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Choice } from '#lib/components/ui/choice/index.ts';
 	import * as Field from '#lib/components/ui/field/index.ts';
 	import { m } from '#lib/paraglide/messages.js';
+	import { moveKeepingFocus, removeKeepingFocus } from '#lib/rules/row-focus.ts';
 	import { move, newGroup, type TreeCondition, type TreeGroup } from '#lib/rules/tree.ts';
 	import { cn } from '#lib/utils.ts';
 
@@ -40,6 +44,7 @@
 		root = false,
 		top = false,
 		empty,
+		name,
 		onremove,
 		onup,
 		ondown
@@ -53,6 +58,8 @@
 		root?: boolean;
 		top?: boolean;
 		empty?: string;
+		/** Which group of its list it is ("Gruppe 2"), for the names of its buttons. */
+		name?: string;
 		onremove?: () => void;
 		onup?: () => void;
 		ondown?: () => void;
@@ -69,12 +76,13 @@
 
 <div
 	class={cn(
-		'flex flex-col gap-3 rounded-2xl border p-3',
-		own ? 'bg-card' : 'bg-secondary/40',
+		cardVariants({ size: 'sm', tone: own ? 'plain' : 'nested' }),
+		'flex flex-col gap-3',
 		top && 'border-0 p-0',
 		error && 'border-destructive'
 	)}
 	data-key={group.key}
+	data-rule-row={own ? undefined : ''}
 	role="group"
 	aria-label={own ? m.rule_conditions() : m.rule_subgroup()}
 >
@@ -83,13 +91,30 @@
 		<Choice bind:checked={group.negate}>{m.rule_negate()}</Choice>
 		{#if !own}
 			<div class="ml-auto flex gap-0.5">
-				<IconButton label={m.rule_move_up()} disabled={!onup} onclick={() => onup?.()}>
+				<IconButton
+					data-row="up"
+					label={name ? m.rule_move_up_of({ name }) : m.rule_move_up()}
+					hint={m.rule_move_up()}
+					disabled={!onup}
+					onclick={(event) => void moveKeepingFocus(event.currentTarget, () => onup?.())}
+				>
 					<ArrowUp aria-hidden="true" />
 				</IconButton>
-				<IconButton label={m.rule_move_down()} disabled={!ondown} onclick={() => ondown?.()}>
+				<IconButton
+					data-row="down"
+					label={name ? m.rule_move_down_of({ name }) : m.rule_move_down()}
+					hint={m.rule_move_down()}
+					disabled={!ondown}
+					onclick={(event) => void moveKeepingFocus(event.currentTarget, () => ondown?.())}
+				>
 					<ArrowDown aria-hidden="true" />
 				</IconButton>
-				<IconButton label={m.rule_remove()} onclick={onremove}>
+				<IconButton
+					data-row="remove"
+					label={name ? m.rule_remove_of({ name }) : m.rule_remove()}
+					hint={m.rule_remove()}
+					onclick={(event) => void removeKeepingFocus(event.currentTarget, () => onremove?.())}
+				>
 					<Trash2 aria-hidden="true" />
 				</IconButton>
 			</div>
@@ -105,12 +130,14 @@
 				{newCondition}
 				{canAddCondition}
 				{canAddGroup}
+				name={m.rule_row_group({ number: index + 1 })}
 				onremove={() => remove(index)}
 				onup={up(index)}
 				ondown={down(index)}
 			/>
 		{:else}
 			{@render row(item as C, {
+				name: m.rule_row_condition({ number: index + 1 }),
 				onremove: () => remove(index),
 				onup: up(index),
 				ondown: down(index)
@@ -125,6 +152,7 @@
 
 	<div class="flex flex-wrap gap-2">
 		<Button
+			data-row="add"
 			variant="outline"
 			size="sm"
 			disabled={!canAddCondition}

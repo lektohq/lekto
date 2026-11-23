@@ -3,19 +3,19 @@ import { userEvent } from '@testing-library/user-event';
 import { createRawSnippet } from 'svelte';
 import { describe, expect, it, vi } from 'vitest';
 import type { FieldEvidence } from '#lib/document-view.ts';
-import type { Lookup } from '#lib/masterdata.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import FieldShell from './FieldShell.svelte';
+import { lookupOf } from '#lib/testing/master-data.ts';
 
 const input = createRawSnippet(() => ({ render: () => '<input id="field-amount" />' }));
-const lookup = {
+const lookup = lookupOf({
 	contacts: [],
 	documentTypes: [],
 	tags: [],
 	fields: [],
 	spaces: [],
 	users: []
-} as unknown as Lookup;
+});
 
 /** The evidence of a field whose quote stands on `pages`. */
 function on(pages: number[]): FieldEvidence {
@@ -47,6 +47,16 @@ describe('a field with the pages of its quote', () => {
 		const eight = [1, 2, 3, 4, 5, 6, 7, 8];
 		const { rerender } = render(FieldShell, { ...props, evidence: on(eight) });
 		expect(chips()).toHaveLength(6);
+		// Who speaks to the page says what they read: a chip's name begins with it (WA-09).
+		const more = screen.getByRole('button', { name: m.source_more({ count: 2 }) });
+		const shown = chips().map((page) =>
+			screen.getByRole('button', { name: m.source_jump({ page }) })
+		);
+		for (const chip of [...shown, more]) {
+			const text = chip.textContent?.trim() ?? '';
+			expect(text).not.toBe('');
+			expect(chip.getAttribute('aria-label')?.startsWith(text)).toBe(true);
+		}
 		await user.click(screen.getByRole('button', { name: m.source_more({ count: 2 }) }));
 		expect(chips()).toHaveLength(8);
 		// Loaded again with the same pages: it stays open.

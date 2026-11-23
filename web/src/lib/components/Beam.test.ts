@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import { userEvent } from '@testing-library/user-event';
 import { toast } from 'svelte-sonner';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -7,12 +7,12 @@ import { fieldLabel } from '#lib/describe.ts';
 import { kindLabel } from '#lib/identifiers.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { documentOf, processingOf } from '#lib/testing/documents.ts';
-import { calls, fakeApi } from '#lib/testing/api.ts';
+import { calls, fakeApi, notFound, pdf } from '#lib/testing/api.ts';
 import { leaveBeam, openBeam, showPages } from '#lib/beam.svelte.ts';
 import { goTo, testPage } from '#lib/testing/page-state.svelte.ts';
 import Beam from './Beam.svelte';
 
-vi.mock('$app/navigation', () => ({ beforeNavigate: vi.fn(), goto: vi.fn() }));
+vi.mock('$app/navigation', () => import('#lib/testing/navigation.ts'));
 // pdf.js needs a worker and a canvas: the archive opens as two A4 pages that are never drawn.
 vi.mock('pdfjs-dist/legacy/build/pdf.mjs', () => ({
 	getDocument: () => ({
@@ -25,9 +25,7 @@ vi.mock('pdfjs-dist/legacy/build/pdf.mjs', () => ({
 	GlobalWorkerOptions: { workerSrc: '' }
 }));
 vi.mock('pdfjs-dist/legacy/build/pdf.worker.min.mjs?url', () => ({ default: 'worker.js' }));
-vi.mock('$app/state', async () => ({
-	page: (await import('#lib/testing/page-state.svelte.ts')).testPage
-}));
+vi.mock('$app/state', () => import('#lib/testing/app-state.ts'));
 
 const LIST = '/ui/documents?tag=t1';
 const BOX = { x: 0.1, y: 0.2, width: 0.3, height: 0.02 };
@@ -59,8 +57,8 @@ beforeEach(() => {
 					page_count: 2,
 					processing
 				}),
-			'GET /api/v1/documents/a/archive': () => new Response(new Uint8Array([37, 80, 68, 70])),
-			'GET /api/v1/documents/b': () => new Response(null, { status: 404 }),
+			'GET /api/v1/documents/a/archive': () => pdf(),
+			'GET /api/v1/documents/b': () => notFound('document', 'b'),
 			'GET /api/v1/contacts/c1': () => ({ id: 'c1', name: 'Stadtwerke' }),
 			'GET /api/v1/documents/a/review': () => ({
 				document: {},
@@ -135,7 +133,6 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-	vi.unstubAllGlobals();
 	vi.restoreAllMocks();
 	processing = processingOf();
 	goTo('/ui/inbox');
@@ -198,6 +195,10 @@ describe('Beam', () => {
 		await waitFor(() => expect(sheet.textContent).toContain('Stadtwerke · Rechnung'));
 		expect(sheet.textContent).toContain(m.beam_position({ current: 1, total: 2 }));
 		expect(await screen.findAllByRole('img', { name: /1|2/ })).toHaveLength(2);
+		// The Beam only shows: for the text it points a screen reader to the document view (WZ-08).
+		const pages = within(sheet).getByRole('document');
+		const hint = document.getElementById(pages.getAttribute('aria-describedby') ?? '');
+		expect(hint?.textContent).toBe(m.pages_text_hint_beam());
 		expect([...sheet.querySelectorAll('img')].map((image) => image.getAttribute('src'))).toEqual([
 			'/api/v1/documents/a/pages/1',
 			'/api/v1/documents/a/pages/2'
@@ -364,6 +365,31 @@ describe('Beam', () => {
 		const sheet = await screen.findByRole('dialog', { name: 'Stromrechnung März' });
 		expect(await screen.findByText(m.beam_meaning_only())).toBeTruthy();
 		expect(sheet.querySelectorAll('.ring-primary')).toHaveLength(0);
+	});
+
+	it('marks the same document anew for another source (WB-02)', async () => {
+		// The Beam lives across all pages: the document seen for one search showed the places
+		// of those words when another search, a rule or the inbox opened it again.
+		goTo(LIST, {}, { beam: { ...beam(0), source: { kind: 'search', words: 'Strom Rechnung' } } });
+		render(Beam);
+		const sheet = await screen.findByRole('dialog', { name: 'Stromrechnung März' });
+		await waitFor(() => expect(sheet.querySelectorAll('.ring-primary')).toHaveLength(2));
+
+		goTo(LIST, {}, { beam: { ...beam(0), source: { kind: 'search', words: 'Zahnarzt' } } });
+		expect(await screen.findByText(m.beam_meaning_only())).toBeTruthy();
+		await waitFor(() =>
+			expect(
+				screen.getByRole('dialog', { name: 'Stromrechnung März' }).querySelectorAll('.ring-primary')
+			).toHaveLength(0)
+		);
+
+		goTo('/ui/rules/r1/apply', {}, { beam: { ...beam(0), source: { kind: 'rule', rule: 'r1' } } });
+		await waitFor(() =>
+			expect(
+				screen.getByRole('dialog', { name: 'Stromrechnung März' }).querySelectorAll('.ring-primary')
+			).toHaveLength(3)
+		);
+		expect(screen.queryByText(m.beam_meaning_only())).toBeNull();
 	});
 
 	it('marks where the text conditions of a rule hit, each labelled once', async () => {

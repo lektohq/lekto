@@ -3,6 +3,7 @@
  * `documents`): which documents can be merged, and why one cannot. The API checks the same:
  * the caller edits every one, none is processed or a mail, and its pages are there to show.
  */
+import { formatNumber } from '#lib/i18n.ts';
 import type { components } from '#lib/api/schema.ts';
 import { m } from '#lib/paraglide/messages.js';
 
@@ -38,7 +39,7 @@ export function mergeBlocked(
 ): string | null {
 	if (all) return m.bulk_merge_single();
 	if (count < 2) return m.bulk_merge_two();
-	if (count > MAX_MERGED + 1) return m.bulk_merge_many({ count: String(MAX_MERGED + 1) });
+	if (count > MAX_MERGED + 1) return m.bulk_merge_many({ count: formatNumber(MAX_MERGED + 1) });
 	for (const document of chosen) {
 		const reason = mergeBlock(document);
 		if (reason) return m.bulk_merge_blocked({ title: document.title, reason });

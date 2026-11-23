@@ -5,13 +5,13 @@ const ROOMY = { maxlength: 200, max: 100 };
 
 describe('addChips', () => {
 	it('adds each line once, trimmed, and leaves out empty lines and known values', () => {
-		expect(addChips(['Nord AG'], ' Nord KV \n\n  \nnord ag\nNord KV', ROOMY)).toEqual({
-			values: ['Nord AG', 'Nord KV'],
+		expect(addChips(['Muster AG'], ' Muster KV \n\n  \nmuster ag\nMuster KV', ROOMY)).toEqual({
+			values: ['Muster AG', 'Muster KV'],
 			left: ''
 		});
 		expect(addChips([], '', ROOMY)).toEqual({ values: [], left: '' });
-		expect(addChips([], 'Meier, Müller & Partner', ROOMY).values).toEqual([
-			'Meier, Müller & Partner'
+		expect(addChips([], 'Mustermann, Muster & Partner', ROOMY).values).toEqual([
+			'Mustermann, Muster & Partner'
 		]);
 	});
 

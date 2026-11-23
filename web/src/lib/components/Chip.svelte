@@ -1,8 +1,12 @@
 <script lang="ts" module>
 	/** The ✕ of a removable chip: round inside the pill, its tap reaching beyond its edges on the
-	 * right and above and below (never over the name), so that a finger hits it on a phone. */
+	 * right and above and below, never over a name that is a target itself (a tag's name that
+	 * opens its path or a choice). */
 	export const CHIP_REMOVE =
 		'relative grid size-6 shrink-0 place-items-center rounded-full opacity-70 hover:bg-background hover:opacity-100 after:absolute after:-inset-y-2.5 after:-right-2.5 after:left-0';
+	/** On a phone it also reaches over the end of a name that is only text: 44 px wide, a
+	 * finger's (web/DESIGN.md, "Touch targets"). */
+	export const CHIP_REMOVE_BESIDE_TEXT = `${CHIP_REMOVE} max-sm:after:-left-2.5`;
 </script>
 
 <script lang="ts">
@@ -100,7 +104,12 @@
 		{@render icon?.()}
 		<span class="min-w-0 truncate">{@render children()}</span>
 		{#if onremove}
-			<button type="button" class={CHIP_REMOVE} aria-label={removeLabel} onclick={onremove}>
+			<button
+				type="button"
+				class={CHIP_REMOVE_BESIDE_TEXT}
+				aria-label={removeLabel}
+				onclick={onremove}
+			>
 				<X class="size-3.5" aria-hidden="true" />
 			</button>
 		{/if}

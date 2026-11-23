@@ -5,6 +5,7 @@
  */
 import type { components } from '#lib/api/schema.ts';
 import { m } from '#lib/paraglide/messages.js';
+import { own } from '#lib/utils.ts';
 
 export type Importance = components['schemas']['Importance'];
 export type FlagColor = components['schemas']['FlagColor'];
@@ -37,8 +38,9 @@ const FLAG_LABELS: Record<FlagColor, () => string> = {
 };
 
 export const importanceLabel = (value: string): string =>
-	IMPORTANCE_LABELS[value as Importance]?.() ?? value;
-export const flagLabel = (value: string): string => FLAG_LABELS[value as FlagColor]?.() ?? value;
+	own<() => string>(IMPORTANCE_LABELS, value)?.() ?? value;
+export const flagLabel = (value: string): string =>
+	own<() => string>(FLAG_LABELS, value)?.() ?? value;
 
 export const importanceOptions = () =>
 	IMPORTANCES.map((value) => ({ value, label: IMPORTANCE_LABELS[value]() }));

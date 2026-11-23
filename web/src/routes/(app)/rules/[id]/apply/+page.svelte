@@ -83,6 +83,9 @@
 	let previewError = $state<string | null>(null);
 	const chosen = new SvelteSet<string>();
 	const accepted = new SvelteSet<string>();
+	/** Documents one application takes at most (`max_documents` of the preview); null before
+	 * the first page. Beyond it nothing is chosen by itself: the rest goes in a further run. */
+	let limit = $state<number | null>(null);
 	let busy = $state(false);
 	let application = $state<Application | null>(null);
 	let summary = $state<JobsSummary | null>(null);
@@ -102,7 +105,8 @@
 	/** The groups folded away, by key. */
 	const folded = new SvelteSet<string>();
 	const allChosen = $derived(
-		plain.length > 0 && plain.every((item) => chosen.has(item.document_id))
+		plain.length > 0 &&
+			(plain.every((item) => chosen.has(item.document_id)) || (limit !== null && count >= limit))
 	);
 	const waiting = $derived(
 		application?.status === 'queued' && summary
@@ -124,7 +128,7 @@
 					rule = found;
 					// Only who may apply the rule gets its preview (the API refuses the others).
 					if (!canApplyRule(found, session.user, loaded.spaces)) {
-						loader.problem = m.error_forbidden();
+						loader.refuse(m.error_forbidden());
 						return;
 					}
 					if (following) void resume(following);
@@ -182,7 +186,9 @@
 			lookedAt += preview.looked_at;
 			total = preview.total;
 			items = [...items, ...preview.items];
-			for (const documentId of preselected(preview.items)) chosen.add(documentId);
+			limit = preview.max_documents;
+			const room = limit === null ? Infinity : limit - count;
+			for (const documentId of preselected(preview.items, room)) chosen.add(documentId);
 			cursor = preview.next_cursor;
 			complete = cursor === null;
 		} catch (error) {
@@ -215,11 +221,13 @@
 		if (!request) return;
 		busy = true;
 		try {
-			if (switchOn) await setEnabled(true);
 			const started = await unwrap(
 				api.POST('/api/v1/rules/{id}/apply', { params: { path: { id } }, body: request })
 			);
 			void goto(`?application=${started.id}`, { replace: true, reset: false });
+			// Switched on only once applying is taken: a refused application leaves the rule
+			// paused, as it was. One that is taken runs, whatever becomes of the switch.
+			if (switchOn) await setEnabled(true).catch(reportError);
 			busy = false;
 			await track(started);
 		} catch (error) {
@@ -311,8 +319,16 @@
 	}
 
 	function chooseAll(on: boolean) {
-		if (on) for (const item of plain) chosen.add(item.document_id);
-		else {
+		if (on) {
+			// As many as one application takes.
+			let room = limit === null ? Infinity : limit - count;
+			for (const item of plain) {
+				if (chosen.has(item.document_id)) continue;
+				if (room <= 0) break;
+				chosen.add(item.document_id);
+				room -= 1;
+			}
+		} else {
 			chosen.clear();
 			accepted.clear();
 		}
@@ -342,6 +358,7 @@
 		{total}
 		loaded={items.length}
 		conflicts={items.length - plain.length}
+		{limit}
 		loading={loadingAll}
 		{complete}
 		offerSwitchOn={changeable && rule?.enabled === false}
@@ -360,13 +377,16 @@
 <div class="flex flex-col gap-6">
 	<PageHeader
 		title={rule ? m.rule_apply_title({ name: rule.name }) : m.rule_apply_generic()}
-		back={{ href: `${BASE}/rules/${id}`, label: rule?.name ?? m.nav_rules() }}
+		back={{
+			href: rule ? `${BASE}/rules/${id}` : `${BASE}/rules`,
+			label: rule?.name ?? m.nav_rules()
+		}}
 		actions={changeable ? switcher : undefined}
 		subtitle={saved ? m.rule_saved_hint() : m.rule_apply_hint()}
 	/>
 
 	{#if problem}
-		<LoadProblem {problem} onretry={() => loader.retry()} />
+		<LoadProblem {problem} onretry={loader.onretry} />
 	{:else if !rule}
 		<Loading />
 	{:else}

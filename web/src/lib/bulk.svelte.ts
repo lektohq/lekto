@@ -10,6 +10,7 @@ import { unwrap } from '#lib/api/call.ts';
 import type { components } from '#lib/api/schema.ts';
 import type { apiQuery } from '#lib/filters.ts';
 import { bulkResult } from '#lib/bulk.ts';
+import { isPassing, reportError } from '#lib/errors.ts';
 import { formatNumber } from '#lib/i18n.ts';
 import { m } from '#lib/paraglide/messages.js';
 
@@ -30,8 +31,11 @@ export const POLL = 1000;
 export class BulkRun {
 	/** The operation while it runs; null between actions. */
 	operation = $state<BulkOperation | null>(null);
-	/** The finished operation whose skipped documents are shown ("Details" of its toast). */
+	/** The finished operation whose skipped documents are shown ("Details"). */
 	skipped = $state<BulkOperation | null>(null);
+	/** The last action that skipped documents, until the next one starts: the bar keeps its
+	 * "Details", since the toast that offers them is gone after a few seconds. */
+	last = $state<BulkOperation | null>(null);
 	#stopped = false;
 	#timer: ReturnType<typeof setTimeout> | undefined;
 	#ondone: () => void;
@@ -56,6 +60,7 @@ export class BulkRun {
 			})
 		);
 		if (this.#stopped) return;
+		this.last = null;
 		this.operation = operation;
 		this.#follow(operation.id);
 	}
@@ -79,8 +84,17 @@ export class BulkRun {
 					this.#finish(operation);
 					return;
 				}
-			} catch {
-				// A hiccup of the connection: ask again.
+			} catch (error) {
+				// A hiccup of the connection or the server restarting: ask again. What the API
+				// refuses (the operation is gone, the session another's) it refuses every time:
+				// say so and end, the list shows what became of the documents.
+				if (!isPassing(error)) {
+					if (this.#stopped) return;
+					this.operation = null;
+					reportError(error);
+					this.#ondone();
+					return;
+				}
 			}
 			if (!this.#stopped) this.#follow(id);
 		}, POLL);
@@ -88,6 +102,7 @@ export class BulkRun {
 
 	#finish(operation: BulkOperation): void {
 		this.operation = null;
+		this.last = operation.skipped.length > 0 ? operation : null;
 		const result = bulkResult(operation);
 		if (operation.status === 'failed') {
 			toast.error(m.bulk_failed(), { description: result });

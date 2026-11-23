@@ -13,10 +13,12 @@ import {
 	type MailField,
 	type MailOperator
 } from '#lib/mail-traits.ts';
-import { quoted } from '#lib/i18n.ts';
+import { quoted, formatNumber } from '#lib/i18n.ts';
 import { folderLabel } from '#lib/mailboxes.ts';
 import { m } from '#lib/paraglide/messages.js';
+import { own } from '#lib/utils.ts';
 import { mailOperatorLabel } from '#lib/rules/describe.ts';
+import { keyInTree, partsOf, type Places } from '#lib/rules/errors.ts';
 import { DEFAULT_PRIORITY, LIMITS } from '#lib/rules/model.ts';
 import {
 	conditionsOf,
@@ -73,6 +75,8 @@ export const STEP_ACTIONS: readonly MailAction[] = [
 ];
 export const ENDING: readonly MailAction[] = ['move', 'trash'];
 export const MAX_STEPS = 10;
+/** The longest value a condition on a mail compares with (`MailConditionBody.value`). */
+export const MAIL_VALUE_MAX = 1000;
 
 export const FIELD_LABELS = MAIL_FIELD_LABELS;
 
@@ -265,7 +269,7 @@ export function validate(form: MailRuleForm, spaces?: readonly Space[]): Record<
 	const name = form.name.trim();
 	if (name === '') problems.name = m.rule_error_name();
 	else if (name.length > LIMITS.name) {
-		problems.name = m.rule_error_text_long({ max: LIMITS.name });
+		problems.name = m.rule_error_text_long({ max: formatNumber(LIMITS.name) });
 	}
 	const priority = Number(form.priority);
 	if (
@@ -297,7 +301,7 @@ export function validate(form: MailRuleForm, spaces?: readonly Space[]): Record<
 		} else if (value === '') {
 			problems[item.key] = m.rule_error_value();
 		} else if (item.field !== 'folder' && value.length > LIMITS.text) {
-			problems[item.key] = m.rule_error_text_long({ max: LIMITS.text });
+			problems[item.key] = m.rule_error_text_long({ max: formatNumber(LIMITS.text) });
 		}
 	}
 	for (const step of form.steps) {
@@ -305,6 +309,28 @@ export function validate(form: MailRuleForm, spaces?: readonly Space[]): Record<
 		if (problem) problems[step.key] = problem;
 	}
 	return problems;
+}
+
+/** Where the places the API names for a mail rule lie in its form, for the errors of a save
+ * (`rules/errors.ts`): the key of the field, the condition, the group or the step. */
+export function mailRulePlaces(form: MailRuleForm): Places {
+	const fields: Record<string, string> = {
+		name: 'name',
+		priority: 'priority',
+		mailbox_id: 'mailbox',
+		user_id: 'user',
+		space_id: 'space'
+	};
+	return {
+		heads: [...Object.keys(fields), 'text_type_id', 'conditions', 'after'],
+		keyAt(path) {
+			const [head, ...rest] = partsOf(path);
+			const field = own(fields, head);
+			if (field) return field;
+			if (head === 'after') return form.steps[Number(rest[0])]?.key ?? null;
+			return head === 'conditions' ? keyInTree(rest, form.conditions) : null;
+		}
+	};
 }
 
 /** Whether the form can be saved. */
@@ -331,7 +357,7 @@ function body(form: MailRuleForm) {
 
 /** "1 Mail", "12 Mails". */
 export const mailsCount = (count: number): string =>
-	count === 1 ? m.mail_rule_mails_one() : m.mail_rule_mails({ count });
+	count === 1 ? m.mail_rule_mails_one() : m.mail_rule_mails({ count: formatNumber(count) });
 
 /** A stored rule as the dry run takes it, in place of itself (`rule_id`). */
 export function dryRunBody(rule: MailRule): MailRuleDryRun {

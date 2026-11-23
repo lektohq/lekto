@@ -9,6 +9,7 @@
 	import Check from '@lucide/svelte/icons/check';
 	import ChevronDown from '@lucide/svelte/icons/chevron-down';
 	import { Select as SelectPrimitive } from 'bits-ui';
+	import { tick } from 'svelte';
 	import { phone } from '#lib/phone.svelte.ts';
 	import { cn } from '#lib/utils.ts';
 	import { FIELD as FIELD_LOOK, FIELD_HEIGHT } from '#lib/components/ui/field-look.ts';
@@ -16,6 +17,10 @@
 	// A choice from a short, fixed list, styled like the inputs. On a phone the system's own
 	// picker (the most comfortable with a thumb, Tobi 20.10.2026); wider, a list in the look of
 	// the other pickers, by keyboard too (arrows, typing the first letters, Enter).
+	//
+	// The field shows `value`, never a choice of its own: a caller that saves a choice at once
+	// (`bind:value` with a getter and a setter) may refuse it, and the field then stands at
+	// what is stored, ready for the same choice again.
 	let {
 		value = $bindable(''),
 		options,
@@ -24,6 +29,7 @@
 		disabled = false,
 		'aria-label': ariaLabel,
 		'aria-invalid': ariaInvalid,
+		'aria-describedby': ariaDescribedby,
 		onchange
 	}: {
 		value?: string;
@@ -33,22 +39,40 @@
 		disabled?: boolean;
 		'aria-label'?: string;
 		'aria-invalid'?: boolean;
+		/** The id of what says more about it: the error below it. */
+		'aria-describedby'?: string;
 		/** Called with the new value when the user picks one. */
 		onchange?: (value: string) => void;
 	} = $props();
 
 	const FIELD = cn(FIELD_LOOK, FIELD_HEIGHT);
+	// The field controls its list, and the list carries the field's name: given here, or the
+	// field itself where a visible label names it (WCAG 4.1.2). bits-ui sets neither.
+	const uid = $props.id();
+	const fieldId = $derived(id ?? `${uid}-field`);
+	const listId = `${uid}-list`;
+	let system = $state<HTMLSelectElement | null>(null);
+
+	function picked(next: string) {
+		value = next;
+		onchange?.(next);
+		// The system's select keeps what was picked; where the caller did not take it, back.
+		void tick().then(() => {
+			if (system && system.value !== value) system.value = value;
+		});
+	}
 	const shown = $derived(options.find((option) => option.value === value)?.label ?? '');
 </script>
 
 {#if phone.current}
 	<select
 		{id}
-		bind:value
+		bind:this={system}
+		bind:value={() => value, picked}
 		{disabled}
 		aria-label={ariaLabel}
 		aria-invalid={ariaInvalid}
-		onchange={(event) => onchange?.(event.currentTarget.value)}
+		aria-describedby={ariaDescribedby}
 		class={cn(FIELD, className, 'max-sm:h-11')}
 	>
 		{#each options as option (option.value)}
@@ -58,21 +82,19 @@
 {:else}
 	<SelectPrimitive.Root
 		type="single"
-		{value}
+		bind:value={() => value, picked}
 		{disabled}
 		items={[...options]}
-		onValueChange={(next) => {
-			value = next;
-			onchange?.(next);
-		}}
 	>
 		<!-- A combobox as the native select is one: named by its label, its value read out. -->
 		<SelectPrimitive.Trigger
-			{id}
+			id={fieldId}
 			role="combobox"
+			aria-controls={listId}
 			data-value={value}
 			aria-label={ariaLabel}
 			aria-invalid={ariaInvalid}
+			aria-describedby={ariaDescribedby}
 			class={cn(FIELD, 'flex items-center gap-2 text-left', className)}
 		>
 			<span class="min-w-0 flex-1 truncate">{shown}</span>
@@ -80,6 +102,9 @@
 		</SelectPrimitive.Trigger>
 		<SelectPrimitive.Portal>
 			<SelectPrimitive.Content
+				id={listId}
+				aria-label={ariaLabel}
+				aria-labelledby={ariaLabel ? undefined : fieldId}
 				sideOffset={4}
 				class="z-50 max-h-(--bits-select-content-available-height) min-w-(--bits-select-anchor-width) overflow-y-auto rounded-lg bg-popover p-1 text-popover-foreground shadow-md ring-1 ring-foreground/10 outline-hidden data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0"
 			>

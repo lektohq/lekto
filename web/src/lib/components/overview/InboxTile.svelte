@@ -5,10 +5,12 @@
 	import TriangleAlert from '@lucide/svelte/icons/triangle-exclamation-point';
 	import type { Component } from 'svelte';
 	import { BASE } from '#lib/base.ts';
+	import LoadProblem from '#lib/components/LoadProblem.svelte';
 	import Figure from '#lib/components/overview/Figure.svelte';
 	import Tile from '#lib/components/overview/Tile.svelte';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
+	import { describeError } from '#lib/errors.ts';
 	import { formatNumber } from '#lib/i18n.ts';
 	import { inbox } from '#lib/inbox.svelte.ts';
 	import { m } from '#lib/paraglide/messages.js';
@@ -38,7 +40,12 @@
 {/snippet}
 
 <Tile title={m.nav_inbox()} icon={InboxIcon} {href} go={m.overview_inbox_go()}>
-	{#if !summary}
+	{#if !summary && inbox.failure !== null}
+		<!-- Above the tile's link, as the tile "System" shows its problem. -->
+		<div class="relative z-10">
+			<LoadProblem problem={describeError(inbox.failure)} onretry={() => void inbox.refresh()} />
+		</div>
+	{:else if !summary}
 		<Skeleton class="h-9 w-24" />
 	{:else}
 		<Figure count={summary.open} label={m.overview_open()} />

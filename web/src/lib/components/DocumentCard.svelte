@@ -12,7 +12,7 @@
 	import { shownChips } from '#lib/tags.ts';
 	import TypeIcon from '#lib/components/TypeIcon.svelte';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
-	import { formatDate } from '#lib/i18n.ts';
+	import { formatDate, formatNumber } from '#lib/i18n.ts';
 	import { documentParts, type Lookup } from '#lib/masterdata.svelte.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import { session } from '#lib/session.svelte.ts';
@@ -112,7 +112,7 @@
 					<span
 						class="mark-glass absolute right-2 bottom-2 rounded-full bg-card/80 px-1.5 text-micro leading-[1.125rem] font-medium tabular-nums"
 					>
-						{m.doc_pages_short({ count: document.page_count })}
+						{m.doc_pages_short({ count: formatNumber(document.page_count) })}
 					</span>
 				{/if}
 			</div>

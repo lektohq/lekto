@@ -8,7 +8,6 @@ import {
 	pathLabel,
 	SEPARATOR,
 	shownChips,
-	tagOptions,
 	visibleRows
 } from './tags.ts';
 
@@ -41,10 +40,6 @@ describe('tags as trees', () => {
 	it('label a tag with its path and pick by scope', () => {
 		expect(pathLabel(TAGS[4])).toBe(['Insurance', 'Health', 'Dental'].join(SEPARATOR));
 		expect(ofScope(TAGS, 'contact').map((entry) => entry.id)).toEqual(['insurer']);
-		expect(tagOptions(TAGS, 'document')[2]).toEqual({
-			value: 'car',
-			label: `Insurance${SEPARATOR}Car`
-		});
 	});
 
 	it('find a tag by the name of a tag above it', () => {

@@ -29,6 +29,7 @@ describe('filters in the URL', () => {
 			field: 'f1',
 			dateFrom: '2026-09-01',
 			dateTo: '2026-09-30',
+			period: null,
 			facts: ['invoice_number:4711:refers', '::own']
 		});
 		// The archive has no lanes; an older link's lane narrows nothing.
@@ -59,6 +60,25 @@ describe('filters in the URL', () => {
 		expect(apiQuery(filters).all_users).toBeUndefined();
 	});
 
+	it('takes a value given twice once, in the order it first came', () => {
+		const params = new URLSearchParams(
+			'contact=c1&contact=c2&contact=c1&tag=t1&tag=t1&type=y1&type=y1&space=s1&space=s1' +
+				'&contact_group=g1&contact_group=g1&type_group=h1&type_group=h1&topic=o1&topic=o1' +
+				'&fact=iban%3Ar1%3A&fact=iban%3Ar1%3A'
+		);
+		expect(parseFilters(params)).toEqual({
+			...NO_FILTERS,
+			contacts: ['c1', 'c2'],
+			tags: ['t1'],
+			types: ['y1'],
+			spaces: ['s1'],
+			contactGroups: ['g1'],
+			typeGroups: ['h1'],
+			topics: ['o1'],
+			facts: ['iban:r1:']
+		});
+	});
+
 	it('leaves out what is not set, and a day that is none', () => {
 		expect(writeFilters(new URLSearchParams(), NO_FILTERS).toString()).toBe('');
 		expect(apiQuery(NO_FILTERS)).toEqual({
@@ -87,6 +107,40 @@ describe('filters in the URL', () => {
 		expect(isFiltered({ ...NO_FILTERS, typeGroups: ['g1'] })).toBe(true);
 		expect(isFiltered({ ...NO_FILTERS, topics: ['p1'] })).toBe(true);
 		expect(isFiltered({ ...NO_FILTERS, dateTo: '2026-01-01' })).toBe(true);
+	});
+
+	it('reads a quick pick as its days of today, and writes it by its name (WG-03)', () => {
+		const today = new Date(2026, 10, 21);
+		const read = parseFilters(new URLSearchParams('period=last_year'), today);
+		expect(read).toMatchObject({
+			dateFrom: '2025-01-01',
+			dateTo: '2025-12-31',
+			period: 'last_year'
+		});
+		// It moves with the day: the same address a year later.
+		expect(
+			parseFilters(new URLSearchParams('period=last_year'), new Date(2027, 0, 1))
+		).toMatchObject({ dateFrom: '2026-01-01', dateTo: '2026-12-31' });
+		expect(writeFilters(new URLSearchParams('date_from=2020-01-01'), read).toString()).toBe(
+			'period=last_year'
+		);
+		// The same days chosen as such stay days.
+		const days = parseFilters(
+			new URLSearchParams('date_from=2025-01-01&date_to=2025-12-31'),
+			today
+		);
+		expect(days.period).toBeNull();
+		expect(writeFilters(new URLSearchParams('period=last_year'), days).toString()).toBe(
+			'date_from=2025-01-01&date_to=2025-12-31'
+		);
+		// The quick pick counts before days beside it; an unknown one is none.
+		expect(
+			parseFilters(new URLSearchParams('period=this_year&date_from=2020-01-01'), today).dateFrom
+		).toBe('2026-01-01');
+		expect(parseFilters(new URLSearchParams('period=next_year'), today)).toMatchObject({
+			dateFrom: null,
+			period: null
+		});
 	});
 });
 

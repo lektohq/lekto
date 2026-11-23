@@ -19,7 +19,9 @@
 		onchange,
 		label,
 		invalid = false,
-		id
+		id,
+		max,
+		full
 	}: {
 		options: readonly PickerOption[];
 		selected: readonly string[];
@@ -27,6 +29,10 @@
 		label: string;
 		invalid?: boolean;
 		id?: string;
+		/** The most values the API takes: once chosen, the others cannot be. */
+		max?: number;
+		/** What says so then ("Höchstens 20 Ordner."). */
+		full?: string;
 	} = $props();
 
 	let query = $state('');
@@ -36,6 +42,7 @@
 	const chips = $derived([...new Set(selected)]);
 	const words = $derived(searchWords(query));
 	const shown = $derived(options.filter((option) => matchesWords(option.label, words)));
+	const reached = $derived(max !== undefined && chips.length >= max);
 
 	function toggle(value: string, on: boolean) {
 		onchange(toggled(selected, value, on));
@@ -61,6 +68,7 @@
 			<span class="px-1 text-sm text-muted-foreground">{m.rule_nothing_chosen()}</span>
 		{/each}
 	</div>
+	{#if reached && full}<p class="px-1 text-xs text-muted-foreground">{full}</p>{/if}
 	{#if options.length > 6}
 		<SearchField bind:value={query} label={m.rule_filter()} />
 	{/if}
@@ -68,10 +76,11 @@
 		{#each shown as option (option.value)}
 			<li>
 				<label
-					class="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-secondary max-sm:min-h-11"
+					class="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-secondary has-disabled:cursor-not-allowed has-disabled:text-muted-foreground has-disabled:hover:bg-transparent max-sm:min-h-11"
 				>
 					<ChoiceBox
 						checked={selected.includes(option.value)}
+						disabled={reached && !selected.includes(option.value)}
 						onchange={(event) => toggle(option.value, event.currentTarget.checked)}
 					/>
 					{option.label}

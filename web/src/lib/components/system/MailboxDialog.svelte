@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import PlugZap from '@lucide/svelte/icons/plug-zap';
 	import RefreshCw from '@lucide/svelte/icons/refresh-cw';
 	import { toast } from 'svelte-sonner';
@@ -16,7 +17,7 @@
 	import { Input } from '#lib/components/ui/input/index.ts';
 	import { describeError, reportError } from '#lib/errors.ts';
 	import { isoDayLocal } from '#lib/dates.ts';
-	import { formatDate } from '#lib/i18n.ts';
+	import { formatDate, formatNumber } from '#lib/i18n.ts';
 	import {
 		complete,
 		createBody,
@@ -73,13 +74,20 @@
 		mailbox ? m.mailbox_edit_title({ name: mailbox.name }) : m.mailbox_new_title()
 	);
 
+	// The form starts when the dialog opens, and for another mailbox. The page behind it reads
+	// its mailbox anew after every fetch and every reconnect of the event stream: that is the
+	// same mailbox as a new object, and must not empty what is being typed.
+	const mailboxId = $derived(mailbox?.id ?? null);
 	$effect(() => {
+		void mailboxId;
 		if (!open) return;
-		form = formOf(mailbox);
-		part = 'connection';
-		tested = null;
-		testProblem = null;
-		void loadChoices();
+		untrack(() => {
+			form = formOf(mailbox);
+			part = 'connection';
+			tested = null;
+			testProblem = null;
+			void loadChoices();
+		});
 	});
 
 	/** The people and types the part "Abruf" chooses from; a failure shows there. */
@@ -311,7 +319,7 @@
 					<span class="text-destructive">{reasonText(tested.error)}</span>
 				{:else if tested}
 					<span class="text-lane-green-foreground"
-						>{m.mail_test_ok({ count: tested.folders.length })}</span
+						>{m.mail_test_ok({ count: formatNumber(tested.folders.length) })}</span
 					>
 					{#if !tested.own_keywords}
 						<span class="text-muted-foreground">{m.mail_test_no_own_keywords()}</span>
@@ -332,6 +340,8 @@
 				options={folders}
 				selected={form.folders}
 				onchange={(chosen) => (form.folders = chosen)}
+				max={LIMITS.folders}
+				full={m.mail_folders_max({ max: formatNumber(LIMITS.folders) })}
 			/>
 		</Field.Field>
 		<div class="grid gap-4 sm:grid-cols-2">

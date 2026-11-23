@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { scrollBehavior } from '#lib/motion.ts';
 	import * as Alert from '#lib/components/ui/alert/index.ts';
 	import LayoutGrid from '@lucide/svelte/icons/layout-grid';
 	import PanelLeftClose from '@lucide/svelte/icons/panel-left-close';
@@ -13,8 +14,10 @@
 	import { onDestroy, onMount, tick, untrack } from 'svelte';
 	import { MediaQuery, SvelteMap } from 'svelte/reactivity';
 	import { toast } from 'svelte-sonner';
+	import { beforeNavigate } from '$app/navigation';
 	import { page } from '$app/state';
 	import { api } from '#lib/api/client.ts';
+	import { keepClear } from '#lib/clear-room.svelte.ts';
 	import { unwrap } from '#lib/api/call.ts';
 	import { ApiError } from '#lib/api/problem.ts';
 	import type { components } from '#lib/api/schema.ts';
@@ -48,6 +51,7 @@
 	import { coalesced } from '#lib/coalesce.ts';
 	import { describeError } from '#lib/errors.ts';
 	import { events } from '#lib/events.svelte.ts';
+	import { listRefresh } from '#lib/list-events.ts';
 	import {
 		NO_FILTERS,
 		apiQuery,
@@ -94,6 +98,7 @@
 	} from '#lib/listing.ts';
 	import { PageLookup } from '#lib/lookup.svelte.ts';
 	import { openLens } from '#lib/open-lens.svelte.ts';
+	import { ListPlace, type Place } from '#lib/list-place.svelte.ts';
 	import { Pager } from '#lib/paging.svelte.ts';
 	import { rememberedPageSize } from '#lib/page-size.ts';
 	import Pagination from '#lib/components/Pagination.svelte';
@@ -184,7 +189,7 @@
 	let editorOpen = $state(false);
 	let editing = $state<Lens | null>(null);
 	const draft = $derived<LensDraft>({
-		filter: lensFilter(filters, today),
+		filter: lensFilter(filters),
 		query: query || null,
 		sort: params.has('sort') ? (sort as LensSort) : null,
 		sortField,
@@ -572,6 +577,18 @@
 		});
 	});
 
+	// Back from a document one stands where one stood (`lib/list-place.svelte.ts`): the back
+	// button brings the place in the snapshot, the document's way back in its history entry.
+	const place = new ListPlace();
+	export const snapshot = {
+		capture: (): Place => ({ y: window.scrollY }),
+		restore: (kept: Place) => place.want(kept)
+	};
+	beforeNavigate(() => returnTo.rememberPlace('documents', { y: window.scrollY }));
+	$effect(() => {
+		if (place.wanted && list.loaded && !list.loading) void place.reach();
+	});
+
 	// Again when an admin switches the reach: the spaces of the filter follow it.
 	onChange(
 		() => scope.allUsers,
@@ -582,10 +599,11 @@
 	);
 
 	onMount(() => {
+		place.want(page.state.place);
 		// Opened without filters, words or a lens: the filters this browser last set apply, in
 		// the URL as if the link had brought them. A link's own filters, its words and a lens go
 		// first; within the page (a chip removed, "All documents" from a lens) nothing applies.
-		const remembered = rememberedFilters();
+		const remembered = rememberedFilters(session.user?.id);
 		const plain = !isFiltered(filters) && !searching && selected.length === 0;
 		if (remembered && plain && !params.has('lens')) {
 			const next = writeFilters(new URLSearchParams(page.url.search), remembered);
@@ -598,14 +616,25 @@
 		// from it on another page, the field takes the focus at once.
 		const withdrawSearch = offerPageSearch(showSearch);
 		if (location.hash === '#search') void tick().then(showSearch);
-		// Events are thin: fetch the list again, at most once in a while.
+		// Events are thin: fetch the list again, at most once in a while. Its numbers (the
+		// count, the facets, the lenses, the stream) only for an event that may change them; a
+		// step of a document being processed reads the rows alone, and only if the page shows
+		// that document (`lib/list-events.ts`).
+		let numbers = false;
 		const refresh = coalesced(() => {
 			void list.refresh();
+			if (!numbers) return;
+			numbers = false;
 			void loadFacets();
 			void loadLensCounts();
 			streamVersion += 1;
 		}, 400);
-		const stop = events.subscribe(refresh);
+		const stop = events.subscribe((event) => {
+			const wanted = listRefresh(event, (id) => list.items.some((item) => item.document.id === id));
+			if (wanted === 'none') return;
+			if (wanted === 'all') numbers = true;
+			refresh();
+		});
 		const stopMeaning = events.on('search.meaning_ready', (event) =>
 			searchNote.meaningReady(String(event.query ?? ''))
 		);
@@ -628,11 +657,11 @@
 	// a link set it; within a lens the filters are the lens's. None (a reset, the last chip
 	// removed) forgets them, in `change`.
 	$effect(() => {
-		if (isFiltered(filters) && !params.has('lens')) rememberFilters(filters);
+		if (isFiltered(filters) && !params.has('lens')) rememberFilters(filters, session.user?.id);
 	});
 
 	function change(next: Filters) {
-		if (!params.has('lens')) rememberFilters(next);
+		if (!params.has('lens')) rememberFilters(next, session.user?.id);
 		go(writeFilters(new URLSearchParams(page.url.search), next));
 	}
 
@@ -740,6 +769,10 @@
 					? HEADER
 					: HEADER + toolRowHeight
 	);
+	// What the keyboard reaches is scrolled clear of all that sticks at the top: the header,
+	// the tools or the selection bar, and the title of a group (`lib/clear-room.svelte.ts`).
+	const GROUP_TITLE = 40;
+	$effect(() => keepClear('top', groupTop + GROUP_TITLE));
 
 	function scrolled() {
 		// The band once the head of the page (title, count, lenses) has gone below the header:
@@ -763,8 +796,7 @@
 		if (!field) return;
 		rowAside = { hidden: false, anchor: window.scrollY };
 		if (desktop.current && window.scrollY > 0) {
-			const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-			window.scrollTo({ top: 0, behavior: still ? 'auto' : 'smooth' });
+			window.scrollTo({ top: 0, behavior: scrollBehavior() });
 		}
 		field.focus({ preventScroll: true });
 	}
@@ -893,41 +925,12 @@ row of filters, on a desktop narrow by the title. -->
 	<!-- From the desktop on (web/DESIGN.md, "Sticky heads"): once the head of the page has gone
 	below the header, a band behind the line below it, across the list. The tools beside the title stay on that
 	line; while the selection bar owns it, they scroll away with the title. Neither takes room. -->
-	<div class="sticky top-16 z-20 -mb-6 hidden h-0 lg:block" aria-hidden="true">
+	<div class="sticky top-16 z-20 -order-2 -mb-6 hidden h-0 lg:block" aria-hidden="true">
 		<div
 			class={['absolute right-0 border-b bg-background', collapsed ? 'left-0' : 'left-80']}
 			class:invisible={!moved}
 			style:height={`${barOnTop ? groupTop - HEADER : HEADER - 8}px`}
 		></div>
-	</div>
-	<div class={['z-30 -mb-6 hidden h-0 lg:block', barOnTop ? 'relative' : 'sticky top-18']}>
-		<div
-			bind:clientWidth={toolsWidth}
-			class="absolute top-0 right-0 flex items-center gap-2 bg-background pl-3"
-		>
-			{#if !streaming}{@render sortMenu(!roomy.current)}{@render selectButton(false)}{/if}
-			<Segmented
-				names="hidden"
-				label={m.layout_label()}
-				value={layout}
-				options={[
-					{ value: 'grid', label: m.layout_grid(), icon: LayoutGrid },
-					{ value: 'list', label: m.layout_list(), icon: List },
-					{ value: 'stream', label: m.layout_stream(), icon: Waypoints }
-				]}
-				onchange={(next) => show(next as Layout)}
-			/>
-			{#if lens && lookup && roomy.current}
-				<Button variant="outline" onclick={() => edit(lens)}>
-					<Pencil aria-hidden="true" />
-					{m.lens_edit()}
-				</Button>
-			{:else if lens && lookup}
-				<IconButton variant="outline" label={m.lens_edit()} onclick={() => edit(lens)}>
-					<Pencil aria-hidden="true" />
-				</IconButton>
-			{/if}
-		</div>
 	</div>
 	<div bind:this={pageHead} class="flex flex-col gap-3" style:--tools-width={`${toolsWidth}px`}>
 		<!-- As high as the head of every other page (`PageHeader`); on a desktop the tools above
@@ -996,6 +999,39 @@ row of filters, on a desktop narrow by the title. -->
 		</div>
 		<div class={[!collapsed && 'lg:hidden']}>
 			{@render lensLinks('chips')}
+		</div>
+	</div>
+
+	<!-- The tools of a desktop. In the document they follow the title and the search, so that
+	Tab and a screen reader reach them in that order; on the page they stand before the head
+	(`-order-1`), where their holder of no height sticks to the line below the header. -->
+	<div class={['z-30 -order-1 -mb-6 hidden h-0 lg:block', barOnTop ? 'relative' : 'sticky top-18']}>
+		<div
+			bind:clientWidth={toolsWidth}
+			class="absolute top-0 right-0 flex items-center gap-2 bg-background pl-3"
+		>
+			{#if !streaming}{@render sortMenu(!roomy.current)}{@render selectButton(false)}{/if}
+			<Segmented
+				names="hidden"
+				label={m.layout_label()}
+				value={layout}
+				options={[
+					{ value: 'grid', label: m.layout_grid(), icon: LayoutGrid },
+					{ value: 'list', label: m.layout_list(), icon: List },
+					{ value: 'stream', label: m.layout_stream(), icon: Waypoints }
+				]}
+				onchange={(next) => show(next as Layout)}
+			/>
+			{#if lens && lookup && roomy.current}
+				<Button variant="outline" onclick={() => edit(lens)}>
+					<Pencil aria-hidden="true" />
+					{m.lens_edit()}
+				</Button>
+			{:else if lens && lookup}
+				<IconButton variant="outline" label={m.lens_edit()} onclick={() => edit(lens)}>
+					<Pencil aria-hidden="true" />
+				</IconButton>
+			{/if}
 		</div>
 	</div>
 
@@ -1180,14 +1216,18 @@ row of filters, on a desktop narrow by the title. -->
 				</LoadProblem>
 			{:else if list.empty}
 				<!-- The owl only before the first document (web/DESIGN.md, "Logo and owl"). -->
-				<EmptyNote mascot={!isFiltered(filters) && !searching}>
+				<!-- A selection from a link that finds nothing is no empty archive either. -->
+				{@const first = !isFiltered(filters) && !searching && selected.length === 0}
+				<EmptyNote mascot={first}>
 					{isFiltered(filters)
 						? m.documents_none_filtered()
 						: searching
 							? m.search_none()
-							: m.documents_none()}
+							: selected.length > 0
+								? m.documents_none_selected()
+								: m.documents_none()}
 					{#snippet action()}
-						{#if !isFiltered(filters) && !searching}
+						{#if first}
 							<!-- Documents come in through the inbox, the one place to upload. -->
 							<a href="{BASE}/inbox" class={cn(buttonVariants({ variant: 'outline' }))}>
 								<Upload aria-hidden="true" />

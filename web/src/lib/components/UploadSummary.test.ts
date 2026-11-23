@@ -2,8 +2,9 @@ import { render, screen, waitFor, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { m } from '#lib/paraglide/messages.js';
+import { signIn } from '#lib/testing/session.ts';
 import { session } from '#lib/session.svelte.ts';
-import { json } from '#lib/testing/api.ts';
+import { fakeApi, json, problem } from '#lib/testing/api.ts';
 import { uploads } from '#lib/upload.svelte.ts';
 import UploadSummary from './UploadSummary.svelte';
 
@@ -13,18 +14,12 @@ const pdf = (name: string) => ({
 });
 
 beforeEach(() => {
-	session.start({
-		user: { id: 'user-1', username: 'tobi', role: 'user' },
-		method: 'password',
-		expires_at: '2026-10-18T12:00:00Z',
-		csrf_token: 'token'
-	});
+	signIn('user', { id: 'user-1' });
 });
 
 afterEach(() => {
 	uploads.reset();
 	session.clear();
-	vi.unstubAllGlobals();
 });
 
 describe('UploadSummary', () => {
@@ -32,10 +27,7 @@ describe('UploadSummary', () => {
 		const answers = [
 			json({ id: 'doc-1' }, 202),
 			json({ id: 'doc-2' }, 202),
-			json(
-				{ type: 'about:blank', title: 'Conflict', status: 409, existing_document_id: 'doc-old' },
-				409
-			)
+			problem(409, { existing_document_id: 'doc-old' })
 		];
 		vi.stubGlobal(
 			'fetch',
@@ -78,6 +70,25 @@ describe('UploadSummary', () => {
 		expect(screen.getByRole('region', { name: m.upload_summary_label() })).toBeTruthy();
 		await userEvent.click(within(summary).getByRole('button', { name: m.upload_dismiss() }));
 		expect(screen.queryByRole('region', { name: m.upload_summary_label() })).toBeNull();
+	});
+
+	it('leads a failed shared file back to its share, to try again (WM-06)', async () => {
+		vi.stubGlobal(
+			'fetch',
+			fakeApi({ 'POST /api/v1/documents': () => problem(503, { detail: 'later' }) })
+		);
+		render(UploadSummary);
+		uploads.add({ files: [pdf('shared.pdf')], skipped: [] }, { again: '/ui/share?id=12345' });
+		uploads.add({ files: [pdf('dropped.pdf')], skipped: [] });
+		const summary = await screen.findByRole('region', { name: m.upload_summary_label() });
+		await waitFor(() => expect(uploads.active).toBe(false));
+		const shared = within(summary).getByText('shared.pdf').closest('li')!;
+		expect(within(shared).getByRole('link', { name: m.retry() }).getAttribute('href')).toBe(
+			'/ui/share?id=12345'
+		);
+		// A file dropped into the inbox is not kept anywhere: no way to send it again.
+		const dropped = within(summary).getByText('dropped.pdf').closest('li')!;
+		expect(within(dropped).queryByRole('link', { name: m.retry() })).toBeNull();
 	});
 
 	it('shows the progress while files are on their way', async () => {

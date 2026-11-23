@@ -1,45 +1,37 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
+import { toast } from 'svelte-sonner';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { goto } from '$app/navigation';
 import type { components } from '#lib/api/schema.ts';
+import { signIn } from '#lib/testing/session.ts';
 import type { Facts } from '#lib/facts.ts';
 import { events } from '#lib/events.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { phone } from '#lib/phone.svelte.ts';
 import { session } from '#lib/session.svelte.ts';
 import { documentOf, inboxItem, listedOf, OWNER, summaryOf } from '#lib/testing/documents.ts';
-import { calls, fakeApi, json } from '#lib/testing/api.ts';
+import {
+	calls,
+	fakeApi,
+	json,
+	masterData,
+	noContent,
+	notFound,
+	pdf,
+	problem
+} from '#lib/testing/api.ts';
 import { goTo } from '#lib/testing/page-state.svelte.ts';
 import { returnTo } from '#lib/return-to.svelte.ts';
 import Page from './+page.svelte';
+import { streamEvents } from '#lib/testing/events.ts';
 
 type Document = components['schemas']['DocumentDetails'];
 
-vi.mock('$app/navigation', () => ({ beforeNavigate: vi.fn(), goto: vi.fn() }));
-vi.mock('$app/state', async () => ({
-	page: (await import('#lib/testing/page-state.svelte.ts')).testPage
-}));
+vi.mock('$app/navigation', () => import('#lib/testing/navigation.ts'));
+vi.mock('$app/state', () => import('#lib/testing/app-state.ts'));
 
-let emit: ((type: string, data: object) => void) | null = null;
-
-function streamEvents() {
-	const listeners = new Map<string, (message: { data: string }) => void>();
-	events.useFactory(
-		() =>
-			({
-				addEventListener(type: string, handler: (message: { data: string }) => void) {
-					listeners.set(type, handler);
-				},
-				close() {}
-			}) as unknown as EventSource
-	);
-	events.start(() => {});
-	emit = (type, data) =>
-		listeners.get(type)?.({
-			data: JSON.stringify({ type, id: crypto.randomUUID(), occurred_at: '', ...data })
-		});
-}
+let emit: ((type: string, data?: object) => void) | null = null;
 
 /** The routes of one document's view. */
 function documentRoutes(id: string, current: () => Document): Parameters<typeof fakeApi>[0] {
@@ -54,15 +46,25 @@ function documentRoutes(id: string, current: () => Document): Parameters<typeof 
 			editable: true
 		}),
 		// The properties tab says so; the test looks at seen.
-		[`GET /api/v1/documents/${id}/files`]: () =>
-			json({ type: 'about:blank', title: 'Not Found', status: 404 }, 404)
+		[`GET /api/v1/documents/${id}/files`]: () => notFound('document', id),
+		[`GET /api/v1/documents/${id}/archive`]: () => pdf(),
+		// Confirming answers 202 with the document as it is now.
+		[`POST /api/v1/documents/${id}/confirm`]: () => json(current(), 202),
+		[`PUT /api/v1/documents/${id}/seen`]: () => noContent(),
+		[`DELETE /api/v1/documents/${id}/seen`]: () => noContent()
 	};
 }
 
 function serve(current: () => Document, routes: Parameters<typeof fakeApi>[0] = {}) {
 	const api = fakeApi({
+		...masterData(),
 		...documentRoutes('doc-1', current),
-		'GET /api/v1/pipeline': () => ({ nodes: [], vision: null }),
+		'GET /api/v1/pipeline': () => ({
+			nodes: [],
+			vision: null,
+			logo_fetch: false,
+			meaning_search: false
+		}),
 		'GET /api/v1/inbox/summary': () => summaryOf(),
 		...routes
 	});
@@ -76,20 +78,14 @@ const seen = (api: ReturnType<typeof fakeApi>) =>
 beforeEach(() => {
 	goTo('/ui/documents/doc-1?tab=properties', { id: 'doc-1' });
 	vi.mocked(goto).mockClear();
-	session.start({
-		user: { id: OWNER, username: 'tobi', role: 'user' },
-		method: 'password',
-		expires_at: '2026-10-18T12:00:00Z',
-		csrf_token: 'token'
-	});
-	streamEvents();
+	signIn('user', { id: OWNER });
+	emit = streamEvents();
 });
 
 afterEach(() => {
 	phone.override(null);
 	events.stop();
 	session.clear();
-	vi.unstubAllGlobals();
 	localStorage.clear();
 });
 
@@ -123,13 +119,25 @@ describe('a short id', () => {
 describe('the frame of the page', () => {
 	it('keeps one title while the document loads and when it cannot be found', async () => {
 		serve(() => documentOf(), {
-			'GET /api/v1/documents/doc-1': () =>
-				json({ type: 'about:blank', title: 'Not Found', status: 404 }, 404)
+			'GET /api/v1/documents/doc-1': () => notFound('document', 'doc-1')
 		});
 		render(Page);
 		expect(screen.getByRole('heading', { level: 1, name: m.document_generic() })).toBeTruthy();
 		expect(await screen.findByText(m.document_not_found())).toBeTruthy();
 		expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+	});
+
+	it('says so when the open document is gone on reading it anew', async () => {
+		let gone = false;
+		serve(() => documentOf({ lane: 'green' }), {
+			'GET /api/v1/documents/doc-1': () =>
+				gone ? notFound('document', 'doc-1') : documentOf({ lane: 'green' })
+		});
+		render(Page);
+		await screen.findByRole('heading', { level: 1, name: documentOf().title });
+		gone = true;
+		emit?.('document.updated', { document_id: 'doc-1', fields: ['tags'] });
+		expect(await screen.findByText(m.document_not_found())).toBeTruthy();
 	});
 
 	it('leaves a document deleted elsewhere the way the person came, once', async () => {
@@ -140,7 +148,7 @@ describe('the frame of the page', () => {
 		emit?.('document.deleted', { document_id: 'doc-1' });
 		await waitFor(() => expect(goto).toHaveBeenCalled());
 		expect(vi.mocked(goto).mock.calls).toEqual([
-			['/ui/documents', { state: { words: '' }, persistState: true }]
+			['/ui/documents', { state: { words: '', by: OWNER }, persistState: true }]
 		]);
 	});
 
@@ -152,7 +160,10 @@ describe('the frame of the page', () => {
 		render(Page);
 		await screen.findByRole('heading', { level: 1, name: documentOf().title });
 		emit?.('document.deleted', { document_id: 'doc-1' });
-		await waitFor(() => expect(goto).toHaveBeenCalledWith('/ui/inbox'));
+		// With the place one stood at in the inbox, where it is known (none here).
+		await waitFor(() =>
+			expect(goto).toHaveBeenCalledWith('/ui/inbox', { state: {}, persistState: true })
+		);
 	});
 });
 
@@ -507,6 +518,31 @@ describe('the document tab', () => {
 		expect(titleField()?.value).toBe('Neu');
 	});
 
+	it('keeps the document and what is typed when reading it anew fails', async () => {
+		// WF-01: every event of the open document reads it anew; one failed attempt took the
+		// page away, with the form and what was typed into it.
+		const failed = vi.spyOn(toast, 'error').mockImplementation(() => '');
+		let down = false;
+		goTo('/ui/documents/doc-1?left=text&right=form', { id: 'doc-1' });
+		const api = serve(parsed, {
+			...readable,
+			'GET /api/v1/documents/doc-1': () => (down ? problem(503) : parsed())
+		});
+		render(Page);
+		await waitFor(() => expect(titleField()).not.toBeNull());
+		await userEvent.clear(titleField()!);
+		await userEvent.type(titleField()!, 'Neu');
+		const loads = () => calls(api).filter((call) => call === 'GET /api/v1/documents/doc-1');
+		const before = loads().length;
+		down = true;
+		emit?.('document.updated', { document_id: 'doc-1', fields: ['tags'] });
+		await waitFor(() => expect(failed).toHaveBeenCalledTimes(1));
+		expect(loads()).toHaveLength(before + 1);
+		expect(titleField()?.value).toBe('Neu');
+		expect(screen.getByRole('form', { name: m.edit_title() })).toBeTruthy();
+		failed.mockRestore();
+	});
+
 	it('shows a pane chosen deep down the one before from its start, on a phone', async () => {
 		phone.override(true);
 		const scrolled = vi.fn();
@@ -659,8 +695,7 @@ describe('opened from the document list', () => {
 		returnTo.rememberDocuments({ pathname: '/ui/documents', search: '?tag=t3' }, '');
 		goTo('/ui/documents/doc-1?from=list', { id: 'doc-1' });
 		serve(() => documentOf({ lane: 'green' }), {
-			'GET /api/v1/documents/doc-2': () =>
-				json({ type: 'about:blank', title: 'Not Found', status: 404 }, 404),
+			'GET /api/v1/documents/doc-2': () => notFound('document', 'doc-2'),
 			'GET /api/v1/documents': () => ({
 				items: ['doc-1', 'doc-2', 'doc-3'].map((id) => listedOf({ id })),
 				next_cursor: null

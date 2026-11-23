@@ -60,7 +60,7 @@ from lekto.adapters.inbound.rest.auth import (
 )
 from lekto.adapters.inbound.rest.context import ApiContext
 from lekto.adapters.inbound.rest.events import EventHub
-from lekto.adapters.inbound.rest.middleware import LimitRequestBody, NoStore
+from lekto.adapters.inbound.rest.middleware import Compress, LimitRequestBody, NoStore
 from lekto.adapters.inbound.rest.paths import HEALTH_PATH, LOGIN_PATH, MCP_PATH, PREFIX
 from lekto.adapters.inbound.rest.schemas.events import EventMessage
 from lekto.adapters.inbound.rest.schemas.external import TaskAnswer
@@ -71,7 +71,7 @@ from lekto.core.domain.document_facts import ROLES as FACT_ROLES
 from lekto.core.domain.identifiers import catalog as identifier_kinds
 from lekto.core.domain.links import TASK_RESULT
 from lekto.core.domain.mail_rules import OPERATORS as MAIL_OPERATORS
-from lekto.core.domain.reasons import Action
+from lekto.core.domain.reasons import Action, Thing
 from lekto.core.domain.reasons import catalog as reasons_catalog
 from lekto.core.ports.wakeup import Channel
 
@@ -218,6 +218,8 @@ def create_app(context: ApiContext, mounts: Sequence[Mount] = ()) -> FastAPI:
         # A logo is master data every user sees; its URL changes with it.
         cacheable=(master_data.LOGO_PATH,),
     )
+    # Outermost: it sees every answer as it leaves, the web UI's files too.
+    app.add_middleware(Compress, plain=(f"{PREFIX}/auth/",))
     for router in (
         account.public,
         account.router,
@@ -294,6 +296,8 @@ def create_app(context: ApiContext, mounts: Sequence[Mount] = ()) -> FastAPI:
         schema["x-reasons"] = reasons_catalog()
         # The actions a reason of the kind `action` names (`reasons.Action`), for clients to word.
         schema["x-actions"] = sorted(action.value for action in Action)
+        # The nouns a reason of the kind `thing` names (`reasons.Thing`), for clients to word.
+        schema["x-things"] = sorted(thing.value for thing in Thing)
         # The kinds of identifiers and whose they are (clients offer them by these).
         schema["x-identifier-kinds"] = identifier_kinds()
         # The role of a fact of each kind until a source tells (`document_facts.ROLES`).

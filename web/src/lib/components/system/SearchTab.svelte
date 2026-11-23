@@ -8,6 +8,8 @@
 	import { unwrap } from '#lib/api/call.ts';
 	import { ApiError } from '#lib/api/problem.ts';
 	import type { components } from '#lib/api/schema.ts';
+	import StatTile from '#lib/components/StatTile.svelte';
+	import EmptyNote from '#lib/components/EmptyNote.svelte';
 	import ConfirmDialog from '#lib/components/ConfirmDialog.svelte';
 	import LoadProblem from '#lib/components/LoadProblem.svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
@@ -17,7 +19,6 @@
 	import { formatDate, formatNumber, formatPercent } from '#lib/i18n.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import { session } from '#lib/session.svelte.ts';
-	import { cn } from '#lib/utils.ts';
 	import * as Card from '#lib/components/ui/card/index.ts';
 	import SectionTitle from '#lib/components/page/SectionTitle.svelte';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
@@ -102,21 +103,11 @@
 	</div>
 {/snippet}
 
-{#snippet tile(value: string, label: string, mono = false)}
-	<div class="flex flex-col gap-0.5 rounded-xl bg-surface px-3.5 py-3">
-		<span
-			class={cn(
-				'font-semibold tabular-nums',
-				mono ? 'pt-1 font-mono text-sm break-all' : 'text-lg'
-			)}
-		>
-			{value}
-		</span>
-		<span class="text-meta text-muted-foreground">{label}</span>
-	</div>
-{/snippet}
-
 <div class="flex flex-col gap-6">
+	<!-- A failed reload: said above what was read before, which stays (web/DESIGN.md, "States"). -->
+	{#if problem && status && !missing}
+		<LoadProblem {problem} onretry={load} />
+	{/if}
 	{#if missing}
 		<p class="text-muted-foreground">{m.reason_search_not_configured()}</p>
 	{:else if problem && !status}
@@ -176,25 +167,33 @@
 				{/if}
 				<div class="grid grid-cols-[repeat(auto-fit,minmax(170px,1fr))] gap-3">
 					{#if meaning}
-						{@render tile(
-							formatNumber(status.index.vectors),
-							m.search_sections_label({
+						<StatTile
+							kind="value"
+							tone="quiet"
+							value={formatNumber(status.index.vectors)}
+							label={m.search_sections_label({
 								average: formatNumber(
 									status.index.embedded ? status.index.vectors / status.index.embedded : 0,
 									{ maximumFractionDigits: 1 }
 								)
-							})
-						)}
-						{@render tile(
-							status.model ?? '',
-							status.dimensions
+							})}
+						/>
+						<StatTile
+							kind="code"
+							tone="quiet"
+							value={status.model ?? ''}
+							label={status.dimensions
 								? m.search_model_label({ dimensions: formatNumber(status.dimensions) })
-								: m.search_model_label_plain(),
-							true
-						)}
+								: m.search_model_label_plain()}
+						/>
 					{/if}
 					{#if status.index.size_bytes != null}
-						{@render tile(fileSize(status.index.size_bytes), m.search_size_label())}
+						<StatTile
+							kind="value"
+							tone="quiet"
+							value={fileSize(status.index.size_bytes)}
+							label={m.search_size_label()}
+						/>
 					{/if}
 				</div>
 			</Card.Root>
@@ -246,12 +245,12 @@
 				</span>
 			</div>
 			{#if !status.embedded_jobs && !status.plain_jobs}
-				<p class="mt-3 text-muted-foreground">{m.search_durations_none({ date: since })}</p>
+				<EmptyNote size="line">{m.search_durations_none({ date: since })}</EmptyNote>
 			{:else}
 				<div class="mt-4 grid grid-cols-[repeat(auto-fit,minmax(min(280px,100%),1fr))] gap-4">
 					{#each [[m.search_with_embedding(), status.embedded_jobs, true], [m.search_without_embedding(), status.plain_jobs, false]] as const as [label, times, embedding] (label)}
 						{#if times && (meaning || !embedding)}
-							<div class="flex flex-col gap-1 rounded-xl border p-4">
+							<Card.Root size="row" class="flex flex-col gap-1">
 								<span class="text-meta text-muted-foreground">{label}</span>
 								<div class="flex items-baseline gap-2">
 									<span class="text-figure tabular-nums">
@@ -260,15 +259,17 @@
 									<span class="text-meta text-muted-foreground">{m.search_median()}</span>
 								</div>
 								<span class="text-meta text-muted-foreground">
-									{m.search_jobs_line({
-										p90: seconds(times.p90_ms),
-										count: formatNumber(times.count)
-									})}
+									{times.count === 1
+										? m.search_jobs_line_one({ p90: seconds(times.p90_ms) })
+										: m.search_jobs_line({
+												p90: seconds(times.p90_ms),
+												count: formatNumber(times.count)
+											})}
 									{#if embedding && status.per_section_ms != null}
 										· {m.search_per_section({ duration: seconds(status.per_section_ms) })}
 									{/if}
 								</span>
-							</div>
+							</Card.Root>
 						{/if}
 					{/each}
 				</div>
@@ -294,19 +295,11 @@
 					<div class="grid grid-cols-[repeat(auto-fit,minmax(170px,1fr))] gap-3">
 						{#each [[check.current, m.search_check_current(), 'good'], [check.missing, m.search_check_missing(), 'bad'], [check.outdated, m.search_check_outdated(), 'bad'], [check.other_model, m.search_check_other_model(), 'bad'], [check.extra, m.search_check_extra(), 'bad']] as const as [count, label, kind] (label)}
 							{#if kind === 'good' || count > 0 || label === m.search_check_missing()}
-								<div
-									class={cn(
-										'flex flex-col gap-1 rounded-xl px-4 py-3.5',
-										kind === 'good'
-											? 'bg-lane-green text-lane-green-foreground ring-1 ring-lane-green-foreground/35 ring-inset'
-											: count > 0
-												? 'bg-lane-yellow text-lane-yellow-foreground ring-1 ring-lane-yellow-foreground/35 ring-inset'
-												: 'bg-surface'
-									)}
-								>
-									<span class="text-figure tabular-nums">{formatNumber(count)}</span>
-									<span class="text-meta">{label}</span>
-								</div>
+								<StatTile
+									value={formatNumber(count)}
+									{label}
+									tone={kind === 'good' ? 'green' : count > 0 ? 'yellow' : 'quiet'}
+								/>
 							{/if}
 						{/each}
 					</div>

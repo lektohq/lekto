@@ -1,14 +1,14 @@
 import { render, screen, waitFor, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FieldDefinition } from '#lib/masterdata.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { TEMPLATES_GUIDE } from '#lib/templates/guide.ts';
 import TemplateInput from './TemplateInput.svelte';
-import { fakeApi, json } from '#lib/testing/api.ts';
+import { type Routes, fakeApi, json } from '#lib/testing/api.ts';
 
 const PAYSLIP = '0199a6c4-0000-7000-8000-0000000000e1';
-let fetchMock = fakeApi();
+let fetchMock: ReturnType<typeof fakeApi>;
 const previews: Record<string, unknown>[] = [];
 const listed: URL[] = [];
 
@@ -27,63 +27,62 @@ function field(id: string, name: string, key: string, types: string[] | null) {
 	};
 }
 
+/** The preview of a template as the API gives it, kept in `previews`. */
+async function preview(request: Request): Promise<Response> {
+	const body = await request.json();
+	previews.push(body);
+	if (body.template.includes('netto')) {
+		return json({
+			used: [],
+			rendered: null,
+			missing: null,
+			error: 'unknown value field.netto',
+			values: null
+		});
+	}
+	if (body.field_id && body.template === 'zwölf') {
+		const unreadable = { rendered: 'zwölf', read: null, unreadable: true };
+		return json({ used: [], missing: null, error: null, values: null, ...unreadable });
+	}
+	const values = body.document_id
+		? {
+				contact: 'Stadtwerke',
+				'field.la_brutto': '3.650,00 EUR',
+				'facts.invoice_number': 'RE-2026-0412'
+			}
+		: null;
+	const rendered = body.document_id
+		? body.template.replace('{{ field.la_brutto }}', '3.650,00 EUR')
+		: null;
+	const read = body.field_id && rendered ? { amount: '3650.00', currency: 'EUR' } : null;
+	return json({ used: [], rendered, missing: null, error: null, values, read });
+}
+
+/** The API of the field: the fields, the documents to try a template on, the preview; `more`
+ * before these. */
+function serve(more: Routes = {}) {
+	fetchMock = fakeApi({
+		'GET /api/v1/fields': () => [
+			field('f1', 'LA_Brutto', 'la_brutto', [PAYSLIP]),
+			field('f2', 'Betrag', 'betrag', ['other'])
+		],
+		'GET /api/v1/documents': (_, url) => {
+			listed.push(url);
+			return {
+				items: [{ id: 'd1', title: 'Lohn März', original_filename: 'lohn-03.pdf' }],
+				next_cursor: null
+			};
+		},
+		'POST /api/v1/templates/preview': preview,
+		...more
+	});
+	vi.stubGlobal('fetch', fetchMock);
+}
+
 beforeEach(() => {
 	previews.length = 0;
 	listed.length = 0;
-	fetchMock = fakeApi();
-	fetchMock.mockImplementation(async (request) => {
-		const url = new URL(request.url);
-		if (url.pathname === '/api/v1/fields') {
-			return json([
-				field('f1', 'LA_Brutto', 'la_brutto', [PAYSLIP]),
-				field('f2', 'Betrag', 'betrag', ['other'])
-			]);
-		}
-		if (url.pathname === '/api/v1/documents') {
-			listed.push(url);
-			return json({
-				items: [{ id: 'd1', title: 'Lohn März', original_filename: 'lohn-03.pdf' }],
-				next_cursor: null
-			});
-		}
-		if (url.pathname === '/api/v1/templates/preview') {
-			const body = await request.json();
-			previews.push(body);
-			if (body.template.includes('netto')) {
-				return json({
-					used: [],
-					rendered: null,
-					missing: null,
-					error: 'unknown value field.netto',
-					values: null
-				});
-			}
-			if (body.field_id && body.template === 'zwölf') {
-				const unreadable = { rendered: 'zwölf', read: null, unreadable: true };
-				return json({ used: [], missing: null, error: null, values: null, ...unreadable });
-			}
-			const values = body.document_id
-				? {
-						contact: 'Stadtwerke',
-						'field.la_brutto': '3.650,00 EUR',
-						'facts.invoice_number': 'RE-2026-0412'
-					}
-				: null;
-			const rendered = body.document_id
-				? body.template.replace('{{ field.la_brutto }}', '3.650,00 EUR')
-				: null;
-			const read = body.field_id && rendered ? { amount: '3650.00', currency: 'EUR' } : null;
-			return json({ used: [], rendered, missing: null, error: null, values, read });
-		}
-		return json({}, 404);
-	});
-	vi.stubGlobal('fetch', fetchMock);
-});
-
-afterEach(() => {
-	vi.unstubAllGlobals();
-	// bits-ui frees the page a moment after a dialog closed; the next test must not wait for it.
-	window.document.body.style.pointerEvents = '';
+	serve();
 });
 
 describe('TemplateInput', () => {
@@ -107,23 +106,14 @@ describe('TemplateInput', () => {
 	it('keeps the verdict on the newest template when an older answer arrives late', async () => {
 		let answerSlow!: () => void;
 		const slow = new Promise<void>((resolve) => (answerSlow = resolve));
-		const base = fetchMock.getMockImplementation()!;
-		fetchMock.mockImplementation(async (request) => {
-			if (new URL(request.url).pathname === '/api/v1/templates/preview') {
+		serve({
+			'POST /api/v1/templates/preview': async (request) => {
 				const body = await request.clone().json();
-				if (body.template === 'slow') {
-					previews.push(body);
-					await slow;
-					return json({
-						used: [],
-						rendered: null,
-						missing: null,
-						error: 'late error',
-						values: null
-					});
-				}
+				if (body.template !== 'slow') return preview(request);
+				previews.push(body);
+				await slow;
+				return { used: [], rendered: null, missing: null, error: 'late error', values: null };
 			}
-			return base(request);
 		});
 		const props = { id: 'title', maxlength: 500, label: 'Title' };
 		const { rerender } = render(TemplateInput, { ...props, value: 'slow' });
@@ -148,9 +138,20 @@ describe('TemplateInput', () => {
 		});
 		await user.click(await screen.findByRole('button', { name: m.template_editor_open() }));
 		const sheet = await screen.findByRole('dialog');
-		expect(
-			await within(sheet).findByRole('button', { name: m.template_insert({ name: 'Netto' }) })
-		).toBeTruthy();
+		const row = await within(sheet).findByRole('button', {
+			name: m.template_insert({ name: 'Netto' })
+		});
+		// The focus shows as the ring every target has, and a finger hits a row and a filter on a
+		// phone (WD-07): the row 44 px tall, the filter with the hit area of a small button.
+		expect(row.className).not.toContain('outline-none');
+		expect(row.className.split(' ')).toContain('max-sm:min-h-11');
+		expect(within(sheet).getByRole('button', { name: 'upcase' }).className).toContain(
+			'max-sm:after:-inset-y-1.5'
+		);
+		// Its footer is a dialog's: "Abbrechen" as a ghost before the action (WD-08).
+		const cancel = within(sheet).getByRole('button', { name: m.cancel() });
+		expect(cancel.className).toContain('hover:bg-muted');
+		expect(cancel.className).not.toContain('border-border');
 		const asked = fetchMock.mock.calls.map(([request]) => new URL(request.url).pathname);
 		expect(asked).not.toContain('/api/v1/fields');
 	});
@@ -248,6 +249,37 @@ describe('TemplateInput', () => {
 		await user.click(within(sheet).getByRole('button', { name: m.cancel() }));
 		await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
 		expect((screen.getByLabelText('Reason') as HTMLTextAreaElement).value).toBe('Check');
+	});
+
+	it('asks before Escape drops a changed draft, and keeps it on "Abbrechen" of the question', async () => {
+		const user = userEvent.setup();
+		render(TemplateInput, { id: 'reason', maxlength: 500, label: 'Reason', value: 'Check' });
+		await user.click(await screen.findByRole('button', { name: m.template_editor_open() }));
+		const sheet = await screen.findByRole('dialog');
+		const draft = (await within(sheet).findByLabelText(m.template_editor())) as HTMLTextAreaElement;
+		await user.type(draft, ' it');
+		await user.keyboard('{Escape}');
+		const asked = await screen.findByRole('alertdialog', { name: m.unsaved_title() });
+		await user.click(within(asked).getByRole('button', { name: m.cancel() }));
+		await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+		// The editor is still there, with the draft.
+		expect(draft.value).toBe('Check it');
+
+		await user.keyboard('{Escape}');
+		const again = await screen.findByRole('alertdialog', { name: m.unsaved_title() });
+		await user.click(within(again).getByRole('button', { name: m.unsaved_discard() }));
+		await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+		expect((screen.getByLabelText('Reason') as HTMLTextAreaElement).value).toBe('Check');
+	});
+
+	it('closes the editor at once on Escape while the draft is as it was', async () => {
+		const user = userEvent.setup();
+		render(TemplateInput, { id: 'reason', maxlength: 500, label: 'Reason', value: 'Check' });
+		await user.click(await screen.findByRole('button', { name: m.template_editor_open() }));
+		await screen.findByRole('dialog');
+		await user.keyboard('{Escape}');
+		await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+		expect(screen.queryByRole('alertdialog')).toBeNull();
 	});
 });
 

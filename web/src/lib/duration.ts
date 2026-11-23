@@ -17,7 +17,7 @@ export function formatDuration(seconds: number): string {
 	if (whole < 3600) {
 		return m.duration_minutes({
 			minutes: String(Math.floor(whole / 60)),
-			seconds: String(whole % 60)
+			seconds: formatNumber(whole % 60)
 		});
 	}
 	const minutes = Math.round(whole / 60);

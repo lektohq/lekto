@@ -1,22 +1,23 @@
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import { describe, expect, it, vi } from 'vitest';
-import type { Lookup } from '#lib/masterdata.svelte.ts';
+import type { Tag } from '#lib/masterdata.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { newCondition } from '#lib/rules/model.ts';
 import ConditionRow from './ConditionRow.svelte';
+import { lookupOf, tagOf } from '#lib/testing/master-data.ts';
 
-const lookup = {
+const lookup = lookupOf({
 	contacts: [],
 	documentTypes: [],
 	tags: [],
 	fields: [],
 	spaces: [],
 	users: []
-} as unknown as Lookup;
+});
 
 describe('a condition on the mail', () => {
 	it('names "Mail" as its subject and the part of the mail in a second choice', () => {
-		const condition = $state({ ...newCondition('mail_cc'), value: 'ben@example.test' });
+		const condition = $state({ ...newCondition('mail_cc'), value: 'john@example.test' });
 		render(ConditionRow, { condition, lookup, onremove: vi.fn() });
 		expect(screen.getByLabelText(m.rule_condition_subject()).textContent).toContain(
 			m.rule_field_mail()
@@ -60,5 +61,60 @@ describe('a condition on a date', () => {
 		expect(field.dataset.stand).toBe('DateInput');
 		await fireEvent.input(field, { target: { value: '2026-12-24' } });
 		expect(condition.value).toBe('2026-12-24');
+	});
+
+	it('keeps a number of a step as it is typed, and none where the field is empty (WD-13)', async () => {
+		const condition = $state({
+			...newCondition('step'),
+			path: 'answer.total',
+			op: 'is' as const,
+			value: 12 as number | string | boolean
+		});
+		render(ConditionRow, { condition, lookup, onremove: vi.fn() });
+		const field = screen.getByLabelText(m.rule_condition_value()) as HTMLInputElement;
+		expect(field.value).toBe('12');
+		// Emptied: it stays empty and is no 0, which nobody typed.
+		await fireEvent.input(field, { target: { value: '' } });
+		expect(field.value).toBe('');
+		expect(Number.isNaN(condition.value)).toBe(true);
+		await fireEvent.input(field, { target: { value: '-5' } });
+		expect(condition.value).toBe(-5);
+		await fireEvent.input(field, { target: { value: '0.5' } });
+		expect(condition.value).toBe(0.5);
+	});
+});
+
+describe('a condition on tags, groups or the topic (WD-09)', () => {
+	const tag = (id: string, name: string, scope: Tag['scope']) => tagOf({ id, name, scope });
+	const tagged = lookupOf({
+		...lookup,
+		tags: [
+			tag('t1', 'Steuer', 'document'),
+			tag('t2', 'Miete', 'document'),
+			tag('o1', 'Wohnen', 'topic')
+		]
+	});
+
+	it.each([
+		['tags', 'contains', 't1', 'Steuer'],
+		['topic', 'is', 'o1', 'Wohnen']
+	] as const)(
+		'chooses the one of %s in the tag picker, not in a select',
+		(field, op, value, name) => {
+			const condition = $state({ ...newCondition(field), op, value });
+			render(ConditionRow, { condition, lookup: tagged, onremove: vi.fn() });
+			// The chosen one stands as its chip in the picker's group; no combobox lists the tags.
+			const picker = screen.getByRole('group', { name: m.rule_condition_value() });
+			expect(picker.textContent).toContain(name);
+			expect(screen.queryByRole('combobox', { name: m.rule_condition_value() })).toBeNull();
+		}
+	);
+
+	it('chooses several for "is one of" in the tag picker too', () => {
+		const condition = $state({ ...newCondition('tags'), op: 'in' as const, value: ['t1', 't2'] });
+		render(ConditionRow, { condition, lookup: tagged, onremove: vi.fn() });
+		const picker = screen.getByRole('group', { name: m.rule_condition_value() });
+		expect(picker.textContent).toContain('Steuer');
+		expect(picker.textContent).toContain('Miete');
 	});
 });

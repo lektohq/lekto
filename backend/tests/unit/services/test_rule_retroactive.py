@@ -282,8 +282,12 @@ async def test_a_user_rule_is_applied_by_its_owner_to_their_own_documents(world:
     with pytest.raises(NotFoundError):
         await r.applications.start(Actor(owner.id), rule.id, version=2, documents=[mine.id])
     too_many = [DocumentId(new_id()) for _ in range(MAX_DOCUMENTS + 1)]
-    with pytest.raises(ValidationError):
+    # More than one application takes: refused with its reason, and the service names the
+    # limit for the preview.
+    with pytest.raises(ValidationError) as refused:
         await r.applications.start(Actor(owner.id), rule.id, version=1, documents=too_many)
+    assert refused.value.reason == because(ReasonCode.RULE_APPLY_TOO_MANY, max=MAX_DOCUMENTS)
+    assert r.applications.max_documents == MAX_DOCUMENTS
 
 
 async def test_a_long_application_continues_in_a_new_job(world: World) -> None:

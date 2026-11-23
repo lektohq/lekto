@@ -64,8 +64,18 @@
 		{ value: 'edit', label: m.space_role_edit() }
 	]);
 
+	// A member's role as chosen while it is being saved; refused (the last editor, no
+	// connection), the field shows the stored one again. Taken, it gives way to the space
+	// read anew.
+	let choice = $state<{ id: string; role: Role } | null>(null);
+	$effect(() => {
+		void space.members;
+		choice = null;
+	});
+
 	async function set(id: string, next: Role) {
 		busy = true;
+		choice = { id, role: next };
 		try {
 			await unwrap(
 				api.PUT('/api/v1/spaces/{id}/members/{user_id}', {
@@ -77,6 +87,7 @@
 			onchanged();
 			userId = '';
 		} catch (error) {
+			choice = null;
 			reportError(error);
 		} finally {
 			busy = false;
@@ -135,10 +146,12 @@
 					{:else}
 						<Select
 							aria-label={m.members_role_of({ name: name(member.user_id) })}
-							value={member.role}
+							bind:value={
+								() => (choice?.id === member.user_id ? choice.role : member.role),
+								(next) => void set(member.user_id, next as Role)
+							}
 							options={roles}
 							disabled={busy}
-							onchange={(value) => set(member.user_id, value as Role)}
 							class="w-40"
 						/>
 						<IconButton
@@ -176,7 +189,7 @@
 					/>
 				</Field.Field>
 				<div>
-					<Button disabled={busy || !userId} onclick={() => set(userId, role)}>
+					<Button {busy} disabled={!userId} onclick={() => set(userId, role)}>
 						{m.members_grant()}
 					</Button>
 				</div>

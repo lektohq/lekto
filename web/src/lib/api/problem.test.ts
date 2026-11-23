@@ -1,12 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import { problem, problemOf } from '#lib/testing/api.ts';
 import { apiError, readProblem, retryAfterSeconds } from './problem.ts';
 
 describe('readProblem', () => {
 	it('reads problem details', async () => {
-		const response = new Response(
-			JSON.stringify({ type: 'about:blank', title: 'Not Found', status: 404, detail: 'No.' }),
-			{ status: 404, headers: { 'content-type': 'application/problem+json' } }
-		);
+		const response = problem(404, { detail: 'No.' });
 		expect(await readProblem(response)).toMatchObject({ status: 404, detail: 'No.' });
 		// The body stays readable.
 		expect(response.bodyUsed).toBe(false);
@@ -14,8 +12,8 @@ describe('readProblem', () => {
 
 	it('ignores other bodies', async () => {
 		expect(await readProblem(new Response('oops', { status: 502 }))).toBeNull();
-		const json = new Response('{"x":1}', { headers: { 'content-type': 'application/json' } });
-		expect(await readProblem(json)).toBeNull();
+		const plain = new Response('{"x":1}', { headers: { 'content-type': 'application/json' } });
+		expect(await readProblem(plain)).toBeNull();
 		const broken = new Response('{', { headers: { 'content-type': 'application/json' } });
 		expect(await readProblem(broken)).toBeNull();
 	});
@@ -46,19 +44,13 @@ describe('retryAfterSeconds', () => {
 describe('apiError', () => {
 	it('takes the body the client already read', async () => {
 		const response = new Response(null, { status: 503 });
-		const body = { type: 'about:blank', title: 'Service Unavailable', status: 503, detail: 'db' };
+		const body = problemOf(503, { detail: 'db' });
 		expect((await apiError(response, body)).problem?.detail).toBe('db');
 		expect((await apiError(response, 'not a problem')).problem).toBeNull();
 	});
 
 	it('carries status, problem and the wait', async () => {
-		const response = new Response(
-			JSON.stringify({ type: 'about:blank', title: 'Too Many Requests', status: 429 }),
-			{
-				status: 429,
-				headers: { 'content-type': 'application/problem+json', 'retry-after': '5' }
-			}
-		);
+		const response = problem(429, { detail: null }, { 'retry-after': '5' });
 		const error = await apiError(response);
 		expect(error.status).toBe(429);
 		expect(error.retryAfter).toBe(5);

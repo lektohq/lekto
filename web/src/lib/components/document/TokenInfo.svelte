@@ -30,9 +30,17 @@
 	const heading = $derived(
 		[
 			model,
-			pages ? m.prompt_calls({ count: usage.attempts }) : null,
-			!pages && usage.requests > 1 ? m.prompt_requests({ count: usage.requests }) : null,
-			!pages && usage.attempts > 1 ? m.prompt_attempts({ count: usage.attempts }) : null
+			pages
+				? usage.attempts === 1
+					? m.prompt_calls_one()
+					: m.prompt_calls({ count: formatNumber(usage.attempts) })
+				: null,
+			!pages && usage.requests > 1
+				? m.prompt_requests({ count: formatNumber(usage.requests) })
+				: null,
+			!pages && usage.attempts > 1
+				? m.prompt_attempts({ count: formatNumber(usage.attempts) })
+				: null
 		]
 			.filter(Boolean)
 			.join(' · ')

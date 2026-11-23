@@ -3,21 +3,18 @@ import { render, screen, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Job } from '#lib/jobs.ts';
+import { signIn } from '#lib/testing/session.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { session } from '#lib/session.svelte.ts';
-import { calls, fakeApi } from '#lib/testing/api.ts';
+import { calls, fakeApi, problem } from '#lib/testing/api.ts';
 import { choose } from '#lib/testing/select.ts';
 import JobsTab from './JobsTab.svelte';
+import { jobsSummaryOf } from '#lib/testing/system.ts';
 
-const summary = {
-	kinds: [
-		{ kind: 'contacts.logo', running: 0, due: 0, planned: 0, failed: 1, done: 41 },
-		{ kind: 'pipeline.node', running: 1, due: 3, planned: 0, failed: 1, done: 900 }
-	],
-	last_started_at: '2026-10-24T11:59:58Z',
-	now: '2026-10-24T12:00:00Z',
-	kept_since: '2026-10-17T12:00:00Z'
-};
+const summary = jobsSummaryOf({
+	'contacts.logo': { failed: 1, done: 41 },
+	'pipeline.node': { running: 1, due: 3, failed: 1, done: 900 }
+});
 
 function job(overrides: Partial<Job>): Job {
 	return {
@@ -57,6 +54,9 @@ const failedLogo = job({
 	retry: 'job'
 });
 
+/** No durations measured yet. */
+const noDurations = () => ({ kinds: [], since: '2026-10-17T12:00:00Z' });
+
 function routes() {
 	return fakeApi({
 		'GET /api/v1/jobs/summary': () => summary,
@@ -86,20 +86,10 @@ function routes() {
 	});
 }
 
-function signIn(role: 'admin' | 'user') {
-	session.start({
-		user: { id: role, username: role, role },
-		method: 'password',
-		expires_at: '2026-10-25T12:00:00Z',
-		csrf_token: 'token'
-	});
-}
-
 beforeEach(() => signIn('admin'));
 
 afterEach(() => {
 	session.clear();
-	vi.unstubAllGlobals();
 	localStorage.clear();
 });
 
@@ -119,7 +109,9 @@ describe('the jobs tab', () => {
 			})
 		).toBeTruthy();
 		expect(within(rows[1]).queryByRole('link')).toBeNull();
-		expect(within(rows[1]).getByText(m.jobs_state_running())).toBeTruthy();
+		// A running job is a plain fact: its badge has no icon.
+		const running = within(rows[1]).getByText(m.jobs_state_running());
+		expect(running.closest('[data-slot="badge"]')?.querySelector('svg')).toBeNull();
 		expect(within(rows[2]).getByText(m.jobs_hidden_document())).toBeTruthy();
 		expect(calls(api)).toContain(
 			'GET /api/v1/jobs?state=running&state=due&state=planned&offset=0&limit=25'
@@ -142,6 +134,7 @@ describe('the jobs tab', () => {
 	it('filters by kind and turns the pages', async () => {
 		const api = fakeApi({
 			'GET /api/v1/jobs/summary': () => summary,
+			'GET /api/v1/jobs/durations': noDurations,
 			'GET /api/v1/jobs': (_request, url) => ({
 				items: [job({ id: `p${url.searchParams.get('offset')}` })],
 				total: 120,
@@ -163,6 +156,31 @@ describe('the jobs tab', () => {
 		expect(calls(api)).toContain(
 			'GET /api/v1/jobs?state=running&state=due&state=planned&kind=contacts.logo&offset=25&limit=25'
 		);
+	});
+
+	it('says so when another page could not be read: the rows are the old ones (WE-02)', async () => {
+		let down = false;
+		const api = fakeApi({
+			'GET /api/v1/jobs/summary': () => summary,
+			'GET /api/v1/jobs/durations': noDurations,
+			'GET /api/v1/jobs': (_request, url) =>
+				down
+					? problem(500, { detail: 'boom' })
+					: {
+							items: [job({ id: `p${url.searchParams.get('offset')}` })],
+							total: 120,
+							next_offset: null
+						}
+		});
+		vi.stubGlobal('fetch', api);
+		render(JobsTab);
+		await screen.findByRole('table');
+		down = true;
+		await userEvent.click(
+			await screen.findByRole('button', { name: m.pagination_page({ page: '2' }) })
+		);
+		expect((await screen.findByRole('alert')).textContent).toContain('boom');
+		expect(screen.getByRole('table')).toBeTruthy();
 	});
 
 	it('lets an admin try a failed job again, a failed step at its document', async () => {
@@ -220,6 +238,12 @@ describe('the jobs tab', () => {
 		const cells = within(jobs)
 			.getAllByRole('cell')
 			.map((cell) => cell.textContent?.trim());
+		// "Done" stands in a lane's tone, so an icon says it too (DESIGN.md, "Badges").
+		const done = within(jobs)
+			.getAllByText(m.jobs_state_done())
+			.map((element) => element.closest('[data-slot="badge"]'))
+			.find((badge) => badge !== null);
+		expect(done?.querySelector('svg')).not.toBeNull();
 		expect(cells).toContain('3s'); // waited
 		expect(cells).toContain('2s'); // ran
 		expect(within(kinds).getByText('900')).toBeTruthy();
@@ -232,6 +256,7 @@ describe('the jobs tab', () => {
 			'fetch',
 			fakeApi({
 				'GET /api/v1/jobs/summary': () => summary,
+				'GET /api/v1/jobs/durations': noDurations,
 				'GET /api/v1/jobs': () => ({
 					items: [{ ...failedLogo, error: null, retry: null }],
 					total: 1,
@@ -255,6 +280,7 @@ describe('the jobs tab', () => {
 			'fetch',
 			fakeApi({
 				'GET /api/v1/jobs/summary': () => summary,
+				'GET /api/v1/jobs/durations': noDurations,
 				'GET /api/v1/jobs': () => ({ items: [], total: 0, next_offset: null }),
 				'GET /api/v1/pipeline': () => ({
 					nodes: [],
@@ -278,6 +304,7 @@ describe('the jobs tab', () => {
 			'fetch',
 			fakeApi({
 				'GET /api/v1/jobs/summary': () => ({ ...summary, last_started_at: '2026-10-24T11:50:00Z' }),
+				'GET /api/v1/jobs/durations': noDurations,
 				'GET /api/v1/jobs': () => ({ items: [], total: 0, next_offset: null })
 			})
 		);

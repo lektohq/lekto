@@ -1,12 +1,13 @@
 <script lang="ts">
 	import { toast } from 'svelte-sonner';
+	import { TEXT_HINT, type TextHint } from '#lib/viewer/text-hint.ts';
 	import { leaveDocument } from '#lib/way-back.ts';
 	import PageTitle from '#lib/components/page/PageTitle.svelte';
 	import File from '@lucide/svelte/icons/file';
 	import ListChecks from '@lucide/svelte/icons/list-checks';
 	import SquarePen from '@lucide/svelte/icons/square-pen';
 	import TextAlignStart from '@lucide/svelte/icons/text-align-start';
-	import { onMount, tick, untrack, type Snippet } from 'svelte';
+	import { type Snippet, onMount, setContext, tick, untrack } from 'svelte';
 	import { SvelteSet } from 'svelte/reactivity';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
@@ -137,6 +138,8 @@
 	const leftAt = $derived(view.left === 'pages' ? pagesAt : textAt);
 	let panes = $state<HTMLDivElement | null>(null);
 	let viewer = $state<DocumentPages | null>(null);
+	// The pages are images; the pane's "Text" shows what they say (`text-hint.ts`).
+	setContext<TextHint>(TEXT_HINT, () => m.pages_text_hint());
 	let textPane = $state<DocumentText | null>(null);
 	let header = $state<DocumentHeader | null>(null);
 
@@ -205,7 +208,15 @@
 				reportSeen(loaded);
 			}
 		} catch (error) {
-			if (wanted === id && request === latest) problem = error;
+			if (wanted === id && request === latest) {
+				// The document is on the screen and was only read anew (an event, a reconnect of
+				// the stream): one failed attempt must not take it away, with what is typed into
+				// its form. It stays, the failure is said, and the next event reads it again.
+				// Gone or out of reach is another matter: then the page says so.
+				const lost = error instanceof ApiError && (error.status === 404 || error.status === 403);
+				if (document?.id === wanted && !lost) reportError(error);
+				else problem = error;
+			}
 			// Gone, though the list held it: left out once one steps on from it.
 			if (error instanceof ApiError && error.status === 404) gone.add(wanted);
 		}
@@ -704,6 +715,10 @@
 										factCounts={facts ? factCounts(facts) : null}
 										factsHref={viewHref(page.url, { ...view, right: 'facts' })}
 										onmove={() => header?.startMove()}
+										onleave={() => {
+											leaving = true;
+											void leaveDocument(fromInbox);
+										}}
 										onreveal={reveal}
 										end={paneSwitch(rightSwitch)}
 									/>

@@ -3,7 +3,7 @@
  * with its path): the tags of a scope, their paths, the tree of a master data tab, and what a
  * search matches. Documents show the leaf; the path says where it stands.
  */
-import { matchesAllWords } from '#lib/master-search.ts';
+import { matchesAllWords } from '#lib/picking.ts';
 import type { Tag, TagScope } from '#lib/masterdata.svelte.ts';
 
 export const SEPARATOR = ' › ';
@@ -19,14 +19,6 @@ export function pathLabel(tag: Pick<Tag, 'name' | 'path'>): string {
 /** The tags of `scope`, in the order of the tree. */
 export function ofScope<T extends TagLike>(tags: readonly T[], scope: TagScope): T[] {
 	return tags.filter((tag) => tag.scope === scope);
-}
-
-/** Options of a picker: the tags of `scope` labelled with their path. */
-export function tagOptions(
-	tags: readonly TagLike[],
-	scope: TagScope
-): { value: string; label: string }[] {
-	return ofScope(tags, scope).map((tag) => ({ value: tag.id, label: pathLabel(tag) }));
 }
 
 /** Whether every word of `query` stands in the tag's path: a search for a parent's name finds

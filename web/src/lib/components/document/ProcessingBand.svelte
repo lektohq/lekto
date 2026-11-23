@@ -16,7 +16,7 @@
 	import { NODE_LABELS } from '#lib/node-labels.ts';
 	import type { Node } from '#lib/pipeline.ts';
 	import { m } from '#lib/paraglide/messages.js';
-	import { MARK, ON_MARK, STRIPE } from '#lib/step-look.ts';
+	import { LANE_MARK, LANE_STRIPE, TONE_TEXT } from '#lib/tones.ts';
 	import { PHASE_LABELS, type Phase } from '#lib/steps.ts';
 	import { cn } from '#lib/utils.ts';
 	import { Badge } from '#lib/components/ui/badge/index.ts';
@@ -63,9 +63,9 @@
 	} = $props();
 
 	const tones: Record<BandTone, string> = {
-		green: MARK.green,
-		yellow: MARK.yellow,
-		red: MARK.red,
+		green: LANE_MARK.green,
+		yellow: LANE_MARK.yellow,
+		red: LANE_MARK.red,
 		running:
 			'motion-safe:animate-pulse bg-lane-running ring-1 ring-inset ring-lane-running-foreground/35',
 		waiting:
@@ -73,9 +73,9 @@
 		carried: 'bg-muted ring-1 ring-inset ring-border'
 	};
 	const stripes: Record<BandTone, string> = {
-		green: STRIPE.green,
-		yellow: STRIPE.yellow,
-		red: STRIPE.red,
+		green: LANE_STRIPE.green,
+		yellow: LANE_STRIPE.yellow,
+		red: LANE_STRIPE.red,
 		running: 'motion-safe:animate-pulse bg-lane-running-foreground/50',
 		waiting: 'bg-muted-foreground/30',
 		carried: 'bg-muted-foreground/25'
@@ -116,7 +116,7 @@
 
 	// A label inside a segment: the chip's text on its ground, the text colour on the running one.
 	const label = (tone: BandTone) =>
-		tone === 'green' || tone === 'yellow' || tone === 'red' ? ON_MARK[tone] : 'text-foreground';
+		tone === 'green' || tone === 'yellow' || tone === 'red' ? TONE_TEXT[tone] : 'text-foreground';
 
 	let width = $state(0);
 	// Each phase keeps room for its name below the bar (wide) and a part of its own.
@@ -201,6 +201,7 @@
 	<button
 		type="button"
 		data-band-node={step.node}
+		data-small-target
 		data-lit={on ? '' : undefined}
 		aria-label={[title(step), reading(step.node)].filter(Boolean).join(' · ')}
 		aria-expanded={step.node === expanded}
@@ -268,10 +269,7 @@
 		{#if lit && span}
 			<span
 				data-band-bracket
-				class={cn(
-					'absolute top-[3px] h-1.5 rounded-b border-[1.5px] border-t-0',
-					brackets[lit.tone]
-				)}
+				class={cn('absolute top-[3px] h-1.5 rounded-b border-dot border-t-0', brackets[lit.tone])}
 				style:left={`${span.left}px`}
 				style:width={`${span.width}px`}
 			>

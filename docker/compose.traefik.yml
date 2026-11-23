@@ -27,6 +27,12 @@ services:
     command:
       - --providers.docker=true
       - --providers.docker.exposedbydefault=false
+      # Traefik routes to a container only while it is healthy. While Lekto restarts (an
+      # update) its router would be gone and Traefik would answer 404, which the web UI cannot
+      # tell from a page that does not exist. With this the router stays and Traefik answers
+      # 5xx itself (500 as measured with v3.7; 502 while the old container stops): the web UI
+      # takes that for "the server cannot be reached" and asks again by itself.
+      - --providers.docker.allowEmptyServices=true
       - --entrypoints.web.address=:80
       - --entrypoints.web.http.redirections.entrypoint.to=websecure
       - --entrypoints.web.http.redirections.entrypoint.scheme=https

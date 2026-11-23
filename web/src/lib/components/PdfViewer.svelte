@@ -13,6 +13,7 @@
 	import PageViewer from '#lib/components/PageViewer.svelte';
 	import type { Mark, Place } from '#lib/document-view.ts';
 	import type { Layout } from '#lib/viewer/zoom.ts';
+	import { DrawnPages } from '#lib/drawn-pages.ts';
 	import { describeError } from '#lib/errors.ts';
 	import { m } from '#lib/paraglide/messages.js';
 
@@ -66,6 +67,12 @@
 	// The width in CSS pixels and the device pixel ratio each page was last drawn for.
 	// eslint-disable-next-line svelte/prefer-svelte-reactivity
 	const drawn = new Map<number, string>();
+	// Which pages stay drawn: those near the view and the last few beside them
+	// (`lib/drawn-pages.ts`); the canvas of any other is emptied, and drawn again on its return.
+	const kept = new DrawnPages<HTMLCanvasElement>();
+
+	/** No source has the file. */
+	class MissingFile extends Error {}
 
 	async function open() {
 		loading = true;
@@ -86,7 +93,7 @@
 				}
 				if (answer.status !== 404) throw await apiError(answer);
 			}
-			if (!response) throw new Error(m.pdf_missing());
+			if (!response) throw new MissingFile();
 			const data = new Uint8Array(await response.arrayBuffer());
 			const pdfjs = await loaded;
 			// The viewer may have closed while the file was on its way: then no document is opened
@@ -97,7 +104,8 @@
 				wasmUrl: `${BASE}/pdfjs/wasm/`,
 				standardFontDataUrl: `${BASE}/pdfjs/standard_fonts/`,
 				cMapUrl: `${BASE}/pdfjs/cmaps/`,
-				cMapPacked: true
+				cMapPacked: true,
+				iccUrl: `${BASE}/pdfjs/iccs/`
 			});
 			doc = await loadingTask.promise;
 			if (destroyed) {
@@ -106,10 +114,14 @@
 			}
 			await measure();
 		} catch (error) {
+			// In the reader's language, never the words of pdf.js or of the browser: what the API or
+			// the network said as everywhere, anything else as a file that cannot be shown.
 			problem =
-				error instanceof Error && !(error instanceof ApiError)
-					? error.message
-					: describeError(error);
+				error instanceof MissingFile
+					? m.pdf_missing()
+					: error instanceof ApiError || error instanceof TypeError
+						? describeError(error)
+						: m.pdf_unreadable();
 		} finally {
 			loading = false;
 		}
@@ -156,12 +168,25 @@
 		} catch {
 			// Cancelled by a newer drawing of the page, or the viewer is gone.
 			if (drawn.get(number) === target) drawn.delete(number);
+			sheet.width = 0;
 			return;
 		}
 		if (tasks.get(number) === task) tasks.delete(number);
 		canvas.width = sheet.width;
 		canvas.height = sheet.height;
 		canvas.getContext('2d')?.drawImage(sheet, 0, 0);
+		// The sheet it was drawn on aside is done with: its pixels go at once.
+		sheet.width = 0;
+		for (const [other, held] of kept.drew(number, canvas)) release(other, held);
+	}
+
+	/** Let go of a page far from the view: its pixels, and a drawing of it still on its way. */
+	function release(number: number, canvas: HTMLCanvasElement) {
+		tasks.get(number)?.cancel();
+		tasks.delete(number);
+		drawn.delete(number);
+		canvas.width = 0;
+		canvas.height = 0;
 	}
 
 	/** Scroll so that the place stands in the upper third of the view. */
@@ -187,9 +212,14 @@
 	{start}
 	{loading}
 	{problem}
+	onretry={() => void open()}
 	{end}
 	{onpage}
-	onshow={(number, node) => void draw(number, node)}
+	onshow={(number, node) => {
+		kept.show(number);
+		void draw(number, node);
+	}}
+	onhide={(number) => kept.hide(number)}
 	onsettle={(pages) => {
 		for (const { number, node } of pages) void draw(number, node);
 	}}

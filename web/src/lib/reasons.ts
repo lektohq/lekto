@@ -6,9 +6,18 @@
  */
 import type { components } from '#lib/api/schema.ts';
 import { fieldLabel } from '#lib/describe.ts';
-import { fieldTypeLabel, isFieldType } from '#lib/fields.ts';
+import { fieldTypeLabel, isFieldType, isMoney, isPeriod } from '#lib/fields.ts';
 import { labelOfKind } from '#lib/identifiers.ts';
-import { formatDate, formatNumber, formatPercent, listLocale, quoted } from '#lib/i18n.ts';
+import { isIsoDay } from '#lib/dates.ts';
+import {
+	formatDate,
+	formatList,
+	formatMoney,
+	formatNumber,
+	formatPercent,
+	quoted
+} from '#lib/i18n.ts';
+import { writePeriod } from '#lib/periods.ts';
 import type { Lookup } from '#lib/masterdata.svelte.ts';
 import { NODE_LABELS } from '#lib/node-labels.ts';
 import { m } from '#lib/paraglide/messages.js';
@@ -346,6 +355,7 @@ export const REASONS: Record<Exclude<ReasonCode, 'text' | 'error'>, ReasonEntry>
 	space_members_personal: entry(m.reason_space_members_personal),
 	space_members: entry(m.reason_space_members),
 	space_rule_apply: entry(m.reason_space_rule_apply),
+	rule_apply_too_many: entry(m.reason_rule_apply_too_many, { max: 'number' }),
 	rule_disabled_deleted: entry(m.reason_rule_disabled_deleted, { kind: 'thing' }),
 	rule_disabled_personal_space: entry(m.reason_rule_disabled_personal_space),
 	rule_disabled_choice: entry(m.reason_rule_disabled_choice),
@@ -421,6 +431,8 @@ export const REASONS: Record<Exclude<ReasonCode, 'text' | 'error'>, ReasonEntry>
 	title_pattern_too_long: entry(m.reason_title_pattern_too_long, { max: 'number' }),
 	description_too_long: entry(m.reason_description_too_long, { max: 'number' }),
 	title_pattern_unknown: entry(m.reason_title_pattern_unknown),
+	template_unknown_value: entry(m.reason_template_unknown_value),
+	template_unknown_value_at: entry(m.reason_template_unknown_value_at, { known: 'list' }),
 	tag_own_parent: entry(m.reason_tag_own_parent),
 	groups_manual: entry(m.reason_groups_manual),
 	tag_wrong_scope: entry(m.reason_tag_wrong_scope, { scope: 'thing', expected: 'thing' }),
@@ -504,8 +516,9 @@ export const REASONS: Record<Exclude<ReasonCode, 'text' | 'error'>, ReasonEntry>
 	mail_rule_unreadable: entry(m.reason_mail_rule_unreadable)
 };
 
-/** The nouns the API names things by (the kind `thing`), in the user's language. */
-const THINGS: Record<string, () => string> = {
+/** The nouns the API names things by (the kind `thing`, the API's `Thing`), in the user's
+ * language: every one of `x-things` (a test holds the two together). */
+export const THINGS: Record<string, () => string> = {
 	// A step of a mail rule on a mail on the server.
 	'mail_step:read': m.mail_step_read,
 	'mail_step:unread': m.mail_step_unread,
@@ -557,6 +570,24 @@ const THINGS: Record<string, () => string> = {
 	issuer: m.thing_issuer,
 	'original filename': m.thing_original_filename,
 	'media type': m.thing_media_type,
+	mailbox: m.thing_mailbox,
+	'mail rule': m.thing_mail_rule,
+	'API token': m.thing_api_token,
+	'push device': m.thing_push_device,
+	'bulk operation': m.thing_bulk_operation,
+	'document version': m.thing_document_version,
+	'mail record': m.thing_mail_record,
+	'push preferences': m.thing_push_preferences,
+	'device name': m.thing_device_name,
+	fact: m.thing_fact,
+	file: m.thing_file,
+	identifier: m.thing_identifier,
+	relation: m.thing_relation,
+	task: m.thing_task,
+	version: m.thing_version,
+	instance: m.thing_instance,
+	'known device': m.thing_known_device,
+	'login failures': m.thing_login_failures,
 	'document tag': m.tag_kind_document,
 	'contact group': m.tag_kind_contact,
 	'document type group': m.tag_kind_type,
@@ -604,11 +635,25 @@ export const ACTIONS: Record<string, () => string> = {
 	manage_mailboxes: m.action_manage_mailboxes
 };
 
+/** A value the API sends with its type (`typed_value` of the core): a number, an amount, a date
+ * or a period, written as the language writes it; the API's English text where it cannot be. */
+function writeTyped(typed: { type?: unknown; value?: unknown; text?: unknown }): string {
+	const { type, value } = typed;
+	if (type === 'number' && Number.isFinite(Number(value)))
+		return formatNumber(Number(value), { maximumFractionDigits: 20 });
+	if (type === 'amount' && isMoney(value)) return formatMoney(value.amount, value.currency);
+	if (type === 'date' && isIsoDay(String(value))) return formatDate(String(value));
+	if (type === 'period' && isPeriod(value) && writePeriod(value.start, value.end))
+		return writePeriod(value.start, value.end);
+	return String(typed.text ?? '');
+}
+
 /** A field's value as a reason shows it: yes or no, not set, a name or text quoted as the
- * language quotes. */
+ * language quotes, a number, an amount, a date and a period in the formats of the UI. */
 function writeValue(value: unknown): string {
 	if (value === null || value === undefined) return m.value_unset();
 	if (typeof value === 'boolean') return value ? m.value_yes() : m.value_no();
+	if (typeof value === 'object') return writeTyped(value);
 	const text = String(value);
 	const inner = /^'(.*)'$/s.exec(text);
 	return inner ? quoted(inner[1]) : text;
@@ -629,13 +674,12 @@ function write(value: unknown, kind: ReasonKind | undefined, options: ReasonOpti
 		case 'value':
 			return writeValue(value);
 		case 'names':
-			return new Intl.ListFormat(listLocale(), { type: 'disjunction' }).format(
-				items(value).map((name) => quoted(String(name)))
+			return formatList(
+				items(value).map((name) => quoted(String(name))),
+				'disjunction'
 			);
 		case 'fields':
-			return new Intl.ListFormat(listLocale(), { type: 'conjunction' }).format(
-				items(value).map((name) => options.field?.(String(name)) ?? String(name))
-			);
+			return formatList(items(value).map((name) => options.field?.(String(name)) ?? String(name)));
 		case 'rule_values':
 			return items(value)
 				.map((item) => {
@@ -646,9 +690,7 @@ function write(value: unknown, kind: ReasonKind | undefined, options: ReasonOpti
 		case 'path':
 			return items(value).map(String).join(' → ');
 		case 'list':
-			return new Intl.ListFormat(listLocale(), { type: 'conjunction' }).format(
-				items(value).map((name) => quoted(String(name)))
-			);
+			return formatList(items(value).map((name) => quoted(String(name))));
 		case 'thing':
 			return own(THINGS, String(value))?.() ?? String(value);
 		case 'action':
@@ -658,9 +700,9 @@ function write(value: unknown, kind: ReasonKind | undefined, options: ReasonOpti
 		case 'identifier_kind':
 			return labelOfKind(String(value));
 		case 'nodes':
-			return new Intl.ListFormat(listLocale(), { type: 'conjunction' }).format(
+			return formatList(
 				items(value).map((node) => {
-					const label = NODE_LABELS[String(node) as keyof typeof NODE_LABELS];
+					const label = own<() => string>(NODE_LABELS, String(node));
 					return label ? label() : String(node);
 				})
 			);

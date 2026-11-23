@@ -2,10 +2,10 @@
 // history by month and the hit rate per field, for the channels and the period chosen.
 import { render, screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { formatDuration } from '#lib/duration.ts';
 import { m } from '#lib/paraglide/messages.js';
-import { calls, fakeApi } from '#lib/testing/api.ts';
+import { calls, fakeApi, problem } from '#lib/testing/api.ts';
 import AutomationTab from './AutomationTab.svelte';
 
 const lanes = (green: number, yellow: number, red: number) => ({ green, yellow, red });
@@ -52,8 +52,6 @@ const report = {
 	]
 };
 
-afterEach(() => vi.unstubAllGlobals());
-
 function serve(body: unknown = report) {
 	const api = fakeApi({ 'GET /api/v1/automation': () => body });
 	vi.stubGlobal('fetch', api);
@@ -66,6 +64,10 @@ describe('the automation tab', () => {
 		render(AutomationTab);
 		expect(await screen.findByText(m.automation_first_green({ count: '70' }))).toBeTruthy();
 		expect(screen.getByText(/^70\s?%$/)).toBeTruthy();
+		// Every lane is LaneBadge: its icon and its word, never the colour alone.
+		const badges = [...document.querySelectorAll('[data-lane]')];
+		expect(badges.length).toBeGreaterThanOrEqual(3);
+		expect(badges.every((badge) => badge.querySelector('svg') !== null)).toBe(true);
 		expect(screen.getByText(formatDuration(52))).toBeTruthy();
 		expect(
 			screen.getByText(
@@ -118,6 +120,42 @@ describe('the automation tab', () => {
 		expect(calls(api)).toHaveLength(6);
 	});
 
+	it('says so when another choice could not be read: the figures are the old ones (WE-02)', async () => {
+		// The chip stood at the new choice above the old figures, without a word.
+		let down = false;
+		const api = fakeApi({
+			'GET /api/v1/automation': () => (down ? problem(500, { detail: 'boom' }) : report)
+		});
+		vi.stubGlobal('fetch', api);
+		render(AutomationTab);
+		await screen.findByText(m.automation_first_green({ count: '70' }));
+		expect(screen.queryByRole('alert')).toBeNull();
+		down = true;
+		await userEvent.click(screen.getByRole('button', { name: m.automation_channel_migration() }));
+		expect((await screen.findByRole('alert')).textContent).toContain('boom');
+		expect(screen.getByText(m.automation_first_green({ count: '70' }))).toBeTruthy();
+		down = false;
+		await userEvent.click(screen.getByRole('button', { name: m.retry() }));
+		await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
+		expect(calls(api)).toHaveLength(3);
+	});
+
+	it('names one document in the singular (WY-02)', async () => {
+		serve({
+			...report,
+			lanes: lanes(1, 0, 0),
+			fields: [
+				{ field: 'contact', name: null, verdicts: verdicts(0, 0, 1, 0), early: 0 },
+				{ field: 'field:a1', name: 'Betrag', verdicts: verdicts(0, 0, 3, 0), early: 0 }
+			]
+		});
+		render(AutomationTab);
+		expect(await screen.findByText(/^1 (Dokument|document) · /)).toBeTruthy();
+		expect(screen.getByText(m.automation_field_decided_one())).toBeTruthy();
+		// One custom field with several decisions: "in 1 Feld".
+		expect(screen.getByText(m.automation_custom_decided_one_field({ count: '3' }))).toBeTruthy();
+	});
+
 	it('tells the hit rate per field and groups the custom fields', async () => {
 		serve();
 		render(AutomationTab);
@@ -126,7 +164,8 @@ describe('the automation tab', () => {
 				m.automation_field_counts({ taken: '28', accepted: '2', corrected: '6', added: '4' })
 			)
 		).toBeTruthy();
-		expect(screen.getByText(m.automation_hits_early({ count: '1' }))).toBeTruthy();
+		// WY-02: one is named in the singular, never "1 Felder".
+		expect(screen.getByText(m.automation_hits_early_one())).toBeTruthy();
 		const group = screen.getByRole('button', { name: new RegExp(m.automation_custom_fields()) });
 		expect(group.getAttribute('aria-expanded')).toBe('true');
 		expect(screen.getByText('Betrag')).toBeTruthy();

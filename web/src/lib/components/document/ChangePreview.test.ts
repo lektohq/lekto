@@ -1,18 +1,18 @@
 import { render, screen } from '@testing-library/svelte';
 import { describe, expect, it } from 'vitest';
 import type { components } from '#lib/api/schema.ts';
-import type { Lookup } from '#lib/masterdata.svelte.ts';
 import { formatMoney } from '#lib/i18n.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { documentOf } from '#lib/testing/documents.ts';
 import ChangePreview from './ChangePreview.svelte';
+import { lookupOf } from '#lib/testing/master-data.ts';
 
 type Preview = components['schemas']['DocumentPreviewOut'];
 
 const NET = 'f-net';
 const space = (id: string, name: string, members: { user_id: string; role: 'edit' | 'read' }[]) =>
 	({ id, name, personal_of: null, description: null, role: 'edit', members }) as never;
-const lookup = {
+const lookup = lookupOf({
 	contacts: [],
 	documentTypes: [],
 	tags: [
@@ -24,14 +24,14 @@ const lookup = {
 		space('s-erika', 'Erika', [{ user_id: 'u-erika', role: 'edit' }]),
 		space('s-family', 'Familie', [
 			{ user_id: 'u-erika', role: 'edit' },
-			{ user_id: 'u-max', role: 'read' }
+			{ user_id: 'u-john', role: 'read' }
 		])
 	],
 	users: [
 		{ id: 'u-erika', username: 'erika', display_name: 'Jane Doe' },
-		{ id: 'u-max', username: 'max', display_name: 'Max Muster' }
+		{ id: 'u-john', username: 'john', display_name: 'John Doe' }
 	]
-} as unknown as Lookup;
+});
 
 const before = documentOf({
 	space_id: 's-erika',
@@ -88,7 +88,7 @@ describe('ChangePreview', () => {
 					space_id: 's-family',
 					members: [
 						{ user_id: 'u-erika', role: 'edit' },
-						{ user_id: 'u-max', role: 'read' }
+						{ user_id: 'u-john', role: 'read' }
 					]
 				}
 			})
@@ -96,7 +96,7 @@ describe('ChangePreview', () => {
 		expect(screen.getByText(m.dryrun_rules_one())).toBeTruthy();
 		expect(screen.getByText(m.dryrun_visible())).toBeTruthy();
 		expect(screen.getByText('Familie')).toBeTruthy();
-		const max = screen.getByText(m.space_member_reads({ name: 'Max Muster' }));
-		expect(max.parentElement?.textContent).toContain(m.dryrun_new());
+		const john = screen.getByText(m.space_member_reads({ name: 'John Doe' }));
+		expect(john.parentElement?.textContent).toContain(m.dryrun_new());
 	});
 });

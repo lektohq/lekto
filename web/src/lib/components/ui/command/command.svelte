@@ -1,4 +1,11 @@
+<script lang="ts" module>
+	/** The id of a command's list, which its search field controls (WCAG 4.1.2). bits-ui links
+	 * the two only through a viewport nobody uses. */
+	export const COMMAND_LIST = Symbol('command list');
+</script>
+
 <script lang="ts">
+	import { setContext } from 'svelte';
 	import { cn } from '#lib/utils.ts';
 	import { Command as CommandPrimitive } from 'bits-ui';
 
@@ -18,6 +25,9 @@
 	}: CommandPrimitive.RootProps & {
 		api?: CommandRootApi | null;
 	} = $props();
+
+	const uid = $props.id();
+	setContext(COMMAND_LIST, `${uid}-list`);
 </script>
 
 <CommandPrimitive.Root

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { formatNumber } from '#lib/i18n.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import { NODE_LABELS } from '#lib/node-labels.ts';
 	import { progress, type NodeState, type Processing } from '#lib/pipeline.ts';
@@ -26,10 +27,10 @@
 		counted.running.length > 0
 			? m.doc_processing({
 					node: counted.running.map((node) => NODE_LABELS[node]()).join(', '),
-					done: counted.done,
-					total: counted.total
+					done: formatNumber(counted.done),
+					total: formatNumber(counted.total)
 				})
-			: m.upload_progress({ done: counted.done, total: counted.total })
+			: m.upload_progress({ done: formatNumber(counted.done), total: formatNumber(counted.total) })
 	);
 
 	function tone(state: NodeState): string {
@@ -69,7 +70,12 @@
 
 <span class={cn('flex min-w-0 flex-col gap-1', className)}>
 	{#if href}
-		<a {href} class="block rounded-full py-1 hover:opacity-80" aria-label={now}>
+		<!-- The bar is 6 px tall: its hit area reaches 24 px with a mouse and 44 px on a phone. -->
+		<a
+			{href}
+			class="relative block rounded-full py-1 after:absolute after:inset-x-0 after:-inset-y-1.5 hover:opacity-80 max-sm:after:-inset-y-4"
+			aria-label={now}
+		>
 			{@render bar()}
 		</a>
 	{:else}

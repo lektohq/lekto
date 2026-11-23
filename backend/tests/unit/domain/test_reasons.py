@@ -20,6 +20,7 @@ from lekto.core.domain.reasons import (
     catalog,
     reasons_from_json,
     text_of,
+    typed_value,
     written,
 )
 from lekto.core.domain.webhooks import validate_url
@@ -54,6 +55,11 @@ def test_the_english_text_writes_each_kind() -> None:
     )
     assert because(ReasonCode.DATE_IMPLAUSIBLE, date="1899-12-31").text == (
         "1899-12-31 is not plausible"
+    )
+    # A value with its type reads as its English text.
+    day = typed_value("date", "2026-03-31", "2026-03-31")
+    assert because(ReasonCode.MODEL_VALUE_OTHER, value=day).text == (
+        "the model set another value (2026-03-31)"
     )
     values: list[JsonValue] = [{"rule": "Paid", "value": True}, {"rule": "Open", "value": None}]
     assert because(ReasonCode.RULES_DISAGREE, values=values).text == (
@@ -136,7 +142,7 @@ def test_a_field_check_stores_its_reasons_beside_the_english_text() -> None:
             "'ABC' is no personnel number (3 to 30 letters and digits, one a digit)",
         ),
         (
-            lambda: check_new_password("short", "tobi"),
+            lambda: check_new_password("short", "john"),
             ReasonCode.PASSWORD_TOO_SHORT,
             {"min": PASSWORD_MIN_LENGTH},
             f"the password must have at least {PASSWORD_MIN_LENGTH} characters",

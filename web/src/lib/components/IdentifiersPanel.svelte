@@ -43,6 +43,7 @@
 		openTotal,
 		targetName
 	} from '#lib/open-identifiers.ts';
+	import { latest } from '#lib/latest.ts';
 	import { Pager } from '#lib/paging.svelte.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import { phone } from '#lib/phone.svelte.ts';
@@ -95,7 +96,11 @@
 		}
 	}
 
+	// The numbers beside the list hang on the words and the kind as the list does: those of an
+	// answer that a later request overtook are dropped with it.
+	const newest = latest();
 	const list = new Pager<OpenIdentifier>(async (offset, limit) => {
+		const current = newest();
 		const params = {
 			query: {
 				source: source || undefined,
@@ -112,11 +117,13 @@
 				? api.POST('/api/v1/identifiers/open/search', { params, body: { q: words } })
 				: api.GET('/api/v1/identifiers/open', { params })
 		);
-		rememberOpenRefs(found.items);
-		counts = found.counts;
-		kinds = found.kinds;
-		recommended = found.recommended;
-		toConfirm = found.to_confirm;
+		if (current()) {
+			rememberOpenRefs(found.items);
+			counts = found.counts;
+			kinds = found.kinds;
+			recommended = found.recommended;
+			toConfirm = found.to_confirm;
+		}
 		return { items: found.items, total: found.total };
 	}, SIZE);
 	const listed = $derived(
@@ -290,17 +297,17 @@
 {#snippet bar()}
 	<SelectionBar count={m.selection_selected({ count: formatNumber(selection.length) })} {busy}>
 		{#snippet trail()}
-			<Button variant="ghost" size="sm" disabled={busy} onclick={() => (chosen = {})}>
+			<Button variant="ghost" size="sm" {busy} onclick={() => (chosen = {})}>
 				<X aria-hidden="true" />
 				{m.open_selection_clear()}
 			</Button>
 		{/snippet}
 		{#snippet actions()}
-			<Button variant="outline" size="sm" disabled={busy} onclick={() => decideChosen('reject')}>
+			<Button variant="outline" size="sm" {busy} onclick={() => decideChosen('reject')}>
 				<Ban aria-hidden="true" />
 				{m.open_reject()}
 			</Button>
-			<Button size="sm" disabled={busy} onclick={() => decideChosen('confirm')}>
+			<Button size="sm" {busy} onclick={() => decideChosen('confirm')}>
 				<Check aria-hidden="true" />
 				{m.open_confirm()}
 			</Button>
@@ -428,7 +435,11 @@
 			</Card.Root>
 		{:else}
 			<Card.Root size="flush" class="overflow-hidden">
-				<Table.Root class="table-fixed" aria-label={m.master_identifiers()}>
+				<Table.Root
+					class="table-fixed"
+					label={m.master_identifiers()}
+					aria-label={m.master_identifiers()}
+				>
 					<Table.Header>
 						<Table.Row>
 							<Table.Head class="w-12 pl-4">

@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { m } from '#lib/paraglide/messages.js';
 import { ApiError } from '#lib/api/problem.ts';
+import { problemOf, type ProblemParts } from '#lib/testing/api.ts';
+import type { ReasonCode } from '#lib/reasons.ts';
 import { keyAt, saveErrors } from './errors.ts';
 import {
 	FIELD_TYPE_OPERATORS,
@@ -31,24 +34,9 @@ import {
 	type RuleModel
 } from './model.ts';
 
-const failed = (status: number, detail: string, spaceId: string | null = null) =>
-	new ApiError(
-		status,
-		{
-			type: 'about:blank',
-			title: 'Failed',
-			status,
-			detail,
-			existing_document_id: null,
-			space_id: spaceId,
-			open_fields: null,
-			blocking_spaces: null,
-			second_factor_required: null,
-			reason: null,
-			errors: null
-		},
-		null
-	);
+/** A refused save as the API sends it: the English `detail`, a reason where the core gives one. */
+const failed = (status: number, detail: string, parts: ProblemParts = {}) =>
+	new ApiError(status, problemOf(status, { detail, ...parts }), null);
 
 const ID = (n: number) => `01999d5e-${String(n).padStart(4, '0')}-7c1e-b6a3-2f4d5e6f7a8b`;
 
@@ -96,9 +84,9 @@ const EVERY_CONDITION: ApiCondition[] = [
 	cond('document_date', 'gt', '2025-12-31'),
 	cond('document_date', 'lt', '2027-01-01'),
 	cond('document_date', 'present'),
-	fieldCondition(101, 'is', 'ACME'),
-	fieldCondition(101, 'in', ['ACME', 'Globex']),
-	fieldCondition(101, 'contains', 'acme'),
+	fieldCondition(101, 'is', 'Muster AG'),
+	fieldCondition(101, 'in', ['Muster AG', 'Muster KG']),
+	fieldCondition(101, 'contains', 'muster'),
 	fieldCondition(101, 'matches', '^A'),
 	fieldCondition(102, 'is', 'https://example.org'),
 	fieldCondition(103, 'gt', '12.5'),
@@ -187,7 +175,8 @@ describe('the rule model', () => {
 		expect(out.actions).toEqual([{ type: 'add_tags', tag_ids: [ID(4), ID(5)] }]);
 	});
 
-	it('mirrors the operator tables of the core', () => {
+	it('offers the comparisons of each field in this order, the first as its default', () => {
+		// Which comparisons, the core's: backend/tests/unit/test_rule_operators_web.py (WT2-09).
 		expect(CONDITION_FIELD_OPERATORS).toEqual({
 			contact: ['is', 'in', 'present', 'missing'],
 			contact_group: ['contains', 'in', 'present', 'missing'],
@@ -501,24 +490,92 @@ describe('errors of saving', () => {
 			byKey: { [group.items[1].key]: "operator 'contains' does not apply" },
 			general: null
 		});
-		const missing = failed(404, `tag ${ID(4)} not found`);
-		expect(Object.keys(saveErrors(missing, model).byKey)).toEqual([
-			group.items[0].key,
-			model.actions[0].key
-		]);
-		const forbidden = failed(403, "no write access to space 'Office'", ID(8));
-		expect(Object.keys(saveErrors(forbidden, model).byKey)).toEqual([model.actions[1].key]);
-		const elsewhere = failed(403, 'only admins change global rules');
-		expect(saveErrors(elsewhere, model).byKey).toEqual({});
+		const missing = failed(404, `tag ${ID(4)} not found`, {
+			code: 'not_found',
+			params: { kind: 'tag', id: ID(4) }
+		});
+		expect(saveErrors(missing, model).byKey).toEqual({
+			[group.items[0].key]: m.rule_error_missing(),
+			[model.actions[0].key]: m.rule_error_missing()
+		});
+		const forbidden = failed(403, "no write access to space 'Office'", {
+			code: 'no_write_access_to_space',
+			params: { space: 'Office' },
+			space_id: ID(8)
+		});
+		expect(saveErrors(forbidden, model).byKey).toEqual({
+			[model.actions[1].key]:
+				`${m.error_forbidden()} ${m.reason_no_write_access_to_space({ space: 'Office' })}`
+		});
+		const elsewhere = failed(403, 'only admins change global rules', {
+			code: 'admins_only',
+			params: { action: 'change_global_rules' }
+		});
+		expect(saveErrors(elsewhere, model)).toEqual({
+			byKey: {},
+			general: `${m.error_forbidden()} ${m.reason_admins_only({ action: m.action_change_global_rules() })}`
+		});
 		const typed = fromApi(
 			definition({ all: [cond('channel', 'is', 'web')], not: false }, [
 				{ type: 'set_document_type', document_type_id: ID(9) }
 			])
 		);
-		const type = failed(404, `document type ${ID(9)} not found`);
+		const type = failed(404, `document type ${ID(9)} not found`, {
+			code: 'not_found',
+			params: { kind: 'document type', id: ID(9) }
+		});
 		expect(Object.keys(saveErrors(type, typed).byKey)).toEqual([typed.actions[0].key]);
 		const other = failed(409, 'changed meanwhile');
 		expect(saveErrors(other, model)).toEqual({ byKey: {}, general: 'changed meanwhile' });
+	});
+
+	it("says an invalid pattern in the user's language, at the conditions that hold it (WD-01)", () => {
+		// The API names no place, but its reason with a code: the English text stood as a
+		// general line, and no condition was marked.
+		const refused = (code: ReasonCode, params: Record<string, unknown>, detail: string) =>
+			failed(422, detail, { code, params });
+		const patterned = fromApi(
+			definition(
+				{
+					all: [
+						cond('text', 'matches', '(a'),
+						cond('text', 'contains', '(a'),
+						{ any: [cond('text', 'matches', '(a'), cond('text', 'matches', 'b+')], not: false }
+					],
+					not: false
+				},
+				[]
+			)
+		);
+		const inner = patterned.conditions.items[2] as GroupNode;
+		const invalid = refused(
+			'pattern_invalid',
+			{ pattern: '(a', detail: 'missing ) at position 2' },
+			"invalid pattern '(a': missing ) at position 2"
+		);
+		const message = m.reason_pattern_invalid({ pattern: '(a', detail: 'missing ) at position 2' });
+		expect(saveErrors(invalid, patterned)).toEqual({
+			byKey: { [patterned.conditions.items[0].key]: message, [inner.items[0].key]: message },
+			general: null
+		});
+		// A pattern no condition holds (changed meanwhile), and any other reason without a
+		// place: said in general, in the user's language all the same.
+		expect(saveErrors(invalid, model)).toEqual({ byKey: {}, general: message });
+	});
+
+	it("says a value templates do not know in the user's language, at its action (WD-11)", () => {
+		// The API's own message has a code and names its place; before, the English text stood
+		// at the block.
+		const params = { at: 'actions[0]', value: 'contct', known: ['contact', 'title'] };
+		const detail = "actions[0]: unknown value contct; templates know 'contact', 'title'";
+		const refused = failed(422, detail, { code: 'template_unknown_value_at', params });
+		const said = saveErrors(refused, model);
+		expect(said.general).toBeNull();
+		expect(Object.keys(said.byKey)).toEqual([model.actions[0].key]);
+		const message = said.byKey[model.actions[0].key];
+		expect(message).toContain('contct');
+		expect(message).not.toContain('unknown value');
+		expect(message).toContain('field.<key>');
 	});
 });
 
@@ -596,6 +653,20 @@ describe('steps of a rule', () => {
 		expect(problems[first.key]).toEqual({ code: 'step_unknown' });
 		second.path = 'flow..amount';
 		expect(validate(model, FIELDS)[second.key]).toEqual({ code: 'path' });
+	});
+
+	it('wants a number where a step condition compares with one, not an emptied field (WD-13)', () => {
+		const model = fromApi(stepsDefinition);
+		const [ask, condition] = model.actions;
+		if (ask.type !== 'ask_webhook' || condition.type !== 'condition') throw new Error('steps');
+		const [first] = conditionsOf(condition.conditions);
+		first.path = `${ask.name}.total`;
+		first.op = 'is';
+		first.value = 7;
+		expect(validate(model, FIELDS)[first.key]).toBeUndefined();
+		// The emptied number field: still a number by its kind, and none.
+		first.value = NaN;
+		expect(validate(model, FIELDS)[first.key]).toEqual({ code: 'number' });
 	});
 
 	it('wants an action besides conditions, and a step name once', () => {

@@ -36,9 +36,10 @@
 {:else if count === 0}
 	<span class="shrink-0 px-2 text-sm text-muted-foreground tabular-nums">{label}</span>
 {:else}
+	<!-- 28 px tall as drawn; its hit area is the 32 px of a control in a row. -->
 	<a
 		{href}
-		class="inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-sm text-brand tabular-nums hover:bg-panel hover:underline"
+		class="relative inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-sm text-brand tabular-nums after:absolute after:inset-x-0 after:-inset-y-0.5 hover:bg-panel hover:underline"
 	>
 		<Icon class="size-3.5" aria-hidden="true" />
 		{label}

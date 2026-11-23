@@ -3,6 +3,7 @@
 	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import { untrack } from 'svelte';
 	import { toast } from 'svelte-sonner';
+	import { formatNumber } from '#lib/i18n.ts';
 	import { api } from '#lib/api/client.ts';
 	import { unwrap } from '#lib/api/call.ts';
 	import type { components } from '#lib/api/schema.ts';
@@ -153,9 +154,27 @@
 		);
 	}
 
-	// Something typed or chosen since the form opened, to ask before it is lost; cleared once
-	// saved or cancelled.
-	let touched = $state(false);
+	// Whether the form differs from how it opened, to ask before that is lost. Held against
+	// what it holds, not against events: a trigger, a kind of body or a model call chosen and a
+	// header removed send no event of a form, and what is typed back is no change. Not asked
+	// once saved or cancelled (`leaving`).
+	const held = () =>
+		JSON.stringify([
+			name,
+			url,
+			trigger,
+			all,
+			types,
+			signed,
+			headers,
+			body,
+			template,
+			openTasks,
+			modelCall,
+			callMinutes
+		]);
+	const opened = untrack(held);
+	const changed = $derived(held() !== opened);
 	let leaving = $state(false);
 
 	/** Saved: on to the webhook's page, once a new secret was seen. */
@@ -218,14 +237,9 @@
 	}
 </script>
 
-<UnsavedGuard dirty={touched && !leaving} />
+<UnsavedGuard dirty={changed && !leaving} />
 
-<AsyncForm
-	class="flex max-w-3xl flex-col gap-6"
-	action={save}
-	ondone={() => {}}
-	onchanged={() => (touched = true)}
->
+<AsyncForm class="flex max-w-3xl flex-col gap-6" action={save} ondone={() => {}}>
 	{#snippet children({ busy, error })}
 		<Field.Field>
 			<Field.Label for="wh-name">{m.field_name()}</Field.Label>
@@ -287,10 +301,16 @@
 				{:else}
 					<p class="text-sm text-muted-foreground">
 						{volume.least === volume.most
-							? m.webhook_volume_total_exact({ count: volume.least })
-							: m.webhook_volume_total_range({ least: volume.least, most: volume.most })}
+							? m.webhook_volume_total_exact({ count: formatNumber(volume.least) })
+							: m.webhook_volume_total_range({
+									least: formatNumber(volume.least),
+									most: formatNumber(volume.most)
+								})}
 						{#if volume.steps.most > 0}
-							{m.webhook_volume_steps({ least: volume.steps.least, most: volume.steps.most })}
+							{m.webhook_volume_steps({
+								least: formatNumber(volume.steps.least),
+								most: formatNumber(volume.steps.most)
+							})}
 						{/if}
 					</p>
 				{/if}
@@ -378,8 +398,8 @@
 			/>
 			<Field.Description id="wh-open-tasks-rule"
 				>{m.webhook_open_tasks_rule({
-					min: WEBHOOK_LIMITS.openTasks.min,
-					max: WEBHOOK_LIMITS.openTasks.max
+					min: formatNumber(WEBHOOK_LIMITS.openTasks.min),
+					max: formatNumber(WEBHOOK_LIMITS.openTasks.max)
 				})}</Field.Description
 			>
 		</Field.Field>
@@ -429,7 +449,7 @@
 					class={cn(buttonVariants({ variant: 'ghost' }))}
 					onclick={() => (leaving = true)}>{m.cancel()}</a
 				>
-				<Button type="submit" disabled={busy || incomplete}>
+				<Button type="submit" {busy} disabled={incomplete}>
 					{webhook ? m.save() : m.create()}
 				</Button>
 			</div>

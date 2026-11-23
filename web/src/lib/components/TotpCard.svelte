@@ -97,7 +97,7 @@
 			</div>
 		{:else}
 			<div>
-				<Button disabled={busy} onclick={start}>{m.totp_setup()}</Button>
+				<Button {busy} onclick={start}>{m.totp_setup()}</Button>
 			</div>
 		{/if}
 	</Card.Content>

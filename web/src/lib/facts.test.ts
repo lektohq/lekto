@@ -30,7 +30,7 @@ const FACTS: Facts = {
 	named: [
 		{
 			contact_id: CONTACT,
-			name: 'Lekto Test GmbH',
+			name: 'Muster GmbH',
 			alias: false,
 			in_text: true,
 			in_code: true,
@@ -53,7 +53,7 @@ const FACTS: Facts = {
 		},
 		{
 			kind: 'vat_id',
-			value: 'DE312456789',
+			value: 'DE987654321',
 			contact_id: 'contact-2',
 			in_text: true,
 			in_code: false,
@@ -84,7 +84,7 @@ const FACTS: Facts = {
 			text: 'BCD',
 			places: [{ page: 1, boxes: [{ x: 0.7, y: 0.8, width: 0.1, height: 0.1 }] }],
 			giro: {
-				name: 'Lekto Test GmbH',
+				name: 'Muster GmbH',
 				iban: 'DE89370400440532013000',
 				bic: null,
 				amount: { amount: '123.45', currency: 'EUR' },
@@ -133,11 +133,11 @@ describe('facts', () => {
 	it('groups them by the document contact, others and none', () => {
 		const groups = grouped(FACTS);
 		expect(groups.own.map((item) => ('name' in item ? item.name : item.value))).toEqual([
-			'Lekto Test GmbH',
+			'Muster GmbH',
 			'DE89370400440532013000'
 		]);
 		expect(groups.others.map((item) => ('value' in item ? item.value : ''))).toEqual([
-			'DE312456789'
+			'DE987654321'
 		]);
 		expect(groups.unknown.map((item) => item.value)).toEqual(['12345678']);
 		expect(factCounts(FACTS)).toEqual({ evidence: 2, unknown: 1, codes: 1 });
@@ -283,5 +283,20 @@ describe('a fact of the filter', () => {
 		expect(factFilterLabel('invoice_number:AbC:')).toBe(`${kindLabel('invoice_number')} R1001`);
 		rememberRef('iban', 'DeF', 'DE89370400440532013000');
 		expect(factFilterLabel('iban:DeF:')).toBe(`${kindLabel('iban')} DE89 3704 0044 0532 0130 00`);
+	});
+
+	// What every object has is no kind and no role: such a name in a link once broke the list.
+	it.each([
+		'__proto__',
+		'__defineGetter__',
+		'valueOf',
+		'toString',
+		'constructor',
+		'hasOwnProperty'
+	])('names %s as written, as any kind or role it does not know', (name) => {
+		expect(factFilterLabel(`${name}::`)).toBe(name);
+		expect(factFilterLabel(`${name}:AbC:`)).toBe(name);
+		expect(factFilterLabel(`::${name}`)).toBe(`${m.filter_fact_any_kind()} · ${name}`);
+		expect(factFilterLabel(`iban::${name}`)).toBe(`${kindLabel('iban')} · ${name}`);
 	});
 });

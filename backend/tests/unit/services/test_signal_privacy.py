@@ -18,15 +18,15 @@ _run = partial(node_run, why="contact")
 
 
 async def _scene(world: World) -> tuple[User, User, Document, Document, Document]:
-    """Tobi's private document, one in a space he shares with Erika, and the new one there,
+    """John's private document, one in a space he shares with Erika, and the new one there,
     whose signals found both."""
-    tobi, erika = await world.user(), await world.user()
-    shared = await world.spaces.create(Actor(tobi.id), "Shared")
-    await world.spaces.set_member(Actor(tobi.id), shared.id, erika.id, SpaceRole.EDIT)
-    home = await world.personal_space(tobi)
-    private = builders.processed(tobi, home, content="private")
-    common = builders.processed(tobi, shared, content="common")
-    new = builders.processed(tobi, shared, content="new")
+    john, erika = await world.user(), await world.user()
+    shared = await world.spaces.create(Actor(john.id), "Shared")
+    await world.spaces.set_member(Actor(john.id), shared.id, erika.id, SpaceRole.EDIT)
+    home = await world.personal_space(john)
+    private = builders.processed(john, home, content="private")
+    common = builders.processed(john, shared, content="common")
+    new = builders.processed(john, shared, content="new")
     found: list[dict[str, object]] = [
         {"document_id": str(item.id), "score": 0.9, "contact_id": None, "tag_ids": []}
         for item in (private, common)
@@ -53,7 +53,7 @@ async def _scene(world: World) -> tuple[User, User, Document, Document, Document
         )
         await uow.processing_log.append(_run(new, Node.JUDGE, {"fields": checks_to_json([check])}))
         await uow.commit()
-    return tobi, erika, private, common, new
+    return john, erika, private, common, new
 
 
 def _neighbours(log: list[NodeRun]) -> tuple[list[object], bool]:
@@ -72,7 +72,7 @@ def _sources(log: list[NodeRun]) -> Any:
 
 
 async def test_a_co_editor_sees_only_the_similar_documents_they_may_read(world: World) -> None:
-    tobi, erika, private, common, new = await _scene(world)
+    john, erika, private, common, new = await _scene(world)
     log = await world.documents.processing_log(Actor(erika.id), new.id)
     assert _neighbours(log) == ([str(common.id)], False)
     assert _sources(log) == [str(common.id)]
@@ -80,7 +80,7 @@ async def test_a_co_editor_sees_only_the_similar_documents_they_may_read(world: 
     (judge,) = [node for node in review.nodes if node.node is Node.JUDGE]
     assert judge.fields[0].candidates[0].sources[0].documents == (str(common.id),)
     # The uploader reads both; what his documents carry stays with admins.
-    assert _neighbours(await world.documents.processing_log(Actor(tobi.id), new.id)) == (
+    assert _neighbours(await world.documents.processing_log(Actor(john.id), new.id)) == (
         [str(private.id), str(common.id)],
         False,
     )
@@ -91,9 +91,9 @@ async def test_a_co_editor_sees_only_the_similar_documents_they_may_read(world: 
 async def test_who_received_a_document_sees_none_of_the_givers_similar_documents(
     world: World,
 ) -> None:
-    tobi, _, _, _, new = await _scene(world)
+    john, _, _, _, new = await _scene(world)
     bob = await world.user()
-    await world.documents.move(Actor(tobi.id), new.id, (await world.personal_space(bob)).id)
+    await world.documents.move(Actor(john.id), new.id, (await world.personal_space(bob)).id)
     log = await world.documents.processing_log(Actor(bob.id), new.id)
     assert _neighbours(log) == ([], False)
     assert _sources(log) == []

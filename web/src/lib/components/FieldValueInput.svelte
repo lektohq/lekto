@@ -27,6 +27,10 @@
 		onunreadable?: (unreadable: boolean) => void;
 	} = $props();
 
+	// The error below the field belongs to it: who lands on the field hears it (web/DESIGN.md,
+	// "Fields").
+	const errorId = $derived(error ? `${id}-error` : undefined);
+
 	const yesNo = $derived([
 		{ value: '', label: m.value_unset() },
 		{ value: 'true', label: m.value_yes() },
@@ -46,6 +50,7 @@
 			bind:value={value.amount}
 			{disabled}
 			aria-invalid={error ? true : undefined}
+			aria-describedby={errorId}
 			class="flex-1"
 		/>
 		<Input
@@ -57,13 +62,41 @@
 		/>
 	</div>
 {:else if field.data_type === 'period' && isPeriod(value)}
-	<PeriodInput bind:value {id} {disabled} invalid={Boolean(error)} {onunreadable} />
+	<PeriodInput
+		bind:value
+		{id}
+		{disabled}
+		invalid={Boolean(error)}
+		describedby={errorId}
+		{onunreadable}
+	/>
 {:else if field.data_type === 'boolean' && typeof value === 'string'}
-	<Select {id} bind:value {disabled} options={yesNo} aria-invalid={error ? true : undefined} />
+	<Select
+		{id}
+		bind:value
+		{disabled}
+		options={yesNo}
+		aria-invalid={error ? true : undefined}
+		aria-describedby={errorId}
+	/>
 {:else if field.data_type === 'choice' && typeof value === 'string'}
-	<Select {id} bind:value {disabled} options={choices} aria-invalid={error ? true : undefined} />
+	<Select
+		{id}
+		bind:value
+		{disabled}
+		options={choices}
+		aria-invalid={error ? true : undefined}
+		aria-describedby={errorId}
+	/>
 {:else if field.data_type === 'date' && typeof value === 'string'}
-	<DateInput {id} label={field.name} bind:value {disabled} invalid={!!error} />
+	<DateInput
+		{id}
+		label={field.name}
+		bind:value
+		{disabled}
+		invalid={!!error}
+		describedby={errorId}
+	/>
 {:else if typeof value === 'string'}
 	<Input
 		{id}
@@ -72,6 +105,7 @@
 		type={field.data_type === 'link' ? 'url' : 'text'}
 		inputmode={field.data_type === 'number' ? 'decimal' : undefined}
 		aria-invalid={error ? true : undefined}
+		aria-describedby={errorId}
 	/>
 {/if}
-{#if error}<Field.Error>{error}</Field.Error>{/if}
+{#if error}<Field.Error id={errorId}>{error}</Field.Error>{/if}

@@ -1,12 +1,13 @@
 <script lang="ts">
 	import Select from '#lib/components/Select.svelte';
 	import ActionRow from '#lib/components/rules/ActionRow.svelte';
+	import AddActionMenu from '#lib/components/rules/AddActionMenu.svelte';
+	import RuleFormFoot from '#lib/components/rules/RuleFormFoot.svelte';
+	import RuleFormHead from '#lib/components/rules/RuleFormHead.svelte';
 	import ConditionGroup, { type RowMoves } from '#lib/components/rules/ConditionGroup.svelte';
 	import ConditionRow from '#lib/components/rules/ConditionRow.svelte';
-	import { Button, buttonVariants } from '#lib/components/ui/button/index.ts';
 	import HintLabel from '#lib/components/HintLabel.svelte';
 	import * as Field from '#lib/components/ui/field/index.ts';
-	import { Input } from '#lib/components/ui/input/index.ts';
 	import type { Lookup } from '#lib/masterdata.svelte.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import { ACTION_LABELS, TRIGGER_LABELS } from '#lib/rules/describe.ts';
@@ -26,9 +27,6 @@
 		type RuleModel
 	} from '#lib/rules/model.ts';
 	import SectionTitle from '#lib/components/page/SectionTitle.svelte';
-	import Plus from '@lucide/svelte/icons/plus';
-	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.ts';
-	import { cn } from '#lib/utils.ts';
 
 	// The form of a rule: name, priority, when it runs, its conditions and actions. The page
 	// saves it; `errors` are by key (see `validate` and `saveErrors`). It does not save while a
@@ -96,32 +94,7 @@
 		onsubmit();
 	}}
 >
-	<div class="grid gap-4 sm:grid-cols-[1fr_12rem]">
-		<Field.Field>
-			<Field.Label for="rule-name">{m.field_name()}</Field.Label>
-			<Input
-				id="rule-name"
-				bind:value={model.name}
-				maxlength={LIMITS.name}
-				aria-invalid={errors.name ? true : undefined}
-			/>
-			{#if errors.name}<Field.Error>{errors.name}</Field.Error>{/if}
-		</Field.Field>
-		<Field.Field>
-			<Field.Label for="rule-priority">{m.rule_priority()}</Field.Label>
-			<Input
-				id="rule-priority"
-				type="number"
-				min={LIMITS.priorityMin}
-				max={LIMITS.priorityMax}
-				step={1}
-				bind:value={model.priority}
-				aria-invalid={errors.priority ? true : undefined}
-			/>
-			<Field.Description>{m.rule_priority_hint()}</Field.Description>
-			{#if errors.priority}<Field.Error>{errors.priority}</Field.Error>{/if}
-		</Field.Field>
-	</div>
+	<RuleFormHead bind:name={model.name} bind:priority={model.priority} {errors} prefix="rule" />
 
 	{#if places.length > 1}
 		<Field.Field>
@@ -185,6 +158,7 @@
 				{model}
 				{errors}
 				steps={asksBefore(model, index)}
+				number={index + 1}
 				error={errors[action.key]}
 				onunreadable={(unreadable) => mark(action.key, unreadable)}
 				onconditionunreadable={mark}
@@ -193,35 +167,20 @@
 				ondown={index < model.actions.length - 1 ? () => move(model.actions, index, 1) : undefined}
 			/>
 		{/each}
-		<!-- Added like a condition: a button, here with the kinds of action in its menu. -->
-		<div>
-			<DropdownMenu.Root>
-				<DropdownMenu.Trigger
-					class={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}
-					disabled={model.actions.length >= LIMITS.actions}
-				>
-					<Plus aria-hidden="true" />
-					{m.rule_add_action()}
-				</DropdownMenu.Trigger>
-				<DropdownMenu.Content align="start" class="w-64">
-					{#each ACTION_TYPES as type (type)}
-						<DropdownMenu.Item onSelect={() => add(type)}>{ACTION_LABELS[type]()}</DropdownMenu.Item
-						>
-					{/each}
-				</DropdownMenu.Content>
-			</DropdownMenu.Root>
-		</div>
+		<AddActionMenu
+			groups={[
+				{
+					items: ACTION_TYPES.map((type) => ({
+						key: type,
+						label: ACTION_LABELS[type](),
+						onselect: () => add(type)
+					}))
+				}
+			]}
+			disabled={model.actions.length >= LIMITS.actions}
+		/>
 		{#if errors.actions}<Field.Error>{errors.actions}</Field.Error>{/if}
 	</section>
 
-	<div class="flex flex-col gap-3 border-t pt-4">
-		{#if general}<Field.Error>{general}</Field.Error>{/if}
-		<p class="text-sm text-muted-foreground">{m.rule_save_hint()}</p>
-		<div class="flex flex-wrap justify-end gap-2">
-			<a href={cancelHref} class={cn(buttonVariants({ variant: 'ghost' }))} onclick={oncancel}
-				>{m.cancel()}</a
-			>
-			<Button type="submit" disabled={busy || blocked}>{m.rule_save()}</Button>
-		</div>
-	</div>
+	<RuleFormFoot error={general} held={busy || blocked} {cancelHref} {oncancel} />
 </form>

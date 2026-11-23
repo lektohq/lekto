@@ -2,13 +2,16 @@ import { render, screen, waitFor, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { goto } from '$app/navigation';
+import { NODE_LABELS } from '#lib/node-labels.ts';
 import type { components } from '#lib/api/schema.ts';
 import { desktop } from '#lib/desktop.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import type { GraphNode } from '#lib/pipeline.ts';
 import { goTo } from '#lib/testing/page-state.svelte.ts';
 import DocumentProcessing from './DocumentProcessing.svelte';
-import { fakeApi, json } from '#lib/testing/api.ts';
+import { fakeApi } from '#lib/testing/api.ts';
+import { documentOf, filesOf } from '#lib/testing/documents.ts';
+import { logEntry } from '#lib/testing/pipeline.ts';
 
 type Document = components['schemas']['DocumentDetails'];
 
@@ -18,11 +21,9 @@ vi.mock('$app/navigation', () => ({
 		(await import('#lib/testing/page-state.svelte.ts')).goTo(href, { id: 'doc-1' })
 	)
 }));
-vi.mock('$app/state', async () => ({
-	page: (await import('#lib/testing/page-state.svelte.ts')).testPage
-}));
+vi.mock('$app/state', () => import('#lib/testing/app-state.ts'));
 
-let fetchMock = fakeApi();
+let fetchMock: ReturnType<typeof fakeApi>;
 
 const graph: GraphNode[] = [
 	{ node: 'receive', requires: [], waits_for: [] },
@@ -34,7 +35,13 @@ const graph: GraphNode[] = [
 	{ node: 'file', requires: ['judge'], waits_for: [] }
 ];
 
-function state(node: string, outcome: string | null, status = 'done') {
+type NodeState = Document['processing']['nodes'][number];
+
+function state(
+	node: NodeState['node'],
+	outcome: NodeState['outcome'],
+	status: NodeState['status'] = 'done'
+): NodeState {
 	return {
 		node,
 		status,
@@ -44,12 +51,31 @@ function state(node: string, outcome: string | null, status = 'done') {
 	};
 }
 
-function documentAt(run: number, status: string, nodes: unknown[]): Document {
-	return {
-		id: 'doc-1',
-		space_id: 's-mine',
-		processing: { status, run, nodes }
-	} as unknown as Document;
+function documentAt(
+	run: number,
+	status: Document['processing']['status'],
+	nodes: Document['processing']['nodes']
+): Document {
+	return documentOf({ space_id: 's-mine', processing: { status, run, vision: false, nodes } });
+}
+
+/** The details of the step open beside the cards, once they are there. */
+function details(container: HTMLElement): Promise<HTMLElement> {
+	return waitFor(() => {
+		const panel = container.querySelector<HTMLElement>('#step-details');
+		expect(panel).not.toBeNull();
+		return panel!;
+	});
+}
+
+/** Run 2 through to the filing, every step ok; `receiving` of the receiving step. */
+function finishedRun(receiving: Partial<NodeState> = {}): Document {
+	return documentAt(2, 'completed', [
+		{ ...state('receive', 'ok'), ...receiving },
+		...(['ocr', 'pages', 'signal_llm', 'signal_neighbours', 'judge', 'file'] as const).map((node) =>
+			state(node, 'ok')
+		)
+	]);
 }
 
 const document = documentAt(1, 'review', [
@@ -62,14 +88,8 @@ const document = documentAt(1, 'review', [
 	state('file', null, 'waiting')
 ]);
 
-const proposed = {
-	node: 'signal_llm',
-	run: 1,
-	outcome: 'ok',
-	reason: null,
-	confidence: null,
+const proposed = logEntry('signal_llm', 1, {
 	model_version: 'qwen3:8b',
-	input: {},
 	output: {
 		proposal: {
 			sender: { value: 'Muster Bäckerei' },
@@ -80,10 +100,9 @@ const proposed = {
 			{ prompt: 2318, completion: 184, usage: { prompt_tokens: 2318, completion_tokens: 184 } }
 		]
 	},
-	pipeline_version: 'test',
 	started_at: '2026-10-13T09:14:22Z',
 	duration_ms: 6300
-};
+});
 
 const judged = {
 	...proposed,
@@ -108,7 +127,7 @@ const judged = {
 						value: 'c-musterverein',
 						label: 'Jugendverein Muster e.V.',
 						contradicted: false,
-						sources: [{ signal: 'signal_neighbours', names: true, votes: 4, of: 5 }]
+						sources: [{ signal: 'signal_neighbours', names: true, votes: 4, found: 5 }]
 					}
 				]
 			}
@@ -130,13 +149,22 @@ const exchange = {
 	]
 };
 
+/** The log of doc-1, the exchanges with a model of every node (none where not given), its
+ * files and how it was read. */
 function serve(log: unknown[], exchanges: Record<string, unknown[]> = {}) {
-	fetchMock.mockImplementation(async (request) => {
-		const path = new URL(request.url).pathname;
-		if (path.endsWith('/log')) return json(log);
-		const node = path.split('/exchanges/')[1];
-		return json(node ? (exchanges[node] ?? []) : []);
+	const nodes = Object.keys(NODE_LABELS);
+	fetchMock = fakeApi({
+		'GET /api/v1/documents/doc-1/log': () => log,
+		'GET /api/v1/documents/doc-1/files': () => filesOf(),
+		'GET /api/v1/documents/doc-1/reading': () => ({ vision: false, pages: [], advice: null }),
+		...Object.fromEntries(
+			nodes.map((node) => [
+				`GET /api/v1/documents/doc-1/exchanges/${node}`,
+				() => exchanges[node] ?? []
+			])
+		)
 	});
+	vi.stubGlobal('fetch', fetchMock);
 }
 
 function show(props: Partial<Parameters<typeof render<typeof DocumentProcessing>>[1]> = {}) {
@@ -165,19 +193,14 @@ async function openTip(button: HTMLElement): Promise<HTMLElement> {
 }
 
 beforeEach(() => {
-	fetchMock = fakeApi();
 	serve([proposed, judged], { signal_llm: [exchange] });
-	vi.stubGlobal('fetch', fetchMock);
 	vi.mocked(goto).mockClear();
 	goTo('/ui/documents/doc-1?tab=processing', { id: 'doc-1' });
 	desktop.override(true);
 });
 
 afterEach(() => {
-	vi.unstubAllGlobals();
 	desktop.override(null);
-	// A dialog makes the page unclickable until it has closed; the next test must not wait.
-	window.document.body.style.pointerEvents = '';
 });
 
 describe('DocumentProcessing', () => {
@@ -210,6 +233,8 @@ describe('DocumentProcessing', () => {
 		).toBeTruthy();
 		const judge = card(container, 'judge');
 		expect(judge.getAttribute('aria-expanded')).toBe('true');
+		// A card without a finding is one line: still a finger tall on a phone (WA-05).
+		expect(judge.className.split(' ')).toContain('max-sm:min-h-11');
 		const panel = container.querySelector('#step-details') as HTMLElement;
 		expect(await within(panel).findByText('contact: the name is only similar')).toBeTruthy();
 		expect(card(container, 'file').textContent).toContain(m.summary_file_waits());
@@ -281,7 +306,7 @@ describe('DocumentProcessing', () => {
 	it('tells the tokens behind the info icon and shows the prompt', async () => {
 		const { container } = show();
 		await userEvent.click(card(container, 'signal_llm'));
-		const panel = await waitFor(() => container.querySelector('#step-details') as HTMLElement);
+		const panel = await details(container);
 		const tooltip = await openTip(
 			await within(panel).findByRole('button', { name: m.tokens_details() })
 		);
@@ -332,15 +357,7 @@ describe('DocumentProcessing', () => {
 		const second = { ...first, run: 2, output: decided('c-bakery') };
 		const filed = { ...proposed, node: 'file', run: 2, output: {} };
 		serve([proposed, first, second, filed]);
-		const current = documentAt(2, 'completed', [
-			state('receive', 'ok'),
-			state('ocr', 'ok'),
-			state('pages', 'ok'),
-			state('signal_llm', 'ok'),
-			state('signal_neighbours', 'ok'),
-			state('judge', 'ok'),
-			state('file', 'ok')
-		]);
+		const current = finishedRun();
 		const { container } = show({ document: current });
 		expect(screen.getByRole('heading', { level: 2, name: m.run_through({ run: 2 }) })).toBeTruthy();
 		expect(await screen.findByText(new RegExp(m.run_since({ run: 1 })))).toBeTruthy();
@@ -361,19 +378,20 @@ describe('DocumentProcessing', () => {
 		// The log of run 1 stopped for review; the document keeps that its first run failed.
 		const again = { ...judged, run: 2, outcome: 'ok', reason: null };
 		serve([proposed, judged, again], { signal_llm: [exchange] });
-		const runs = (first_lane: Document['first_lane']) =>
-			({
-				...document,
-				first_lane,
-				processing: { ...document.processing, run: 2 }
-			}) as unknown as Document;
+		const runs = (first_lane: Document['first_lane']) => ({
+			...document,
+			first_lane,
+			processing: { ...document.processing, run: 2 }
+		});
 		const first = () =>
 			within(screen.getByRole('region', { name: m.log_runs() })).getByRole('button', {
 				name: new RegExp(m.log_run({ run: 1 }))
 			});
 
 		const { unmount } = show({ document: runs('red') });
-		expect(await screen.findByText(`${m.processing_steps()} · ${m.log_run({ run: 2 })}`));
+		expect(
+			await screen.findByText(`${m.processing_steps()} · ${m.log_run({ run: 2 })}`)
+		).toBeTruthy();
 		await waitFor(() => expect(first().textContent).toContain(m.outcome_failed()));
 		unmount();
 
@@ -389,7 +407,7 @@ describe('DocumentProcessing', () => {
 			reason: null,
 			model_version: 'person',
 			output: {
-				confirmed_by: 'u-tobi',
+				confirmed_by: 'u-john',
 				outcome_before: 'uncertain',
 				accepted: [],
 				entered: ['contact'],
@@ -397,22 +415,14 @@ describe('DocumentProcessing', () => {
 			}
 		};
 		serve([proposed, judged, confirmed]);
-		const current = documentAt(2, 'completed', [
-			state('receive', 'ok'),
-			state('ocr', 'ok'),
-			state('pages', 'ok'),
-			state('signal_llm', 'ok'),
-			state('signal_neighbours', 'ok'),
-			state('judge', 'ok'),
-			state('file', 'ok')
-		]);
+		const current = finishedRun();
 		current.contact_id = 'c-musterverein';
 		const { container } = show({ document: current });
 		const judge = card(container, 'judge');
 		const name = m.space_named_someone();
 		expect(await within(judge).findByText(m.summary_overruled_confirmed({ name }))).toBeTruthy();
 		await userEvent.click(judge);
-		const panel = await waitFor(() => container.querySelector('#step-details') as HTMLElement);
+		const panel = await details(container);
 		expect(within(panel).getByText(m.processing_overruled_confirmed({ name }))).toBeTruthy();
 		// A person's confirmation has no prompt of its own.
 		expect(within(panel).queryByRole('button', { name: m.prompt_open() })).toBeNull();
@@ -424,19 +434,10 @@ describe('DocumentProcessing', () => {
 
 	it('tells no times of a later run it cannot tell apart from an earlier one', async () => {
 		// Run 2 without the log (a reader): receiving is run 1's, hours before the rest.
-		const later = documentAt(2, 'completed', [
-			{
-				...state('receive', 'ok'),
-				started_at: '2026-10-13T01:00:00Z',
-				finished_at: '2026-10-13T01:00:01Z'
-			},
-			state('ocr', 'ok'),
-			state('pages', 'ok'),
-			state('signal_llm', 'ok'),
-			state('signal_neighbours', 'ok'),
-			state('judge', 'ok'),
-			state('file', 'ok')
-		]);
+		const later = finishedRun({
+			started_at: '2026-10-13T01:00:00Z',
+			finished_at: '2026-10-13T01:00:01Z'
+		});
 		show({ document: later, manageable: false });
 		const read = screen.getByRole('heading', { name: new RegExp(m.phase_read()) });
 		expect(read.textContent).not.toMatch(/\d+(h|m|s)/);

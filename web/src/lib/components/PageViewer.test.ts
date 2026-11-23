@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/svelte';
 import { createRawSnippet } from 'svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { m } from '#lib/paraglide/messages.js';
+import { TEXT_HINT } from '#lib/viewer/text-hint.ts';
 import PageViewer from './PageViewer.svelte';
 
 // jsdom lays nothing out: the viewer gets a width and its paddings by hand.
@@ -30,7 +31,6 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-	vi.unstubAllGlobals();
 	vi.restoreAllMocks();
 	if (clientWidth) Object.defineProperty(HTMLElement.prototype, 'clientWidth', clientWidth);
 });
@@ -38,10 +38,43 @@ afterEach(() => {
 const page = createRawSnippet(() => ({ render: () => '<span></span>' }));
 
 describe('PageViewer', () => {
+	it('names each page and says where the text of the pages stands (WZ-08)', () => {
+		// The pages are images of the document: without names the region read as empty.
+		const sizes = [1, 2, 3].map(() => ({ width: 600, height: 800 }));
+		render(PageViewer, {
+			props: { sizes, label: 'Pages of “Muster Versicherung”', page },
+			context: new Map([[TEXT_HINT, () => m.pages_text_hint()]])
+		});
+		const pages = screen.getAllByRole('img');
+		expect(pages.map((image) => image.getAttribute('aria-label'))).toEqual([
+			m.pdf_page({ current: '1', total: '3' }),
+			m.pdf_page({ current: '2', total: '3' }),
+			m.pdf_page({ current: '3', total: '3' })
+		]);
+		const view = screen.getByRole('document');
+		const hint = document.getElementById(view.getAttribute('aria-describedby') ?? '');
+		expect(hint?.textContent).toBe(m.pages_text_hint());
+	});
+
+	it('says nothing of a text where nobody told it of one', () => {
+		render(PageViewer, { sizes: [{ width: 600, height: 800 }], label: 'PDF', page });
+		expect(screen.getByRole('document').hasAttribute('aria-describedby')).toBe(false);
+	});
+
 	it('zooms with + and − but leaves the browser its shortcuts with Ctrl, ⌘ or Alt', async () => {
 		render(PageViewer, { sizes: [{ width: 600, height: 800 }], label: 'PDF', page });
 		const view = screen.getByRole('document');
-		const zoom = () => screen.getByRole('button', { name: m.pdf_zoom_reset() }).textContent?.trim();
+		// Named by the percent it shows, then by what it does (WC-08).
+		const button = () =>
+			screen.getByRole('button', {
+				name: new RegExp(`^\\d+ %, .*${m.pdf_zoom_reset().slice(1)}$`)
+			});
+		const zoom = () => button().textContent?.trim();
+		expect(
+			button()
+				.getAttribute('aria-label')
+				?.startsWith(zoom() ?? 'none')
+		).toBe(true);
 		const before = zoom();
 		await fireEvent.keyDown(view, { key: '+', ctrlKey: true });
 		await fireEvent.keyDown(view, { key: '-', metaKey: true });

@@ -62,7 +62,7 @@ describe('the jobs', () => {
 	it('say when one is due, how long it waited and how long it ran', () => {
 		setLocale('de', { reload: false });
 		const running = job({ state: 'running', attempts: 1, started_at: '2026-10-24T11:59:46Z' });
-		expect(jobDue(running, NOW)).toMatch(/11:54|13:54/); // the time it fell due, in the zone
+		expect(jobDue(running, NOW)).toBe('24.10.26, 13:54'); // the time it fell due, in the zone
 		expect(jobWait(running, NOW)).toBe('5m\u00a046s');
 		expect(jobRun(running, NOW)).toBe('bisher 14s');
 		expect(jobDue(job({}), NOW)).toBe('seit 6m\u00a00s');

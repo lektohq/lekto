@@ -40,7 +40,7 @@
 			<Icon class="size-4" />
 		</span>
 		<div class="flex min-w-0 flex-col">
-			<SectionTitle size="card" level={3} {id}>{title}</SectionTitle>
+			<SectionTitle size="card" level={2} {id}>{title}</SectionTitle>
 			<span class="text-xs text-muted-foreground">{hint}</span>
 		</div>
 		{#if action}{@render action()}{/if}

@@ -23,6 +23,17 @@ const FORMAL_ALLOWED = new Set([
 	'identifier_kind_letter_date'
 ]);
 
+// One thing has one name (DESIGN.md, "Words"; Tobi, 21.11.2026): the words that were used
+// beside it stay out.
+const OTHER_WORDS: Record<string, RegExp> = {
+	'a paused webhook is "pausiert"': /Webhook[^.]*\b(aus|ab)geschaltet\b/,
+	'the model that reads page images is the "VLM"': /\bBildmodell/,
+	'what a rule or a webhook fills in is a "Template"': /\bVorlagen?\b/,
+	'it is "das Token"': /\b([Dd]er|[Dd]ieser|[Dd]iesen|[Dd]en|[Ee]inen|[Kk]einen) (API-)?Token\b/,
+	'the second step of a sign-in is the "zweite Faktor"': /Zwei-Faktor/,
+	'the channel is "Web"': /Web-Oberfläche/
+};
+
 // "Nummer" alone, not in a compound ("Kundennummer"): only for the numbers that mark the
 // document itself. This list may only shrink.
 const NUMBER = /\bNummer(n)?\b/;
@@ -53,6 +64,17 @@ describe('German texts', () => {
 		expect(matching(ERSTELLEN, ERSTELLEN_ALLOWED)).toEqual([]);
 	});
 
+	it.each(Object.entries(OTHER_WORDS))('give one thing one name: %s', (_rule, other) => {
+		expect(matching(other)).toEqual([]);
+	});
+
+	it('name a channel the same wherever it stands', () => {
+		for (const channel of ['web', 'api', 'migration', 'mail']) {
+			expect(catalogue[`automation_channel_${channel}`]).toBe(catalogue[`rule_channel_${channel}`]);
+		}
+		expect(catalogue.origin_channel_mail).toBe(catalogue.rule_channel_mail);
+	});
+
 	it('keep allowlisted keys that still need it', () => {
 		const needless = [...FORMAL_ALLOWED].filter(
 			(key) => !(key in catalogue) || !FORMAL.test(catalogue[key])
@@ -62,6 +84,14 @@ describe('German texts', () => {
 
 	it('call a value that tells who a "Kennung", not a "Nummer"', () => {
 		expect(matching(NUMBER, NUMBER_ALLOWED)).toEqual([]);
+	});
+
+	it('names the choice of what a condition looks at unlike any of its options (WD-15)', () => {
+		// "Bezug" is the relation (DESIGN.md, glossary), one of the options: a screen reader
+		// said "Bezug, Bezug". The choice is "Worauf" (Tobi, 22.11.2026).
+		const options = keys().filter((key) => key.startsWith('rule_field_'));
+		expect(options.length).toBeGreaterThan(5);
+		expect(options.map((key) => catalogue[key])).not.toContain(catalogue.rule_condition_subject);
 	});
 
 	it('notice a formal or lowercase address', () => {

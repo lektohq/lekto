@@ -8,7 +8,7 @@
 	import ProcessingProgress from '#lib/components/ProcessingProgress.svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { inboxDocument } from '#lib/document-view.ts';
-	import { formatDate } from '#lib/i18n.ts';
+	import { formatNumber, formatMoment } from '#lib/i18n.ts';
 	import type { InboxItem } from '#lib/inbox-view.ts';
 	import { byId, userLabel, type Lookup } from '#lib/masterdata.svelte.ts';
 	import { m } from '#lib/paraglide/messages.js';
@@ -47,9 +47,7 @@
 		const user = lookup ? byId(lookup.users).get(done.by) : undefined;
 		return viaToken(user ? userLabel(user) : m.inbox_by_unknown(), done.via_token);
 	});
-	const when = $derived(
-		done ? formatDate(done.at, { dateStyle: 'medium', timeStyle: 'short' }) : ''
-	);
+	const when = $derived(done ? formatMoment(done.at) : '');
 	// Waiting only for the space Lekto suggests: say which, and who would see it there.
 	const suggestion = $derived(onlySpace(item.open) ? suggestedSpace(item.open) : null);
 	// Small beside the row; on a phone only the icon, as wide as a finger.
@@ -74,7 +72,7 @@
 				{suggestion
 					? suggestionText(suggestion, document.space_id, lookup)
 					: (reasonsText(item.open[0]?.reasons, item.open[0]?.reason, labelled(lookup)) ??
-						m.inbox_open_fields({ count: item.open.length }))}
+						m.inbox_open_fields({ count: formatNumber(item.open.length) }))}
 			</span>
 		</span>
 	{:else if item.tab === 'new'}
@@ -95,24 +93,12 @@
 	{/if}
 	{#snippet aside()}
 		{#if item.tab === 'new'}
-			<Button
-				variant="outline"
-				size="sm"
-				class={action}
-				disabled={busy}
-				onclick={() => onseen(document.id)}
-			>
+			<Button variant="outline" size="sm" class={action} {busy} onclick={() => onseen(document.id)}>
 				<Check aria-hidden="true" />
 				<span class="max-sm:sr-only">{m.inbox_seen()}</span>
 			</Button>
 		{:else if done?.how === 'seen'}
-			<Button
-				variant="ghost"
-				size="sm"
-				class={action}
-				disabled={busy}
-				onclick={() => onunseen(document.id)}
-			>
+			<Button variant="ghost" size="sm" class={action} {busy} onclick={() => onunseen(document.id)}>
 				<Undo2 aria-hidden="true" />
 				<span class="max-sm:sr-only">{m.inbox_unseen()}</span>
 			</Button>

@@ -4,9 +4,10 @@
 	import Minus from '@lucide/svelte/icons/minus';
 	import { toast } from 'svelte-sonner';
 	import { api } from '#lib/api/client.ts';
-	import { TOKEN_NAME_MAX, tokenChanges, tokensChanged } from '#lib/tokens.svelte.ts';
+	import { TOKEN_NAME_MAX, tokens as store, tokensChanged } from '#lib/tokens.svelte.ts';
 	import { unwrap } from '#lib/api/call.ts';
 	import type { components } from '#lib/api/schema.ts';
+	import EmptyNote from '#lib/components/EmptyNote.svelte';
 	import EditorShell from '#lib/components/EditorShell.svelte';
 	import FormDialog from '#lib/components/FormDialog.svelte';
 	import Select from '#lib/components/Select.svelte';
@@ -18,7 +19,7 @@
 	import { Input } from '#lib/components/ui/input/index.ts';
 	import { describeError } from '#lib/errors.ts';
 	import { isoDayLocal } from '#lib/dates.ts';
-	import { formatDate } from '#lib/i18n.ts';
+	import { formatDate, formatNumber, formatMoment } from '#lib/i18n.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import Loading from '#lib/components/Loading.svelte';
 	import LoadProblem from '#lib/components/LoadProblem.svelte';
@@ -38,9 +39,13 @@
 	type Scope = components['schemas']['TokenScope'];
 
 	// API tokens: for scripts and tools, never for this UI. The token itself is shown once.
-	let tokens = $state<Token[] | null>(null);
-	let problem = $state<string | null>(null);
+	// The list is the one the shortcut's card beside it reads too (`lib/tokens.svelte.ts`).
+	const tokens = $derived(store.list);
+	const problem = $derived(store.failure === null ? null : describeError(store.failure));
 	let creating = $state(false);
+	// Where the focus goes once a token's secret was seen, or its row is gone with it: the
+	// dialogs before have closed, and the keyboard would start at the top of the page.
+	let newToken = $state<HTMLElement | null>(null);
 	let name = $state('');
 	// A preset, or the rights one by one (`own`; `.knowledge/plans/token-rights.md`).
 	let scope = $state<Scope | 'own'>('read');
@@ -50,20 +55,8 @@
 	// The token whose dialog is open (web/DESIGN.md, "Settings").
 	let shown = $state<Token | null>(null);
 
-	async function load() {
-		problem = null;
-		try {
-			tokens = await unwrap(api.GET('/api/v1/auth/tokens'));
-		} catch (failure) {
-			problem = describeError(failure);
-		}
-	}
-
 	// Again whenever a token is created or revoked here or on the shortcut's card.
-	$effect(() => {
-		void tokenChanges.version;
-		void load();
-	});
+	$effect(() => void store.load());
 
 	function openCreate() {
 		name = '';
@@ -94,6 +87,8 @@
 		shown = null;
 		toast.success(m.token_revoked());
 		tokensChanged();
+		// After the dialog has given the focus back to a row that is gone.
+		setTimeout(() => newToken?.focus(), 0);
 	}
 
 	// The scope `upload` is for a shortcut that sends shared files (web/DESIGN.md, "App").
@@ -134,9 +129,7 @@
 	};
 
 	function used(token: Token): string {
-		return token.last_used_at
-			? formatDate(token.last_used_at, { dateStyle: 'short', timeStyle: 'short' })
-			: m.token_never_used();
+		return token.last_used_at ? formatMoment(token.last_used_at) : m.token_never_used();
 	}
 	function expiry(token: Token): string {
 		return token.expires_at
@@ -150,15 +143,17 @@
 	<Card.Header>
 		<Card.Title>{m.token_title()}</Card.Title>
 		<Card.Description>{m.token_hint()}</Card.Description>
-		<Card.Action><Button onclick={openCreate}>{m.token_new()}</Button></Card.Action>
+		<Card.Action>
+			<Button bind:ref={newToken} onclick={openCreate}>{m.token_new()}</Button>
+		</Card.Action>
 	</Card.Header>
 	<Card.Content>
 		{#if problem}
-			<LoadProblem {problem} onretry={load} />
+			<LoadProblem {problem} onretry={() => void store.load(true)} />
 		{:else if tokens === null}
 			<Loading />
 		{:else if tokens.length === 0}
-			<p class="text-muted-foreground">{m.token_none()}</p>
+			<EmptyNote size="line">{m.token_none()}</EmptyNote>
 		{:else}
 			<ul class="divide-y">
 				{#each tokens as token (token.id)}
@@ -181,7 +176,7 @@
 						<Badge variant="note">
 							{token.scope
 								? SCOPE_LABELS[token.scope]()
-								: m.token_scope_custom({ count: token.rights.length })}
+								: m.token_scope_custom({ count: formatNumber(token.rights.length) })}
 						</Badge>
 						<ChevronRight class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
 					</li>
@@ -248,6 +243,7 @@
 	title={m.token_created_title()}
 	description={m.token_created_hint()}
 	onclose={() => (created = null)}
+	returnTo={newToken}
 />
 
 {#if shown}

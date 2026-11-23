@@ -3,10 +3,9 @@
 	import type { Lookup } from '#lib/masterdata.svelte.ts';
 	import { signalSummary } from '#lib/signals.ts';
 
-	// What a signal said in one run: the proposal, best classes, similar documents, names and
-	// identifiers in the text, or why it abstained; for the OCR, how well it read each page; for
-	// the fields node, whether each value stands by its label (rows by place: two fields may
-	// share a name).
+	// What a signal said in one run: the proposal, names and identifiers in the text, or why it
+	// abstained; for the fields node, whether each value stands by its label (rows by place: two
+	// fields may share a name). Words only: a document opens in the Beam, from `StepDetails`.
 	let { entry, lookup }: { entry: components['schemas']['LogEntry']; lookup: Lookup | null } =
 		$props();
 
@@ -17,11 +16,7 @@
 	<dt class="text-muted-foreground">{row.label}</dt>
 	<dd class="flex min-w-0 flex-wrap gap-x-3 gap-y-0.5 break-words">
 		{#each row.items as item, index (index)}
-			{#if item.href}
-				<a href={item.href} class="text-brand hover:underline">{item.text}</a>
-			{:else}
-				<span>{item.text}</span>
-			{/if}
+			<span>{item.text}</span>
 		{/each}
 	</dd>
 {/each}

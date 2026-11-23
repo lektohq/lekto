@@ -3,7 +3,9 @@
 	import Upload from '@lucide/svelte/icons/upload';
 	import { onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
+	import { beforeNavigate } from '$app/navigation';
 	import { page } from '$app/state';
+	import { formatNumber } from '#lib/i18n.ts';
 	import { api } from '#lib/api/client.ts';
 	import { unwrap } from '#lib/api/call.ts';
 	import { ApiError } from '#lib/api/problem.ts';
@@ -18,11 +20,14 @@
 	import { coalesced } from '#lib/coalesce.ts';
 	import { describeError, reportError } from '#lib/errors.ts';
 	import { events } from '#lib/events.svelte.ts';
+	import { listRefresh } from '#lib/list-events.ts';
 	import { inbox, type InboxSummary } from '#lib/inbox.svelte.ts';
 	import { inboxTabHref, inboxTabOf, type InboxItem, type InboxTab } from '#lib/inbox-view.ts';
 	import { readDrop } from '#lib/intake.ts';
 	import { PageLookup } from '#lib/lookup.svelte.ts';
+	import { ListPlace, type Place } from '#lib/list-place.svelte.ts';
 	import { PagedList } from '#lib/paging.svelte.ts';
+	import { returnTo } from '#lib/return-to.svelte.ts';
 	import { openBeam } from '#lib/beam.svelte.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import { phone } from '#lib/phone.svelte.ts';
@@ -102,11 +107,33 @@
 		() => void lookup.load()
 	);
 
+	// Back from a document one stands where one stood (`lib/list-place.svelte.ts`), with as
+	// many documents as "Mehr laden" had brought: the back button brings the place in the
+	// snapshot, the document's way back in its history entry.
+	const place = new ListPlace();
+	const standing = (): Place => ({ y: window.scrollY, loaded: list.items.length });
+	export const snapshot = {
+		capture: standing,
+		restore: (kept: Place) => place.want(kept)
+	};
+	beforeNavigate(() => returnTo.rememberPlace('inbox', standing()));
+	$effect(() => {
+		const wanted = place.wanted;
+		if (!wanted || !list.loaded || list.loading) return;
+		if (list.hasMore && !list.error && list.items.length < (wanted.loaded ?? 0)) void list.more();
+		else void place.reach();
+	});
+
 	onMount(() => {
+		place.want(page.state.place);
 		void lookup.load();
-		// Events are thin: fetch the list again, at most once in a while.
+		// Events are thin: fetch the list again, at most once in a while; for a step of a
+		// document being processed only if the inbox shows that document (`lib/list-events.ts`).
 		const refresh = coalesced(() => void list.refresh(), 400);
-		const stop = events.subscribe(refresh);
+		const stop = events.subscribe((event) => {
+			const wanted = listRefresh(event, (id) => list.items.some((item) => item.document.id === id));
+			if (wanted !== 'none') refresh();
+		});
 		return () => {
 			refresh.cancel();
 			stop();
@@ -146,7 +173,7 @@
 		const { marked } = await unwrap(
 			api.POST('/api/v1/inbox/seen', { params: { query: { all_users: scope.query } } })
 		);
-		toast.success(m.inbox_all_seen_done({ count: marked }));
+		toast.success(m.inbox_all_seen_done({ count: formatNumber(marked) }));
 		await changed();
 	}
 
@@ -248,7 +275,9 @@
 <ConfirmDialog
 	bind:open={askAll}
 	title={m.inbox_all_seen_title()}
-	description={fresh === 1 ? m.inbox_all_seen_text_one() : m.inbox_all_seen_text({ count: fresh })}
+	description={fresh === 1
+		? m.inbox_all_seen_text_one()
+		: m.inbox_all_seen_text({ count: formatNumber(fresh) })}
 	confirmLabel={m.inbox_all_seen_confirm()}
 	destructive={false}
 	onconfirm={markAll}

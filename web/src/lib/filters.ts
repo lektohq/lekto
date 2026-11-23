@@ -22,6 +22,10 @@ export interface Filters {
 	/** The document date lies between them, both days included (ISO days; either open). */
 	dateFrom: string | null;
 	dateTo: string | null;
+	/** A quick pick of the period, which moves with the day ("last year"); `dateFrom` and
+	 * `dateTo` then hold its days as of today. Null: the days are meant as they stand, also
+	 * when they are the days of a quick pick today (the tile of a year). */
+	period: RelativePeriod | null;
 	/** Facts the document has, each as `kind:value:role` (any part empty for any); all. */
 	facts: string[];
 }
@@ -37,6 +41,7 @@ export const NO_FILTERS: Filters = {
 	field: null,
 	dateFrom: null,
 	dateTo: null,
+	period: null,
 	facts: []
 };
 
@@ -50,10 +55,17 @@ const LISTS = {
 	spaces: 'space'
 } as const;
 
-/** The filters in `params`; empty values (`?contact=`) count as none. Whom the list covers is no
- * filter but a setting (`scope`). */
-export function parseFilters(params: URLSearchParams): Filters {
-	const all = (key: string) => params.getAll(key).filter((value) => value !== '');
+/** The filters in `params`; empty values (`?contact=`) count as none, a value given twice
+ * (`?contact=c1&contact=c1`, in a link written by hand) once: each value is one chip, and a list
+ * names it once. Whom the list covers is no filter but a setting (`scope`). A quick pick of
+ * the period stands as its name (`period=last_year`) and means its days as of `today`; it
+ * counts before days beside it. */
+export function parseFilters(params: URLSearchParams, today: Date = new Date()): Filters {
+	const all = (key: string) => [...new Set(params.getAll(key).filter((value) => value !== ''))];
+	const period = RELATIVE_PERIODS.find((known) => known === params.get('period')) ?? null;
+	const days = period
+		? relativePeriod(period, today)
+		: { dateFrom: day(params.get('date_from')), dateTo: day(params.get('date_to')) };
 	return {
 		contacts: all(LISTS.contacts),
 		types: all(LISTS.types),
@@ -63,23 +75,27 @@ export function parseFilters(params: URLSearchParams): Filters {
 		topics: all(LISTS.topics),
 		spaces: all(LISTS.spaces),
 		field: params.get('field') || null,
-		dateFrom: day(params.get('date_from')),
-		dateTo: day(params.get('date_to')),
+		...days,
+		period,
 		facts: all('fact')
 	};
 }
 
 /** Write the filters into `params` (other parameters stay). */
 export function writeFilters(params: URLSearchParams, filters: Filters): URLSearchParams {
-	for (const key of [...Object.values(LISTS), 'field', 'date_from', 'date_to', 'fact']) {
+	for (const key of [...Object.values(LISTS), 'field', 'date_from', 'date_to', 'period', 'fact']) {
 		params.delete(key);
 	}
 	for (const [list, key] of Object.entries(LISTS) as [keyof typeof LISTS, string][]) {
 		for (const id of filters[list]) params.append(key, id);
 	}
 	if (filters.field) params.set('field', filters.field);
-	if (filters.dateFrom) params.set('date_from', filters.dateFrom);
-	if (filters.dateTo) params.set('date_to', filters.dateTo);
+	if (filters.period) {
+		params.set('period', filters.period);
+	} else {
+		if (filters.dateFrom) params.set('date_from', filters.dateFrom);
+		if (filters.dateTo) params.set('date_to', filters.dateTo);
+	}
 	for (const fact of filters.facts) params.append('fact', fact);
 	return params;
 }
@@ -125,7 +141,8 @@ export function monthPeriod(month: string): Pick<Filters, 'dateFrom' | 'dateTo'>
 	return { dateFrom: `${month}-01`, dateTo: `${month}-${pad2(lastDayOfMonth(year, number))}` };
 }
 
-/** A period that moves with the day: the quick picks of the filters, as a lens keeps them. */
+/** A period that moves with the day: the quick picks of the filters, as the address and a lens
+ * keep them. */
 export type RelativePeriod = 'this_year' | 'last_12_months' | 'last_year';
 export const RELATIVE_PERIODS: readonly RelativePeriod[] = [
 	'this_year',
@@ -145,23 +162,21 @@ export function relativePeriod(
 		case 'last_year':
 			return yearPeriod(year - 1);
 		case 'last_12_months': {
-			const start = new Date(year - 1, today.getMonth(), today.getDate() + 1);
+			// The day after the same day a year before, the 28th of February for the 29th: as the
+			// core reckons it (`RelativePeriod.period`), which a lens's numbers and MCP use (WT3-05).
+			const day = Math.min(today.getDate(), lastDayOfMonth(year - 1, today.getMonth() + 1));
+			const start = new Date(year - 1, today.getMonth(), day + 1);
 			return { dateFrom: isoDayLocal(start), dateTo: null };
 		}
 	}
 }
 
-/** Which relative period the period of the filters is as of `today`, if any. */
-export function relativeOf(
-	filters: Pick<Filters, 'dateFrom' | 'dateTo'>,
+/** The filters with a quick pick as their period: its name and its days as of `today`. */
+export function quickPick(
+	period: RelativePeriod,
 	today: Date
-): RelativePeriod | null {
-	return (
-		RELATIVE_PERIODS.find((period) => {
-			const days = relativePeriod(period, today);
-			return days.dateFrom === filters.dateFrom && days.dateTo === filters.dateTo;
-		}) ?? null
-	);
+): Pick<Filters, 'dateFrom' | 'dateTo' | 'period'> {
+	return { ...relativePeriod(period, today), period };
 }
 
 /** What the period of the filters is: a whole year, a whole month, another span, or none. */

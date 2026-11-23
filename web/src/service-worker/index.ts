@@ -15,8 +15,10 @@ import {
 	sharedKey,
 	sharePath,
 	shellPaths,
-	strategy
+	strategy,
+	unreachable
 } from '#lib/app-cache.ts';
+import { askToOpen } from '#lib/app-open.ts';
 import { BASE as base } from '#lib/base.ts';
 import { type PushPayload, pushText } from '#lib/push-text.ts';
 
@@ -112,13 +114,20 @@ async function file(request: Request): Promise<Response> {
 }
 
 async function page(request: Request): Promise<Response> {
+	const kept = async () => (await caches.open(CACHE)).match(PAGE);
+	let response: Response;
 	try {
-		return await fetch(request);
+		response = await fetch(request);
 	} catch (error) {
-		const kept = await (await caches.open(CACHE)).match(PAGE);
-		if (kept) return kept;
+		const page = await kept();
+		if (page) return page;
 		throw error;
 	}
+	// A proxy answering for a Lekto that is not there: the app's page, as without a connection.
+	if (unreachable(response.status, response.headers.get('content-type'))) {
+		return (await kept()) ?? response;
+	}
+	return response;
 }
 
 /** Files another app shared (Android's share sheet, the manifest's `share_target`): kept under a
@@ -201,10 +210,15 @@ worker.addEventListener('notificationclick', (event) => {
 async function open(url: string): Promise<void> {
 	const windows = await worker.clients.matchAll({ type: 'window', includeUncontrolled: true });
 	const app = windows.find((client) => new URL(client.url).pathname.startsWith(`${base}/`));
-	if (app) {
-		await app.focus();
-		await app.navigate(url).catch(() => undefined);
-	} else {
+	if (!app) {
 		await worker.clients.openWindow(url);
+		return;
 	}
+	await app.focus();
+	// The app goes there itself, through its router (`lib/app-open.ts`): loading the address
+	// would start it anew, end its uploads and ask about unsaved changes in the browser's
+	// words. A window that does not answer is loaded; one this worker does not control
+	// cannot be, and gets a window of its own.
+	if (await askToOpen(app, url)) return;
+	await app.navigate(url).catch(() => worker.clients.openWindow(url));
 }

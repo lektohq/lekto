@@ -103,7 +103,7 @@
 			<Button
 				type="button"
 				size="sm"
-				disabled={busy}
+				{busy}
 				onclick={() => ondecide({ ...base, action: 'withdraw' })}
 			>
 				{m.facts_decide_restore()}
@@ -114,7 +114,7 @@
 					type="button"
 					variant="outline"
 					size="sm"
-					disabled={busy}
+					{busy}
 					onclick={() => ondecide({ ...base, action: 'withdraw' })}
 				>
 					{onlyByPerson(fact) ? m.facts_decide_remove() : m.facts_decide_undo()}
@@ -125,13 +125,13 @@
 					type="button"
 					variant="outline"
 					size="sm"
-					disabled={busy}
+					{busy}
 					onclick={() => ondecide({ ...base, action: 'reject' })}
 				>
 					{m.facts_decide_reject()}
 				</Button>
 			{/if}
-			<Button type="submit" size="sm" disabled={busy || !changed}>
+			<Button type="submit" size="sm" {busy} disabled={!changed}>
 				{m.facts_decide_save()}
 			</Button>
 		{/if}

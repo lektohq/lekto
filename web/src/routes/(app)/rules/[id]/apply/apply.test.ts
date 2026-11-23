@@ -1,4 +1,5 @@
 import { render, screen, waitFor } from '@testing-library/svelte';
+import { toast } from 'svelte-sonner';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { goto } from '$app/navigation';
@@ -6,17 +7,17 @@ import { bulkDocuments } from '#lib/bulk.ts';
 import type { components } from '#lib/api/schema.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { session } from '#lib/session.svelte.ts';
-import { calls, fakeApi, json } from '#lib/testing/api.ts';
+import { calls, fakeApi, json, masterData, problem } from '#lib/testing/api.ts';
 import { goTo } from '#lib/testing/page-state.svelte.ts';
 import Page from './+page.svelte';
+import { signIn } from '#lib/testing/session.ts';
+import { jobsSummaryOf } from '#lib/testing/system.ts';
 
 type Preview = components['schemas']['ApplyPreviewOut'];
 type Application = components['schemas']['RuleApplicationOut'];
 
-vi.mock('$app/navigation', () => ({ beforeNavigate: vi.fn(), goto: vi.fn() }));
-vi.mock('$app/state', async () => ({
-	page: (await import('#lib/testing/page-state.svelte.ts')).testPage
-}));
+vi.mock('$app/navigation', () => import('#lib/testing/navigation.ts'));
+vi.mock('$app/state', () => import('#lib/testing/app-state.ts'));
 
 const rule = {
 	id: 'r1',
@@ -44,13 +45,14 @@ const row = (id: string): Preview['items'][number] => ({
 	accepted: null
 });
 
-const preview = (ids: string[], next: string | null): Preview => ({
+const preview = (ids: string[], next: string | null, max = 1000): Preview => ({
 	rule_id: 'r1',
 	version: 1,
 	items: ids.map(row),
 	next_cursor: next,
 	looked_at: 200,
-	total: 800
+	total: 800,
+	max_documents: max
 });
 
 const application = (status: Application['status']): Application => ({
@@ -72,6 +74,7 @@ const application = (status: Application['status']): Application => ({
 function held(pages: Preview[], routes: Parameters<typeof fakeApi>[0] = {}) {
 	const waiting: (() => void)[] = [];
 	const api = fakeApi({
+		...masterData(),
 		'GET /api/v1/rules/r1': () => rule,
 		'POST /api/v1/rules/r1/apply/preview': async () => {
 			const page = pages.shift();
@@ -94,12 +97,11 @@ const looked = (checked: string, count: string) =>
 
 beforeEach(() => {
 	goTo('/ui/rules/r1/apply', { id: 'r1' });
-	session.user = { id: 'u1', role: 'admin' } as typeof session.user;
+	signIn('admin');
 });
 
 afterEach(() => {
-	session.user = null;
-	vi.unstubAllGlobals();
+	session.clear();
 	vi.clearAllMocks();
 });
 
@@ -179,15 +181,11 @@ describe("a rule's dry run", () => {
 		const { release } = held([preview(['a'], null)], {
 			'POST /api/v1/rules/r1/apply': () => application('queued'),
 			'GET /api/v1/rule-applications/a1': () => application('queued'),
-			'GET /api/v1/jobs/summary': () => ({
-				kinds: [
-					{ kind: 'pipeline.node', running: 1, due: 2, planned: 0, failed: 0, done: 0 },
-					{ kind: 'rules.apply', running: 0, due: 1, planned: 0, failed: 0, done: 0 }
-				],
-				last_started_at: new Date().toISOString(),
-				now: new Date().toISOString(),
-				kept_since: '2026-10-26T12:00:00Z'
-			})
+			'GET /api/v1/jobs/summary': () =>
+				jobsSummaryOf(
+					{ 'pipeline.node': { running: 1, due: 2 }, 'rules.apply': { due: 1 } },
+					{ last_started_at: new Date().toISOString(), now: new Date().toISOString() }
+				)
 		});
 		const user = userEvent.setup();
 		render(Page);
@@ -198,9 +196,73 @@ describe("a rule's dry run", () => {
 		await user.click(apply);
 
 		expect(await screen.findByText(m.rule_apply_waiting())).toBeTruthy();
-		expect(await screen.findByText(new RegExp(m.rule_apply_ahead({ count: '3' })))).toBeTruthy();
+		// Shown in the bar, and said to a screen reader in the region that stays (WD-12).
+		const ahead = await screen.findAllByText(new RegExp(m.rule_apply_ahead({ count: '3' })));
+		expect(ahead).toHaveLength(2);
+		expect(ahead.some((element) => element.getAttribute('aria-live') === 'polite')).toBe(true);
 		expect(screen.getByRole('link', { name: m.rule_apply_jobs() })).toBeTruthy();
 		expect(goto).toHaveBeenCalledWith('?application=a1', { replace: true, reset: false });
+	});
+
+	it('chooses no more documents than one application takes, and says so (WD-03)', async () => {
+		// Every hit was chosen, and applying more than the server's limit only failed, in
+		// English, with hundreds to deselect by hand.
+		const { api, release } = held(
+			[preview(['a', 'b'], 'next', 3), preview(['c', 'd', 'e'], null, 3)],
+			{
+				'POST /api/v1/rules/r1/apply': () => application('queued'),
+				'GET /api/v1/rule-applications/a1': () => application('queued'),
+				'GET /api/v1/jobs/summary': () =>
+					jobsSummaryOf(
+						{},
+						{ last_started_at: new Date().toISOString(), now: new Date().toISOString() }
+					)
+			}
+		);
+		const user = userEvent.setup();
+		render(Page);
+		await release();
+		await release();
+
+		expect(await screen.findByText(m.selection_selected({ count: '3' }))).toBeTruthy();
+		expect(screen.getByText(m.rule_apply_limit({ max: '3' }))).toBeTruthy();
+		// "All" is as many as one application takes.
+		const all = screen.getByRole('checkbox', { name: m.rule_preview_select_all() });
+		expect((all as HTMLInputElement).checked).toBe(true);
+		await user.click(all);
+		expect(screen.getByText(m.selection_selected({ count: '0' }))).toBeTruthy();
+		await user.click(all);
+		expect(screen.getByText(m.selection_selected({ count: '3' }))).toBeTruthy();
+
+		await user.click(screen.getByRole('button', { name: m.rule_apply_action() }));
+		await waitFor(() => expect(calls(api)).toContain('POST /api/v1/rules/r1/apply'));
+		const sent = api.mock.calls.find(([request]) => request.url.endsWith('/apply'))![0];
+		expect((await sent.json()).document_ids).toEqual(['a', 'b', 'c']);
+	});
+
+	it('switches a paused rule on only once applying is taken (WD-03)', async () => {
+		// "Activate and apply" switched the rule on first: a refused application left it on,
+		// with nothing applied.
+		const { api, release } = held([preview(['a'], null)], {
+			'POST /api/v1/rules/r1/apply': () =>
+				problem(422, {
+					detail: 'select at most 2 documents',
+					code: 'rule_apply_too_many',
+					params: { max: 2 }
+				})
+		});
+		const failed = vi.spyOn(toast, 'error').mockImplementation(() => '');
+		render(Page);
+		await release();
+		const both = await screen.findByRole('button', { name: m.rule_switch_on_apply() });
+		await waitFor(() => expect((both as HTMLButtonElement).disabled).toBe(false));
+		await userEvent.click(both);
+
+		await waitFor(() =>
+			expect(failed).toHaveBeenCalledWith(m.reason_rule_apply_too_many({ max: '2' }))
+		);
+		expect(calls(api)).not.toContain('PATCH /api/v1/rules/r1');
+		failed.mockRestore();
 	});
 
 	it('shows an application it comes back to, not a new dry run', async () => {

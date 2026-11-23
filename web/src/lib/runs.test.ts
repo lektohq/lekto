@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { components } from '#lib/api/schema.ts';
-import type { GraphNode, Processing } from '#lib/pipeline.ts';
+import type { Processing } from '#lib/pipeline.ts';
 import {
 	glance,
 	glanceSeconds,
@@ -12,18 +12,19 @@ import {
 	startedAgain,
 	stateOf
 } from './runs.ts';
+import { graphOf, logEntry } from '#lib/testing/pipeline.ts';
 
 type LogEntry = components['schemas']['LogEntry'];
 
-const GRAPH: GraphNode[] = [
-	{ node: 'receive', requires: [], waits_for: [] },
-	{ node: 'ocr', requires: ['receive'], waits_for: [] },
-	{ node: 'parse', requires: ['ocr'], waits_for: [] },
-	{ node: 'judge', requires: ['parse'], waits_for: [] },
-	{ node: 'fields', requires: ['judge'], waits_for: [] },
-	{ node: 'apply_rules', requires: ['fields'], waits_for: [] },
-	{ node: 'file', requires: ['apply_rules'], waits_for: [] }
-];
+const GRAPH = graphOf({
+	receive: [],
+	ocr: ['receive'],
+	parse: ['ocr'],
+	judge: ['parse'],
+	fields: ['judge'],
+	apply_rules: ['fields'],
+	file: ['apply_rules']
+});
 
 function entry(
 	node: LogEntry['node'],
@@ -32,20 +33,7 @@ function entry(
 	started_at = '2026-10-14T08:49:01Z',
 	extra: Partial<LogEntry> = {}
 ): LogEntry {
-	return {
-		node,
-		run,
-		outcome,
-		reason: null,
-		confidence: null,
-		model_version: null,
-		input: {},
-		output: {},
-		pipeline_version: 'test',
-		started_at,
-		duration_ms: 1000,
-		...extra
-	};
+	return logEntry(node, run, { outcome, started_at, ...extra });
 }
 
 // Run 1 ends for review at the verdict; run 2 starts again at the verdict and ends for review

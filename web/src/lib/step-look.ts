@@ -11,9 +11,10 @@ import OctagonX from '@lucide/svelte/icons/octagon-x';
 import TriangleAlert from '@lucide/svelte/icons/triangle-exclamation-point';
 import { m } from '#lib/paraglide/messages.js';
 import type { NodeState } from '#lib/pipeline.ts';
-import type { Lane } from '#lib/tones.ts';
+import type { Tone as UiTone } from '#lib/tones.ts';
 
-export type Tone = 'green' | 'yellow' | 'red' | 'running' | 'muted';
+/** The tones a step can have, of the UI's (`tones.ts`, which draws them). */
+export type Tone = Extract<UiTone, 'green' | 'yellow' | 'red' | 'running' | 'muted'>;
 
 export interface Look {
 	icon: typeof Circle;
@@ -47,51 +48,3 @@ export function delegatedLabel(state: NodeState, now: Date = new Date()): string
 	const left = (new Date(state.deadline).getTime() - now.getTime()) / 60_000;
 	return m.node_status_delegated_left({ minutes: String(Math.max(1, Math.ceil(left))) });
 }
-
-/** Text colour of a tone: the tones of the UI. */
-export { TONE_TEXT } from '#lib/tones.ts';
-
-/** A lane as a mark (the band, the rail of the timeline), drawn like the lane's chip (Tobi,
- * 23.10.2026): its ground, and an edge in its text colour that sets the pale ground of the
- * light theme off the card. */
-export const MARK: Record<Lane, string> = {
-	green: 'bg-lane-green ring-1 ring-inset ring-lane-green-foreground/35',
-	yellow: 'bg-lane-yellow ring-1 ring-inset ring-lane-yellow-foreground/45',
-	red: 'bg-lane-red ring-1 ring-inset ring-lane-red-foreground/40'
-};
-
-/** A small mark (the matrix, the counts, the dots of the timeline): flat, the lane's ground in
- * a plain border of its text colour; an inner ring looks shaded at that size. */
-export const DOT: Record<Lane, string> = {
-	green: 'border-[1.5px] border-lane-green-foreground bg-lane-green',
-	yellow: 'border-[1.5px] border-lane-yellow-foreground bg-lane-yellow',
-	red: 'border-[1.5px] border-lane-red-foreground bg-lane-red'
-};
-
-/** A stripe too thin for a ground (the steps beside the longest one in the band): the lane's
- * text colour, softened. */
-export const STRIPE: Record<Lane, string> = {
-	green: 'bg-lane-green-foreground/45',
-	yellow: 'bg-lane-yellow-foreground/60',
-	red: 'bg-lane-red-foreground/55'
-};
-
-/** Text written on a lane's mark: the chip's text. */
-export const ON_MARK: Record<Lane, string> = {
-	green: 'text-lane-green-foreground',
-	yellow: 'text-lane-yellow-foreground',
-	red: 'text-lane-red-foreground'
-};
-
-/** The ring of a mark or card that is pointed at, in its tone's text colour. */
-export const LIT_RING: Record<Tone, string> = {
-	green: 'ring-lane-green-foreground',
-	yellow: 'ring-lane-yellow-foreground',
-	red: 'ring-lane-red-foreground',
-	running: 'ring-lane-running-foreground',
-	muted: 'ring-muted-foreground'
-};
-
-/** An action in the yellow lane (to the filing question), drawn like the chip. */
-export const YELLOW_ACTION =
-	'bg-lane-yellow text-lane-yellow-foreground ring-1 ring-inset ring-lane-yellow-foreground/35 hover:bg-lane-yellow/70';

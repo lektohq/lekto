@@ -270,6 +270,14 @@ service worker (`/ui/service-worker.js`, revalidated like every other file) keep
 the web UI for a start without a connection, never an answer of the API. Over plain HTTP the
 browser offers no install and Lekto works as a website.
 
+Lekto compresses the files of the web UI and the JSON of the API itself (gzip, for a client that
+accepts it; not the sign-in, downloads or event streams), so the proxy need not.
+
+Serve Lekto over HTTP/2, as the three extensions do (nginx: `http2 on;` beside
+`listen 443 ssl;`). Over HTTP/1.1 a browser opens at most six connections to a host, and every
+tab of Lekto that is in front holds one for its events; a tab that is hidden lets go of it
+after a few seconds and takes it up again when it is shown.
+
 Two paths must not be buffered or cut short by the proxy:
 
 - `/api/v1/events`: server-sent events, minutes to hours.
@@ -279,6 +287,14 @@ Uploads must not be cut short either: the proxy's body limit must allow `LEKTO_U
 and its time to read a request must allow the slowest upload. Traefik v3 stops reading a request
 after 60 seconds, the body included (`respondingTimeouts.readTimeout`); `compose.traefik.yml`
 sets 15 minutes, which takes 100 MiB from 1 Mbit/s on.
+
+While Lekto restarts (an update) the proxy answers for it. The web UI takes a 5xx without
+Lekto's own JSON error body (502, 503, 504, a plain 500) for "the server cannot be reached": it
+keeps the person signed in, shows its own page and asks again by itself until Lekto is back. A
+404 it cannot tell from a page that does not exist, so the proxy must not answer that then.
+Traefik does by default: it drops the router of a container that is not healthy.
+`providers.docker.allowEmptyServices=true` keeps the router, and Traefik answers 5xx;
+`compose.traefik.yml` sets it.
 
 For nginx:
 

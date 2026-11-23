@@ -1,10 +1,8 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fakeApi, json } from '#lib/testing/api.ts';
+import { describe, expect, it, vi } from 'vitest';
+import { fakeApi, json, masterData, problem } from '#lib/testing/api.ts';
 import { PageLookup } from './lookup.svelte.ts';
 
-afterEach(() => vi.unstubAllGlobals());
-
-const USERS = [{ id: 'u1', username: 'tobi', role: 'user', active: true }];
+const USERS = [{ id: 'u1', username: 'john', role: 'user', active: true }];
 
 describe('the master data of a page', () => {
 	it('keeps the newest answer, not the slowest', async () => {
@@ -13,7 +11,10 @@ describe('the master data of a page', () => {
 			releaseFirst = () => resolve(json([]));
 		});
 		let asked = 0;
-		vi.stubGlobal('fetch', fakeApi({ 'GET /api/v1/users': () => (++asked === 1 ? first : USERS) }));
+		vi.stubGlobal(
+			'fetch',
+			fakeApi({ ...masterData(), 'GET /api/v1/users': () => (++asked === 1 ? first : USERS) })
+		);
 		const lookup = new PageLookup();
 		const slow = lookup.load();
 		await lookup.load();
@@ -27,7 +28,7 @@ describe('the master data of a page', () => {
 		const onerror = vi.fn();
 		vi.stubGlobal(
 			'fetch',
-			fakeApi({ 'GET /api/v1/users': () => json({ detail: 'Down', status: 503 }, 503) })
+			fakeApi({ ...masterData(), 'GET /api/v1/users': () => problem(503, { detail: 'Down' }) })
 		);
 		const lookup = new PageLookup(onerror);
 		await lookup.load();
@@ -35,7 +36,7 @@ describe('the master data of a page', () => {
 		expect(lookup.problem).toBeTruthy();
 		expect(onerror).toHaveBeenCalledOnce();
 
-		vi.stubGlobal('fetch', fakeApi());
+		vi.stubGlobal('fetch', fakeApi(masterData()));
 		await lookup.load();
 		expect(lookup.problem).toBeNull();
 		expect(lookup.value?.users).toEqual([]);
