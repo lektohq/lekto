@@ -280,6 +280,8 @@
 					bind:value={form.username}
 					maxlength={LIMITS.username}
 					autocomplete="off"
+					autocapitalize="none"
+					autocorrect="off"
 					spellcheck={false}
 				/>
 			</Field.Field>

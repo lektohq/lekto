@@ -44,7 +44,7 @@
 	import PageTitle from '#lib/components/page/PageTitle.svelte';
 	import { leaveDocument } from '#lib/way-back.ts';
 	import FormDialog from '#lib/components/FormDialog.svelte';
-	import PageEditor from '#lib/components/document/PageEditor.svelte';
+	import PageEditor from '#lib/components/document/PageEditorOnDemand.svelte';
 	import VersionUpload from '#lib/components/document/VersionUpload.svelte';
 
 	type Document = components['schemas']['DocumentDetails'];

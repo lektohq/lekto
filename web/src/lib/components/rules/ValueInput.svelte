@@ -177,6 +177,8 @@
 			aria-invalid={invalid || undefined}
 			type={type === 'link' ? 'url' : 'text'}
 			inputmode={type === 'number' ? 'decimal' : undefined}
+			autocapitalize={textual ? 'none' : undefined}
+			autocorrect={textual ? 'off' : undefined}
 			value={text}
 			oninput={(event) =>
 				onchange(

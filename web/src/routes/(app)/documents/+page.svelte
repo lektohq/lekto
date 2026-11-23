@@ -30,7 +30,7 @@
 	import DocumentRow from '#lib/components/DocumentRow.svelte';
 	import BulkSkipped from '#lib/components/BulkSkipped.svelte';
 	import DocumentsBulkBar from '#lib/components/DocumentsBulkBar.svelte';
-	import PageEditor from '#lib/components/document/PageEditor.svelte';
+	import PageEditor from '#lib/components/document/PageEditorOnDemand.svelte';
 	import { mergeBlocked, type Candidate, type Mergeable } from '#lib/merge.ts';
 	import { BulkRun, type BulkSelection } from '#lib/bulk.svelte.ts';
 	import { MAX_DOCUMENTS, MAX_HITS } from '#lib/bulk.ts';
