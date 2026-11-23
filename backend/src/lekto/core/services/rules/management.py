@@ -302,7 +302,7 @@ class RuleService:
         for path, template in writing_templates(values).items():
             try:
                 written[path] = self._templates.render(template, values)
-            except (MissingValueError, ValidationError):
+            except MissingValueError, ValidationError:
                 continue
         return written
 

@@ -184,7 +184,7 @@ def test_never_counts_less_than_regex_spells_out() -> None:
             pattern = _generate(rng, 0)
             try:
                 spelled = spelled_by_regex(pattern)
-            except (regex.error, KeyError, ValueError, RecursionError):
+            except regex.error, KeyError, ValueError, RecursionError:
                 continue
             compared += 1
             assert spelled_out(pattern) >= spelled, pattern

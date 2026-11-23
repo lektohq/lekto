@@ -243,7 +243,7 @@ class _Lined:
     size: tuple[float, float]
 
     @classmethod
-    def of(cls, textpage: pypdfium2.PdfTextPage, geometry: Geometry) -> "_Lined":
+    def of(cls, textpage: pypdfium2.PdfTextPage, geometry: Geometry) -> _Lined:
         upright, _ = page_chars(textpage, geometry)
         return cls(_spelt(upright, loose=False), _spelt(upright, loose=True), geometry.size)
 

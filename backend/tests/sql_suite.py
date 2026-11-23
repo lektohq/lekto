@@ -5032,8 +5032,10 @@ def _schema(connection: Connection) -> set[tuple[Any, ...]]:
         }
     queries = [
         "SELECT 'index', indexname, indexdef FROM pg_indexes WHERE schemaname = 'public'",
+        # Postgres 18 keeps NOT NULL as constraints too, named after the table and column when
+        # they were made, so a renamed one differs by name alone; the columns say it already.
         "SELECT 'constraint', conname, pg_get_constraintdef(oid) FROM pg_constraint "
-        "WHERE connamespace = 'public'::regnamespace",
+        "WHERE connamespace = 'public'::regnamespace AND contype <> 'n'",
         "SELECT 'column', table_name || '.' || column_name, "
         "concat_ws(' ', data_type, numeric_precision, numeric_scale, character_maximum_length, "
         "is_nullable, column_default) FROM information_schema.columns "

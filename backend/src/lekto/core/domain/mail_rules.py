@@ -240,9 +240,7 @@ class MailRule:
     version: int = 0
 
     @classmethod
-    def create(
-        cls, *, mailbox_id: MailboxId, changes: MailRuleChanges, now: datetime
-    ) -> "MailRule":
+    def create(cls, *, mailbox_id: MailboxId, changes: MailRuleChanges, now: datetime) -> MailRule:
         require_utc(now, "now")
         rule = cls(
             id=MailRuleId(new_id()),

@@ -58,7 +58,7 @@ test('every area opens, and the dialogs create things', async ({ page }) => {
 	await page.getByRole('button', { name: 'Create' }).click();
 	await expect(page.getByText(NAME).first()).toBeVisible();
 	await page.getByRole('button', { name: `Edit ${NAME}` }).click();
-	await page.getByRole('button', { name: `Delete ${NAME}` }).click();
+	await page.getByRole('button', { name: `Delete “${NAME}”` }).click();
 	await page.getByRole('alertdialog').getByRole('button', { name: 'Delete' }).click();
 	await expect(page.getByText(NAME)).toHaveCount(0);
 

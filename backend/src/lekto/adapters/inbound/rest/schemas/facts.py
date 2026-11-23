@@ -39,7 +39,7 @@ class SpanOut(BaseModel):
     )
 
     @classmethod
-    def of(cls, span: Span) -> "SpanOut":
+    def of(cls, span: Span) -> SpanOut:
         return cls(
             start=span.start,
             end=span.end,
@@ -70,7 +70,7 @@ class HolderOut(BaseModel):
     source: HolderSource = Field(description="Who told it: `rule` or `model`.")
 
     @classmethod
-    def of(cls, holder: Holder | None) -> "HolderOut | None":
+    def of(cls, holder: Holder | None) -> HolderOut | None:
         if holder is None:
             return None
         return cls(kind=holder.kind, name=holder.name, source=holder.source)
@@ -143,7 +143,7 @@ class FoundIdentifierOut(BaseModel):
     @classmethod
     def of(
         cls, item: IdentifierFact, others: Mapping[Key, frozenset[ContactId]] | None
-    ) -> "FoundIdentifierOut":
+    ) -> FoundIdentifierOut:
         found = item.found
         return cls(
             kind=found.kind,
@@ -185,7 +185,7 @@ class DocumentNumberOut(BaseModel):
     )
 
     @classmethod
-    def of(cls, item: DocumentNumber) -> "DocumentNumberOut":
+    def of(cls, item: DocumentNumber) -> DocumentNumberOut:
         return cls(
             kind=item.fact.kind,
             value=item.fact.value,
@@ -240,7 +240,7 @@ class CodeOut(BaseModel):
     )
 
     @classmethod
-    def of(cls, item: CodeFacts) -> "CodeOut":
+    def of(cls, item: CodeFacts) -> CodeOut:
         giro = None
         if item.giro is not None:
             amount = item.giro.amount
@@ -352,7 +352,7 @@ class FactsOut(BaseModel):
     )
 
     @classmethod
-    def of(cls, report: DocumentFacts) -> "FactsOut":
+    def of(cls, report: DocumentFacts) -> FactsOut:
         others = report.other_contacts
         return cls(
             contact_id=report.contact_id,

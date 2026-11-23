@@ -37,7 +37,7 @@ class FilesystemObjectStore:
         path = self._path(key)
         try:
             return await asyncio.to_thread(path.read_bytes)
-        except (FileNotFoundError, NotADirectoryError, IsADirectoryError):
+        except FileNotFoundError, NotADirectoryError, IsADirectoryError:
             raise NotFoundError("object", key) from None
 
     async def upload(self, key: str, source: Path, *, content_type: str) -> None:
@@ -57,7 +57,7 @@ class FilesystemObjectStore:
         def copy() -> None:
             try:
                 file = path.open("rb")
-            except (FileNotFoundError, NotADirectoryError, IsADirectoryError):
+            except FileNotFoundError, NotADirectoryError, IsADirectoryError:
                 raise NotFoundError("object", key) from None
             with file:
                 _write_atomically(target, lambda out: shutil.copyfileobj(file, out, _CHUNK))

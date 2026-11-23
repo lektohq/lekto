@@ -92,7 +92,7 @@ class MailMarks:
     flag: FlagColor | None = None
 
     @classmethod
-    def of_flags(cls, flags: Iterable[str]) -> "MailMarks":
+    def of_flags(cls, flags: Iterable[str]) -> MailMarks:
         """The marks of a mail's IMAP flags; the colour bits are no keywords of their own."""
         names = list(flags)
         folded = {name.casefold() for name in names}

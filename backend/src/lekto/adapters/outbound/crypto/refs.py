@@ -34,11 +34,11 @@ class AesSivRefCipher:
     def open(self, ref: str, *, context: str) -> str:
         try:
             data = from_base64url(ref)
-        except (ValueError, binascii.Error):
+        except ValueError, binascii.Error:
             raise DecryptionError("not a reference") from None
         if not data.startswith(_VERSION):
             raise DecryptionError("unknown reference format")
         try:
             return self._aead.decrypt(data[1:], [context.encode()]).decode()
-        except (InvalidTag, ValueError):
+        except InvalidTag, ValueError:
             raise DecryptionError("the reference does not open with this key") from None

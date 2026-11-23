@@ -146,7 +146,7 @@ class Visibility:
     everything: bool = False
 
     @classmethod
-    def of(cls, reach: Reach) -> "Visibility":
+    def of(cls, reach: Reach) -> Visibility:
         return cls(reach.edits, reach.reads)
 
     def allows(self, document: IndexDocument) -> bool:

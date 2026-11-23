@@ -51,6 +51,7 @@ from lekto.core.domain.pipeline import (
     NodeResult,
     NodeRun,
     NodeStatus,
+    NodeUnavailableError,
     Outcome,
     ProcessingHistory,
     ProcessingStatus,
@@ -230,7 +231,8 @@ class NodeExecutor(Protocol):
 
     Runs outside any transaction and may take long. Returns what the node decided, or a result
     to complete when it is stored; raising an exception counts as a failed attempt and is
-    retried, except UnprocessableDocumentError, which fails the node at once.
+    retried, except UnprocessableDocumentError, which fails the node at once, and
+    NodeUnavailableError, whose fallback ends the node after the last attempt.
     """
 
     async def run(self, document: Document) -> NodeResult | DeferredResult: ...
@@ -246,7 +248,7 @@ class IncomingFile:
     size: int
 
     @classmethod
-    def of(cls, path: Path) -> "IncomingFile":
+    def of(cls, path: Path) -> IncomingFile:
         """Hash an existing file (blocking; for tools and tests)."""
         digest = hashlib.sha256()
         size = 0
@@ -785,7 +787,7 @@ class PipelineService:
         it."""
         try:
             await self._move_target(uow, user, source, id)
-        except (NotFoundError, SpaceWriteDeniedError):
+        except NotFoundError, SpaceWriteDeniedError:
             return False
         return True
 
@@ -967,6 +969,16 @@ class PipelineService:
             outcome: NodeResult | DeferredResult = await self._executors[node].run(document)
         except UnprocessableDocumentError as error:
             outcome = _failed(error.reason)
+        except NodeUnavailableError as error:
+            retry_at = self._retry.next_run(job.tries, self._clock.now())
+            log.warning(
+                "pipeline node waits for a service",
+                extra={"document_id": str(document_id), "node": node, "attempt": job.tries},
+            )
+            if retry_at is not None:
+                await self._defer(job, document_id, node, run, retry_at, str(error))
+                return
+            outcome = error.fallback
         except Exception as error:
             crashed = because(
                 ReasonCode.NODE_CRASHED, error=type(error).__name__, detail=str(error)

@@ -748,7 +748,7 @@ class IndexingService:
             since=durations.since,
         )
 
-    async def _durations(self) -> "_Durations":
+    async def _durations(self) -> _Durations:
         """How long the latest done index jobs ran, those that embedded and those that only
         wrote the words; a job whose embedding failed counts as neither."""
         since = self._clock.now() - self._policy.durations_window

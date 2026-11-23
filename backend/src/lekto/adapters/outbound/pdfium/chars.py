@@ -84,11 +84,11 @@ class Geometry:
     rotation: int
 
     @classmethod
-    def of(cls, page: pypdfium2.PdfPage) -> "Geometry":
+    def of(cls, page: pypdfium2.PdfPage) -> Geometry:
         left, bottom, right, top = page.get_cropbox()
         return cls(left, bottom, right, top, page.get_rotation() % 360)
 
-    def turned(self, degrees: int) -> "Geometry":
+    def turned(self, degrees: int) -> Geometry:
         """The page turned further, clockwise."""
         return dataclasses.replace(self, rotation=(self.rotation + degrees) % 360)
 

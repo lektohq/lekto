@@ -25,7 +25,11 @@ export default ts.config(
 	{
 		rules: {
 			// Types do the job; ESLint's own check does not know TypeScript's globals.
-			'no-undef': 'off'
+			'no-undef': 'off',
+			// The app lives below the fixed base `/ui` (`#lib/base.ts`), and its links and `goto`
+			// calls are built from it (`#lib/navigation.ts`), not by SvelteKit's `resolve()`. The rule
+			// ran only for SvelteKit 1 and 2 until eslint-plugin-svelte 3.24.
+			'svelte/no-navigation-without-resolve': 'off'
 		}
 	}
 );

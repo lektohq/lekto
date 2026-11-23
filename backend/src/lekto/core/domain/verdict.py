@@ -246,7 +246,7 @@ class _Ranking[K]:
         undivided: bool = False,
         evidence: Mapping[K, CandidateSource] | None = None,
         identified: Iterable[K] = (),
-    ) -> "_Ranking[K]":
+    ) -> _Ranking[K]:
         """`answer`: the value the model's answer matches, as a source (the model names it if
         the source says so); `classified`: the classifier's probabilities, best first;
         `carried`: the value a similar document carries; `undivided`: as for `_majority`."""
@@ -1068,7 +1068,7 @@ class _Persons:
     uploader: UserId | None = None
 
     @classmethod
-    def of(cls, persons: Mapping[UserId, Strength], uploader: UserId | None) -> "_Persons":
+    def of(cls, persons: Mapping[UserId, Strength], uploader: UserId | None) -> _Persons:
         others = {user: strength for user, strength in persons.items() if user != uploader}
         return cls(
             hard=frozenset(user for user, strength in others.items() if strength is Strength.HARD),

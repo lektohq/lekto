@@ -40,7 +40,7 @@ SCOPE = (
 def _zone(name: str) -> str:
     try:
         ZoneInfo(name)
-    except (ZoneInfoNotFoundError, ValueError):
+    except ZoneInfoNotFoundError, ValueError:
         raise ValueError(f"unknown time zone: {name!r:.80}") from None
     return name
 

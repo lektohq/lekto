@@ -1,5 +1,6 @@
-"""A small stand-in for the Lekto API: the endpoints the migration uses, in memory. The real API
-is exercised by the flow tests in the backend's test suite."""
+"""A small stand-in for the Lekto API: the endpoints the migration uses, in memory. Every answer
+goes through pylekto's model of it, so the stand-in cannot drift from what pylekto reads. The
+real API is exercised by the flow tests in the backend's test suite."""
 
 import hashlib
 import json
@@ -10,15 +11,44 @@ from datetime import UTC, datetime
 from email.parser import BytesParser
 from email.policy import HTTP
 from typing import Any, cast
-from uuid import uuid4
+from uuid import NAMESPACE_OID, UUID, uuid4, uuid5
 
 import httpx2
-
-from lekto_migration.plan import REVIEW_CODES
+from pylekto import API_VERSION, LEKTO_VERSION
+from pylekto.models import (
+    ContactOut,
+    DocumentAccepted,
+    DocumentChanged,
+    DocumentDetails,
+    DocumentPage,
+    DocumentPreviewOut,
+    DocumentTextOut,
+    DocumentTypeOut,
+    FieldOut,
+    LogEntry,
+    Me,
+    ProfileOut,
+    ReadingOut,
+    SpaceOut,
+    TagOut,
+    UserOut,
+)
 
 TOKEN = "lekto-test-key"
 PREFIX = "/api/v1"
-ADMIN: dict[str, Any] = {"id": "admin-id", "username": "root", "role": "admin", "active": True}
+NOW = "2026-10-21T08:00:00Z"  # when the master data the stand-in holds were created
+ADMIN: dict[str, Any] = {
+    "id": str(UUID(int=1)),
+    "username": "root",
+    "role": "admin",
+    "active": True,
+}
+INSTANCE = str(UUID(int=99))
+
+
+def personal_id(user_id: str) -> str:
+    """The id of a user's personal space."""
+    return str(uuid5(NAMESPACE_OID, f"personal:{user_id}"))
 
 
 @dataclass
@@ -29,16 +59,16 @@ class FakeLekto:
     tags: dict[str, dict[str, Any]] = field(default_factory=dict)
     fields: dict[str, dict[str, Any]] = field(default_factory=dict)
     spaces: dict[str, dict[str, Any]] = field(
-        default_factory=lambda: {f"personal:{ADMIN['id']}": _personal(ADMIN["id"])}
+        default_factory=lambda: {personal_id(ADMIN["id"]): _personal(ADMIN["id"])}
     )
     documents: dict[str, dict[str, Any]] = field(default_factory=dict)
     profiles: dict[str, dict[str, Any]] = field(default_factory=dict)  # user id -> e-mail
     scope: str = "read_write"
     role: str = "admin"
+    api_version: str | None = API_VERSION  # None: a Lekto before 0.16, which names none
     ticks: int = 1  # polls until a document's pipeline is through
     lanes: dict[str, str] = field(default_factory=dict)  # file name -> lane (default green)
     errors: dict[str, tuple[int, int]] = field(default_factory=dict)  # file name -> (status, times)
-    review_codes: bool = True  # whether it takes the codes of reviews (`x-reasons`)
     log: list[tuple[str, str]] = field(default_factory=list)
     texts: dict[str, str] = field(default_factory=dict)  # file name -> the archive's text
     advice: dict[str, str] = field(default_factory=dict)  # file name -> reading advice
@@ -55,6 +85,14 @@ class FakeLekto:
     def writes(self) -> list[tuple[str, str]]:
         return [entry for entry in self.log if entry[0] != "GET"]
 
+    def add_user(self, username: str, **values: Any) -> str:
+        """A user Lekto has already, with their personal space; their id."""
+        id = str(uuid4())
+        self.users[id] = {"id": id, "username": username, "role": "user", "active": True}
+        self.users[id].update(values)
+        self.spaces[personal_id(id)] = _personal(id)
+        return id
+
     # --- routing -----------------------------------------------------------------------------
 
     def _handle(self, request: httpx2.Request) -> httpx2.Response:
@@ -63,15 +101,8 @@ class FakeLekto:
             return _problem(401, "authentication is required")
         path = request.url.path.removeprefix(PREFIX)
         method = request.method
-        if path == "/openapi.json":
-            codes = ["text", "error", *(REVIEW_CODES.values() if self.review_codes else ())]
-            reasons: dict[str, Any] = {code: {} for code in codes}
-            return httpx2.Response(200, json={"x-reasons": reasons})
         if path == "/auth/me":
-            return httpx2.Response(
-                200,
-                json={"user": {**ADMIN, "role": self.role}, "token_scope": self.scope},
-            )
+            return self._me()
         if method != "GET" and self.scope != "read_write":
             return _problem(403, "this API token may only read")
         body = (
@@ -110,7 +141,7 @@ class FakeLekto:
                 for key in ("group_ids", "parent_id", "name"):
                     if key in body:
                         store[found[2]][key] = body[key]
-                return httpx2.Response(200, json=store[found[2]])
+                return self._answer(200, f"/{found[1]}", store[found[2]])
         if found := re.fullmatch(r"/users/([^/]+)/profile", path):
             return self._profile(found[1], method, body)
         if found := re.fullmatch(r"/(users|fields)/([^/]+)", path):
@@ -120,7 +151,7 @@ class FakeLekto:
                     store[found[2]]["active"] = body["active"]
                 if "choices" in body:
                     store[found[2]]["choices"] = body["choices"]
-                return httpx2.Response(200, json=store[found[2]])
+                return self._answer(200, f"/{found[1]}", store[found[2]])
         if found := re.fullmatch(r"/spaces/([^/]+)/members/([^/]+)", path):
             space = self.spaces[found[1]]
             if found[2] == space["personal_of"] and body.get("role") != "edit":
@@ -129,18 +160,40 @@ class FakeLekto:
                 return _problem(404, "user not found")
             space["members"] = [m for m in space["members"] if m["user_id"] != found[2]]
             space["members"].append({"user_id": found[2], "role": body["role"]})
-            return httpx2.Response(200, json=space)
+            return self._answer(200, "/spaces", space)
         if path == "/documents" and method == "POST":
             return self._upload(request)
         if path == "/documents" and method == "GET":
-            items = list(self.documents.values())
-            return httpx2.Response(200, json={"items": items, "next_cursor": None})
+            items = [self._listed(d) for d in self.documents.values()]
+            return _valid(200, DocumentPage, {"items": items, "next_cursor": None})
         if found := re.fullmatch(r"/documents/([^/]+)(/[a-z-]+)?", path):
             document = self.documents.get(found[1])
             if document is None:
                 return _problem(404, "document not found")
             return self._document(document, method, found[2] or "", request, body)
         return _problem(404, f"unknown {method} {path}")
+
+    def _me(self) -> httpx2.Response:
+        me = Me.model_validate(
+            {
+                "user": self._user({**ADMIN, "role": self.role}),
+                "authenticated_with": "token",
+                "csrf_token": None,
+                "session_expires_at": None,
+                "token_scope": self.scope,
+                "rights": [],
+                "has_password": False,
+                "totp_enabled": False,
+                "linked_accounts": [],
+                "lekto_version": LEKTO_VERSION,
+                "api_version": self.api_version or API_VERSION,
+                "instance_id": INSTANCE,
+                "shortcut_url": None,
+            }
+        ).model_dump(mode="json")
+        if self.api_version is None:
+            del me["api_version"]
+        return httpx2.Response(200, json=me)
 
     def _profile(self, user: str, method: str, body: dict[str, Any]) -> httpx2.Response:
         """A user's profile: display name (on the user) and e-mail; a name another user has
@@ -167,15 +220,17 @@ class FakeLekto:
                 self.users[user]["display_name"] = wanted
             if "email" in body:
                 profile["email"] = body["email"]
-        return httpx2.Response(
+        return _valid(
             200,
-            json={
+            ProfileOut,
+            {
                 "user_id": user,
                 "display_name": self.users[user].get("display_name"),
                 "aliases": [],
                 "birth_date": None,
                 "email": profile["email"],
                 "identifiers": [],
+                "numbers": [],
             },
         )
 
@@ -183,7 +238,7 @@ class FakeLekto:
         self, path: str, store: dict[str, dict[str, Any]], method: str, body: dict[str, Any]
     ) -> httpx2.Response:
         if method == "GET":
-            return httpx2.Response(200, json=list(store.values()))
+            return httpx2.Response(200, json=[self._out(path, item) for item in store.values()])
         if method != "POST":
             return _problem(405, "method not allowed")
         if f"POST {path}" in self.refuse:
@@ -197,10 +252,10 @@ class FakeLekto:
             for item in store.values()
         ):
             return _problem(409, f"{name} exists")
-        id = uuid4().hex
+        id = str(uuid4())
         if path == "/users":
             item = {"id": id, "username": name, "role": "user", "active": True}
-            self.spaces[f"personal:{id}"] = _personal(id)
+            self.spaces[personal_id(id)] = _personal(id)
         elif path == "/spaces":
             members = body.get("members") or [{"user_id": ADMIN["id"], "role": "edit"}]
             for member in members:
@@ -225,15 +280,69 @@ class FakeLekto:
                 "scope": body.get("scope", "document"),
                 "parent_id": body.get("parent_id"),
             }
-        elif path in ("/contacts", "/document-types"):
+        else:  # contacts, document types
             item = {"id": id, "name": name, "group_ids": []}
-        else:
-            item = {"id": id, "name": name}
         store[id] = item
         if name in self.lose_answer:
             self.lose_answer.discard(name)
             return _problem(503, "lost")
-        return httpx2.Response(201, json=item)
+        return self._answer(201, path, item)
+
+    # --- answers -----------------------------------------------------------------------------
+
+    def _answer(self, status: int, path: str, item: dict[str, Any]) -> httpx2.Response:
+        return httpx2.Response(status, json=self._out(path, item))
+
+    def _out(self, path: str, item: dict[str, Any]) -> dict[str, Any]:
+        """An object of the stand-in as the API answers it: what it holds, the rest as Lekto
+        fills it in."""
+        made = {"created_at": NOW}
+        if path == "/users":
+            return self._user(item)
+        if path == "/contacts":
+            empty: dict[str, Any] = dict.fromkeys(("logo", "logo_failure"))
+            for key in ("aliases", "identifiers", "group_ids", "topic_ids"):
+                empty[key] = []
+            return _fit(ContactOut, made | empty | item)
+        if path == "/document-types":
+            nothing = dict.fromkeys(("description", "title_pattern", "icon"))
+            return _fit(
+                DocumentTypeOut, made | nothing | {"group_ids": [], "relation_target": False} | item
+            )
+        if path == "/tags":
+            shown = {"assignment": "manual", "shown": True, "icon": None, "color": None}
+            tag = {"scope": "document", "parent_id": None, "path": [item["name"]]} | item
+            return _fit(TagOut, made | shown | tag)
+        if path == "/fields":
+            defaults: dict[str, Any] = {
+                "key": re.sub(r"\W+", "_", item["name"].lower()),
+                "document_type_ids": None,
+                "choices": [],
+                "required": False,
+                "required_document_type_ids": [],
+                "description": None,
+                "assignment": "manual",
+                "position": 0,
+            }
+            return _fit(FieldOut, made | defaults | item)
+        if path == "/spaces":
+            members = [
+                {
+                    "user_id": member["user_id"],
+                    "role": member["role"],
+                    "username": self.users[member["user_id"]]["username"],
+                    "display_name": self.users[member["user_id"]].get("display_name"),
+                    "active": self.users[member["user_id"]].get("active", True),
+                }
+                for member in item.get("members", [])
+            ]
+            space = made | {"description": None, "role": "edit", "version": 1} | item
+            return _fit(SpaceOut, space | {"members": members})
+        raise AssertionError(path)
+
+    def _user(self, user: dict[str, Any]) -> dict[str, Any]:
+        defaults = {"display_name": None, "personal_space_id": personal_id(user["id"])}
+        return _fit(UserOut, {"created_at": NOW} | defaults | user)
 
     # --- documents ---------------------------------------------------------------------------
 
@@ -262,7 +371,7 @@ class FakeLekto:
         uploader = fields.get("uploaded_by", ADMIN["id"])
         if uploader not in self.users or not self.users[uploader]["active"]:
             return _problem(404, "user not found")
-        space = fields.get("space_id", f"personal:{uploader}")
+        space = fields.get("space_id", personal_id(uploader))
         sha256 = hashlib.sha256(content).hexdigest()
         # Every file exists once per installation; the migration's admin reads every document.
         for existing in self.documents.values():
@@ -274,7 +383,8 @@ class FakeLekto:
         if not content.startswith(b"%PDF") and not content.startswith(b"\xff\xd8"):
             return _problem(415, "unsupported file type")
         metadata = json.loads(fields.get("metadata", "{}"))
-        id = uuid4().hex
+        id = str(uuid4())
+        received = datetime.now(UTC).isoformat()
         self.documents[id] = {
             "id": id,
             "title": metadata.get("title", filename),
@@ -291,7 +401,7 @@ class FakeLekto:
             "document_date": metadata.get("document_date"),
             "fields": metadata.get("fields", {}),
             "_metadata": fields.get("metadata", "{}"),
-            "created_at": metadata.get("created_at") or datetime.now(UTC).isoformat(),
+            "created_at": metadata.get("created_at") or received,
             "lane": None,
             "processing": {"status": "processing", "run": 1, "nodes": _nodes({"receive": "ok"})},
             "_lane": "yellow" if metadata.get("review") else self.lanes.get(filename, "green"),
@@ -301,13 +411,14 @@ class FakeLekto:
                     "outcome": "ok",
                     "reason": None,
                     "output": {"imported": metadata} if metadata else {},
+                    "started_at": received,
                 }
             ],
             "_text": self.texts.get(filename, f"{metadata.get('title', filename)} text " * 50),
         }
         if self.after_upload is not None:
             self.after_upload(len(self.uploads))
-        return httpx2.Response(202, json={"id": id, "status_url": f"{PREFIX}/documents/{id}"})
+        return _valid(202, DocumentAccepted, {"id": id, "status_url": f"{PREFIX}/documents/{id}"})
 
     def _document(
         self,
@@ -318,16 +429,17 @@ class FakeLekto:
         body: dict[str, Any],
     ) -> httpx2.Response:
         if sub == "/log" and method == "GET":
-            return httpx2.Response(200, json=document["_log"])
+            return httpx2.Response(200, json=[_entry(e) for e in document["_log"]])
         if sub == "/text" and method == "GET":
             text = document["_text"]
-            return httpx2.Response(
+            return _valid(
                 200,
-                json={"text": text, "offset": 0, "total_length": len(text), "next_offset": None},
+                DocumentTextOut,
+                {"text": text, "offset": 0, "total_length": len(text), "next_offset": None},
             )
         if sub == "/reading" and method == "GET":
             advice = self.advice.get(document["original_filename"])
-            return httpx2.Response(200, json={"vision": False, "pages": [], "advice": advice})
+            return _valid(200, ReadingOut, {"vision": False, "pages": [], "advice": advice})
         if sub == "/move" and method == "POST":
             document["space_id"] = body["space_id"]
             return httpx2.Response(204)
@@ -349,16 +461,25 @@ class FakeLekto:
             if "tag_ids" in body:
                 after["tag_ids"] = sorted(body["tag_ids"])
             if sub == "/dry-run":
-                return httpx2.Response(200, json={"document": after, "changed": [], "rules": []})
+                preview: dict[str, Any] = {
+                    "document": _details(after),
+                    "changed": [],
+                    "rules": [],
+                    "visibility": None,
+                }
+                return _valid(200, DocumentPreviewOut, preview)
             self.aligned.append((document["id"], body))
             document.update(after)
-            return httpx2.Response(200, json={**after, "rules": []})
+            return _valid(200, DocumentChanged, {**_details(after), "rules": []})
         if sub == "" and method == "GET":
-            return httpx2.Response(200, json=self._poll(document))
+            return httpx2.Response(200, json=_details(self._poll(document)))
         return _problem(404, f"unknown {method} {sub}")
 
     def _public(self, document: dict[str, Any]) -> dict[str, Any]:
         return {key: value for key, value in document.items() if not key.startswith("_")}
+
+    def _listed(self, document: dict[str, Any]) -> dict[str, Any]:
+        return {**_details(self._public(document)), "in_inbox": False}
 
     def _poll(self, document: dict[str, Any]) -> dict[str, Any]:
         id = document["id"]
@@ -390,7 +511,7 @@ class FakeLekto:
                 document["_log"].append(
                     {"node": "parse", "outcome": "failed", "reason": "no text recognised"}
                 )
-        return {key: value for key, value in document.items() if not key.startswith("_")}
+        return self._public(document)
 
 
 NODES = (
@@ -424,13 +545,51 @@ def _nodes(outcomes: dict[str, str]) -> list[dict[str, Any]]:
     ]
 
 
+def _details(document: dict[str, Any]) -> dict[str, Any]:
+    """A document as `GET /documents/{id}` answers it."""
+    values: dict[str, Any] = {
+        "access": "edit",
+        "first_lane": document.get("lane"),
+        "page_count": 1,
+        "confirmed_at": None,
+        "updated_at": NOW,
+    }
+    processing = {"vision": False} | document["processing"]
+    return _fit(DocumentDetails, values | document | {"processing": processing})
+
+
+def _entry(entry: dict[str, Any]) -> dict[str, Any]:
+    """An entry of a document's log as the API answers it."""
+    values: dict[str, Any] = {
+        "run": 1,
+        "confidence": None,
+        "model_version": None,
+        "input": {},
+        "output": {},
+        "pipeline_version": "1",
+        "started_at": NOW,
+        "duration_ms": 0.0,
+    }
+    return _fit(LogEntry, values | entry)
+
+
 def _personal(user_id: str) -> dict[str, Any]:
     return {
-        "id": f"personal:{user_id}",
+        "id": personal_id(user_id),
         "name": "Personal",
         "personal_of": user_id,
         "members": [{"user_id": user_id, "role": "edit"}],
     }
+
+
+def _fit(model: Any, values: dict[str, Any]) -> dict[str, Any]:
+    """`values` as JSON of the pylekto model of the answer; one that does not fit fails the
+    test here, not in the client."""
+    return cast("dict[str, Any]", model.model_validate(values).model_dump(mode="json"))
+
+
+def _valid(status: int, model: Any, values: dict[str, Any]) -> httpx2.Response:
+    return httpx2.Response(status, json=_fit(model, values))
 
 
 def _problem(status: int, detail: str) -> httpx2.Response:

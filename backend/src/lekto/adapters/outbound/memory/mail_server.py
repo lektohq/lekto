@@ -101,7 +101,7 @@ class MemoryMailServer:
         )
 
     @asynccontextmanager
-    async def session(self, login: MailLogin) -> AsyncIterator["MemoryMailSession"]:
+    async def session(self, login: MailLogin) -> AsyncIterator[MemoryMailSession]:
         yield MemoryMailSession(self._account(login))
 
     def _account(self, login: MailLogin) -> MemoryMailAccount:
@@ -202,7 +202,7 @@ class MemoryMailSession:
         if mail is not None:
             self._box(folder).mails.remove(mail)
 
-    def _box(self, folder: str) -> "MemoryFolder":
+    def _box(self, folder: str) -> MemoryFolder:
         box = self._account.boxes.get(folder)
         if box is None:
             raise MailServerError(because(ReasonCode.MAIL_FOLDER_MISSING, folder=folder))

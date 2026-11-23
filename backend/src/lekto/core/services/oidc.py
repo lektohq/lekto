@@ -221,7 +221,7 @@ class OidcService:
                 link_user=None if data["link_user"] is None else UserId(_uuid(data["link_user"])),
                 started_at=datetime.fromisoformat(data["started_at"]),
             )
-        except (DecryptionError, ValueError, KeyError, TypeError):
+        except DecryptionError, ValueError, KeyError, TypeError:
             raise expired from None
         if not (flow.started_at <= self._clock.now() < flow.started_at + FLOW_LIFETIME):
             raise expired

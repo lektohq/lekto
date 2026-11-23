@@ -82,7 +82,7 @@ def resolve(item: Expected, directory: Directory) -> Resolved:
             field_id = id_of("field", field_name.removeprefix("field:"))
             check = None if field_id is None else f"field:{field_id}"
         entry: dict[str, Any] = {"reason": reason.text[:MAX_REVIEW_REASON], "field": check}
-        if reason.code is not None and directory.review_codes:
+        if reason.code is not None:
             entry |= {"code": reason.code, "params": {"name": reason.name}}
         review.append(entry)
     resolved = Resolved(str(uploader["id"]), space_id, values, review[:MAX_REVIEWS], missing)

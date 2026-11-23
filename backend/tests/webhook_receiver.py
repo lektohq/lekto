@@ -37,7 +37,7 @@ class LocalReceiver:
         self._server: asyncio.Server | None = None
         self._port = 0
 
-    async def __aenter__(self) -> "LocalReceiver":
+    async def __aenter__(self) -> LocalReceiver:
         self._server = await asyncio.start_server(self._serve, "127.0.0.1", 0)
         self._port = self._server.sockets[0].getsockname()[1]
         return self
@@ -89,7 +89,7 @@ class LocalReceiver:
             lines += [f"{name}: {value}" for name, value in extra.items()]
             writer.write(("\r\n".join(lines) + "\r\n\r\nok").encode())
             await writer.drain()
-        except (asyncio.IncompleteReadError, ConnectionError, asyncio.CancelledError):
+        except asyncio.IncompleteReadError, ConnectionError, asyncio.CancelledError:
             pass
         finally:
             writer.close()

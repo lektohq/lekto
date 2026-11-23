@@ -71,7 +71,7 @@ class MailOf(MailHead):
     mailbox_id: UUID
 
     @classmethod
-    def of(cls, origin: MailOrigin | None) -> "MailOf | None":
+    def of(cls, origin: MailOrigin | None) -> MailOf | None:
         if origin is None:
             return None
         return cls(
@@ -133,7 +133,7 @@ class Facts:
         steps: Mapping[str, JsonValue] | None = None,
         referred_types: Sequence[DocumentTypeId | None] = (),
         mail: MailOf | None = None,
-    ) -> "Facts":
+    ) -> Facts:
         taxonomy = taxonomy or Taxonomy()
         return cls(
             contact_id=document.contact_id,

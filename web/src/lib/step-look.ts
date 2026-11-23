@@ -8,7 +8,7 @@ import CircleDashed from '@lucide/svelte/icons/circle-dashed';
 import Hourglass from '@lucide/svelte/icons/hourglass';
 import LoaderCircle from '@lucide/svelte/icons/loader-circle';
 import OctagonX from '@lucide/svelte/icons/octagon-x';
-import TriangleAlert from '@lucide/svelte/icons/triangle-alert';
+import TriangleAlert from '@lucide/svelte/icons/triangle-exclamation-point';
 import { m } from '#lib/paraglide/messages.js';
 import type { NodeState } from '#lib/pipeline.ts';
 import type { Tone as UiTone } from '#lib/tones.ts';

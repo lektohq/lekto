@@ -1,7 +1,7 @@
 <script lang="ts">
 	import InfoTip from '#lib/components/InfoTip.svelte';
 	import CircleCheck from '@lucide/svelte/icons/circle-check';
-	import TriangleAlert from '@lucide/svelte/icons/triangle-alert';
+	import TriangleAlert from '@lucide/svelte/icons/triangle-exclamation-point';
 	import { NODE_LABELS } from '#lib/node-labels.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import { SIGNAL_NODES } from '#lib/signals.ts';

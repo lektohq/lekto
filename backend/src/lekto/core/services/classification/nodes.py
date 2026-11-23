@@ -386,7 +386,7 @@ class _Offer:
     general: list[tuple[str, FieldDefinition]]
     tag_names: list[str]
     listed_contacts: list[Listed]
-    spaces: dict[str, "ListedSpace"]
+    spaces: dict[str, ListedSpace]
     schema: JsonObject
 
 
@@ -417,7 +417,7 @@ class LlmSignal(_ModelStep):
         super().__init__(uow, store, model, clock, policy)
         self._desk = desk
 
-    async def run(self, document: Document) -> "NodeResult | ExternalCall | ModelFactsResult":
+    async def run(self, document: Document) -> NodeResult | ExternalCall | ModelFactsResult:
         outside = await model_call_state(self._uow, self._desk, document, TaskKind.PROPOSE)
         if outside is None and self._model is None:
             return abstained(because(ReasonCode.NO_LANGUAGE_MODEL))
@@ -502,7 +502,7 @@ class LlmSignal(_ModelStep):
         )
         return ModelFactsResult(result, await TextFacts.read(text), model_read, model_told)
 
-    async def _offer(self, document: Document, text: str) -> "_Offer":
+    async def _offer(self, document: Document, text: str) -> _Offer:
         """What the model may choose from for `document`: the contacts its text names, the
         types with their fields, the tags and topics, the spaces, and the schema of the
         answer."""
@@ -1447,7 +1447,7 @@ async def _ocr_reading(
         words = await asyncio.to_thread(lambda: reading_from_json(json.loads(data)))
     except NotFoundError:
         words = None
-    except (ValueError, ValidationError):
+    except ValueError, ValidationError:
         log.warning("the words of the reading cannot be read", extra={"key": key})
         words = None
     return _Reading(pages, words or _NO_WORDS)

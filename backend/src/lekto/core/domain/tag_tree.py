@@ -32,7 +32,7 @@ class TagTree:
     children: dict[TagId | None, tuple[TagId, ...]]
 
     @classmethod
-    def of(cls, tags: Iterable[Tag]) -> "TagTree":
+    def of(cls, tags: Iterable[Tag]) -> TagTree:
         by_id = {tag.id: tag for tag in tags}
         children: dict[TagId | None, list[TagId]] = {}
         for tag in sorted(by_id.values(), key=lambda item: sort_key(item.name)):

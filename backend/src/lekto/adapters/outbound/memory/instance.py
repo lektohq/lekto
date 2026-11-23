@@ -24,7 +24,7 @@ INSTANCE: Table[InstanceRow] = Table("instance", lambda _: ["the instance"])
 
 
 class MemoryInstanceRepository:
-    def __init__(self, uow: "MemoryUnitOfWork") -> None:
+    def __init__(self, uow: MemoryUnitOfWork) -> None:
         self._uow = uow
 
     async def id(self) -> UUID:

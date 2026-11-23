@@ -205,7 +205,7 @@ def _near(have: Any, had: Any) -> bool:
         return abs(datetime.fromisoformat(str(have)) - datetime.fromisoformat(str(had))) <= (
             RECEIPT_SLACK
         )
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return False
 
 

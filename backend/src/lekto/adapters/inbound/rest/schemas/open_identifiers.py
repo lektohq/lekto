@@ -46,7 +46,7 @@ class RecommendationOut(BaseModel):
     reason: ReasonOut = Field(description="Why, with its code.")
 
     @classmethod
-    def of(cls, recommended: Recommended) -> "RecommendationOut":
+    def of(cls, recommended: Recommended) -> RecommendationOut:
         return cls(action=recommended.action, reason=ReasonOut.of(recommended.reason))
 
 
@@ -86,7 +86,7 @@ class OpenIdentifierOut(BaseModel):
         names: Mapping[ContactId, str],
         persons: Mapping[UserId, str],
         refs: RefCipher,
-    ) -> "OpenIdentifierOut":
+    ) -> OpenIdentifierOut:
         return cls(
             kind=item.kind,
             value=item.value,
@@ -110,7 +110,7 @@ class OpenCountsOut(BaseModel):
     suggested: int
 
     @classmethod
-    def of(cls, counts: Mapping[OpenSource, int]) -> "OpenCountsOut":
+    def of(cls, counts: Mapping[OpenSource, int]) -> OpenCountsOut:
         return cls(
             learned=counts.get(OpenSource.LEARNED, 0),
             suggested=counts.get(OpenSource.SUGGESTED, 0),
@@ -134,7 +134,7 @@ class OpenPageOut(BaseModel):
     )
 
     @classmethod
-    def of(cls, page: OpenPage, refs: RefCipher) -> "OpenPageOut":
+    def of(cls, page: OpenPage, refs: RefCipher) -> OpenPageOut:
         return cls(
             items=[
                 OpenIdentifierOut.of(item, page.names, page.persons, refs) for item in page.items
@@ -160,7 +160,7 @@ class OccurrenceOut(BaseModel):
     locations: list[LocationOut] = Field(description="By page, a box per line.")
 
     @classmethod
-    def of(cls, occurrence: Occurrence) -> "OccurrenceOut":
+    def of(cls, occurrence: Occurrence) -> OccurrenceOut:
         return cls(
             own=occurrence.own,
             locations=[LocationOut.of(location) for location in occurrence.locations],
@@ -181,7 +181,7 @@ class PlaceOut(BaseModel):
     )
 
     @classmethod
-    def of(cls, place: Place) -> "PlaceOut":
+    def of(cls, place: Place) -> PlaceOut:
         excerpt = place.excerpt
         return cls(
             document_id=place.document,
@@ -208,7 +208,7 @@ class OpenDetailOut(BaseModel):
     )
 
     @classmethod
-    def of(cls, detail: OpenDetail, refs: RefCipher) -> "OpenDetailOut":
+    def of(cls, detail: OpenDetail, refs: RefCipher) -> OpenDetailOut:
         return cls(
             identifier=OpenIdentifierOut.of(detail.item, detail.names, detail.persons, refs),
             places=[PlaceOut.of(place) for place in detail.places],
@@ -278,7 +278,7 @@ class OutcomeOut(BaseModel):
     reason: ReasonOut | None = Field(description="Why it was not done.")
 
     @classmethod
-    def of(cls, outcome: DecisionOutcome) -> "OutcomeOut":
+    def of(cls, outcome: DecisionOutcome) -> OutcomeOut:
         error = outcome.error
         return cls(
             kind=outcome.kind,

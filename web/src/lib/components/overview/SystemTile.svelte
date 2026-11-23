@@ -2,7 +2,7 @@
 	import Activity from '@lucide/svelte/icons/activity';
 	import CircleCheck from '@lucide/svelte/icons/circle-check';
 	import OctagonX from '@lucide/svelte/icons/octagon-x';
-	import TriangleAlert from '@lucide/svelte/icons/triangle-alert';
+	import TriangleAlert from '@lucide/svelte/icons/triangle-exclamation-point';
 	import { onMount } from 'svelte';
 	import { api } from '#lib/api/client.ts';
 	import { unwrap } from '#lib/api/call.ts';

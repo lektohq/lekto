@@ -24,7 +24,7 @@ type SeenKey = tuple[UserId, DocumentId]
 
 
 class MemoryInboxRepository:
-    def __init__(self, uow: "MemoryUnitOfWork") -> None:
+    def __init__(self, uow: MemoryUnitOfWork) -> None:
         self._uow = uow
 
     async def query(

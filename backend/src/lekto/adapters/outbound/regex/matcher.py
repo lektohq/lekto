@@ -12,9 +12,11 @@ from lekto.adapters.outbound.regex.size import MAX_SPELLED_OUT, spelled_out
 from lekto.core.domain.errors import PatternTimeoutError, ValidationError
 from lekto.core.domain.reasons import ReasonCode, because
 
+_NO_V1 = "the flag V1 is not supported: patterns follow the syntax of V0"
+
 
 @lru_cache(maxsize=512)
-def _compile(pattern: str, case_sensitive: bool) -> "regex.Pattern[str]":
+def _compile(pattern: str, case_sensitive: bool) -> regex.Pattern[str]:
     if spelled_out(pattern) > MAX_SPELLED_OUT:
         raise ValidationError(
             because(ReasonCode.PATTERN_TOO_LARGE, pattern=pattern, max=MAX_SPELLED_OUT)
@@ -24,10 +26,10 @@ def _compile(pattern: str, case_sensitive: bool) -> "regex.Pattern[str]":
         return regex.compile(pattern, flags)
     except regex.error as error:
         detail = str(error)
-    except ValueError as error:  # flags that exclude one another, `(?au)`
-        detail = str(error)
-    except KeyError:  # `regex` fails so on the flag V1 beside the V0 it compiles with
-        detail = "the flag V1 is not supported: patterns follow the syntax of V0"
+    except ValueError as error:  # flags that exclude one another: `(?au)`, `(?V1)` beside V0
+        detail = _NO_V1 if "VERSION1" in str(error) else str(error)
+    except KeyError:  # `regex` before 2026.11 failed so on the flag V1 beside V0
+        detail = _NO_V1
     raise ValidationError(
         because(ReasonCode.PATTERN_INVALID, pattern=pattern, detail=detail)
     ) from None
@@ -53,7 +55,7 @@ class RegexPatternMatcher:
         return await asyncio.to_thread(self._find, compiled, text, limit)
 
     def _find(
-        self, compiled: "regex.Pattern[str]", text: str, limit: int
+        self, compiled: regex.Pattern[str], text: str, limit: int
     ) -> tuple[tuple[int, int], ...]:
         found: list[tuple[int, int]] = []
         try:
@@ -68,7 +70,7 @@ class RegexPatternMatcher:
             ) from None
         return tuple(found)
 
-    def _search(self, compiled: "regex.Pattern[str]", text: str) -> bool:
+    def _search(self, compiled: regex.Pattern[str], text: str) -> bool:
         try:
             return compiled.search(text, concurrent=True, timeout=self._timeout) is not None
         except TimeoutError:

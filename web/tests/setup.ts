@@ -8,10 +8,11 @@ import { takeUnrouted } from '#lib/testing/api.ts';
 // deadline counts only for one that would fail. Not per test (Tobi, 10.11.2026).
 configure({ asyncUtilTimeout: 10_000 });
 
-// A dialog or menu of bits-ui takes the pointer from the page while it is open. One that a test
-// leaves open would take it from the next test of the file too: every test starts with it. No
-// test switches the check of the pointer off for that (`pointerEventsCheck`): it is what finds a
-// dialog that does not give the pointer back.
+// A dialog or menu of bits-ui sets `pointer-events: none` on the body while it is open and takes it
+// back a moment after it closes. Since jsdom 31 every element inherits it, so a test that ends
+// within that moment, or leaves a dialog open, would leave the next one unable to click anything.
+// No test switches the check of the pointer off for that (`pointerEventsCheck`): it is what finds
+// a dialog that does not give the pointer back.
 afterEach(() => {
 	document.body.style.pointerEvents = '';
 });

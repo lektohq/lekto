@@ -220,7 +220,7 @@ class MailboxOut(BaseModel):
     updated_at: datetime
 
     @classmethod
-    def of(cls, mailbox: Mailbox) -> "MailboxOut":
+    def of(cls, mailbox: Mailbox) -> MailboxOut:
         status = mailbox.status
         return cls(
             id=mailbox.id,
@@ -299,7 +299,7 @@ class ConnectionTestOut(BaseModel):
     error: ReasonOut | None
 
     @classmethod
-    def of(cls, test: ConnectionTest) -> "ConnectionTestOut":
+    def of(cls, test: ConnectionTest) -> ConnectionTestOut:
         return cls(
             ok=test.error is None,
             folders=list(test.folders),
@@ -315,7 +315,7 @@ class MailRuleRefOut(BaseModel):
     enabled: bool
 
     @classmethod
-    def of(cls, rule: MailRule) -> "MailRuleRefOut":
+    def of(cls, rule: MailRule) -> MailRuleRefOut:
         return cls(id=rule.id, name=rule.name, enabled=rule.enabled)
 
 
@@ -325,7 +325,7 @@ class MailStepOut(BaseModel):
     failed: ReasonOut | None = Field(description="Why the server refused it; null: done.")
 
     @classmethod
-    def of(cls, item: StepOutcome) -> "MailStepOut":
+    def of(cls, item: StepOutcome) -> MailStepOut:
         return cls(
             action=item.step.action,
             value=item.step.value,
@@ -371,7 +371,7 @@ class MailOut(BaseModel):
     )
 
     @classmethod
-    def of(cls, view: MailView) -> "MailOut":
+    def of(cls, view: MailView) -> MailOut:
         record = view.record
         return cls(
             id=record.id,
@@ -406,7 +406,7 @@ class MailPageOut(BaseModel):
     )
 
     @classmethod
-    def of(cls, page: MailsPage, offset: int) -> "MailPageOut":
+    def of(cls, page: MailsPage, offset: int) -> MailPageOut:
         return cls(
             items=[MailOut.of(view) for view in page.mails],
             total=page.total,
@@ -437,7 +437,7 @@ class MailSummaryOut(BaseModel):
     )
 
     @classmethod
-    def of(cls, summary: MailSummary) -> "MailSummaryOut":
+    def of(cls, summary: MailSummary) -> MailSummaryOut:
         return cls(
             counts=dict(summary.counts),
             rules=[MailRuleRefOut.of(rule) for rule in summary.rules],

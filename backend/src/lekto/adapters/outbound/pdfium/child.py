@@ -69,7 +69,7 @@ async def run_child(
     if code == UNPROCESSABLE:
         try:
             reason = Reason.from_json(json.loads(completed.stdout))
-        except (ValueError, ValidationError):
+        except ValueError, ValidationError:
             raise RuntimeError(f"{task} gave no usable reason") from None
         raise UnprocessableDocumentError(reason)
     if code == OUT_OF_MEMORY or code in _OUT_OF_MEMORY_SIGNALS:

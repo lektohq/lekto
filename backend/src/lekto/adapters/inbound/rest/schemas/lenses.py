@@ -69,7 +69,7 @@ class FactFilterOut(BaseModel):
     role: FactRole | None
 
     @classmethod
-    def of(cls, criterion: FactCriterion, refs: RefCipher) -> "FactFilterOut":
+    def of(cls, criterion: FactCriterion, refs: RefCipher) -> FactFilterOut:
         ref = None
         if criterion.kind is not None and criterion.value is not None:
             ref = seal(refs, criterion.kind, criterion.value)
@@ -138,7 +138,7 @@ class LensFilterOut(BaseModel):
     facts: list[FactFilterOut]
 
     @classmethod
-    def of(cls, filter: LensFilter, refs: RefCipher) -> "LensFilterOut":
+    def of(cls, filter: LensFilter, refs: RefCipher) -> LensFilterOut:
         return cls(
             contact_ids=list(filter.contact_ids),
             document_type_ids=list(filter.document_type_ids),
@@ -254,7 +254,7 @@ class LensOut(BaseModel):
     updated_at: datetime
 
     @classmethod
-    def of(cls, lens: Lens, refs: RefCipher) -> "LensOut":
+    def of(cls, lens: Lens, refs: RefCipher) -> LensOut:
         return cls(
             id=lens.id,
             name=lens.name,

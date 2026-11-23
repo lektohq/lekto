@@ -2,6 +2,8 @@
 
 from dataclasses import replace
 
+import pytest
+
 from lekto.adapters.outbound.memory import (
     BagOfWordsEmbeddings,
     FakeClassifier,
@@ -11,6 +13,7 @@ from lekto.core.domain.documents import Document, DocumentChanges
 from lekto.core.domain.errors import EmbeddingsError
 from lekto.core.domain.identifiers import Identifier, IdentifierKind
 from lekto.core.domain.master_data import Assignment, Contact, Tag
+from lekto.core.domain.pipeline import NodeUnavailableError
 from lekto.core.domain.search import EmbeddingStamp, IndexDocument
 from lekto.core.ports.embeddings import EmbeddingResult
 from lekto.core.services.classification.signals import (
@@ -263,9 +266,14 @@ async def test_neighbours_are_the_confirmed_documents_the_owner_may_read(world: 
     assert placed["neighbours"][0]["space_id"] == home
     assert placed["known"]["spaces"] == [home]
 
+    # A model or index that does not answer: the attempt runs again, abstaining is the fallback.
+    broken = NeighboursSignal(world.uow, world.object_store, index, Broken(), builders.NEIGHBOURS)
+    with pytest.raises(NodeUnavailableError) as raised:
+        await broken.run(document)
+    assert ABSTAINED in raised.value.fallback.output
+
     for unavailable in (
         NeighboursSignal(world.uow, world.object_store, None, embeddings, builders.NEIGHBOURS),
-        NeighboursSignal(world.uow, world.object_store, index, Broken(), builders.NEIGHBOURS),
         NeighboursSignal(
             world.uow,
             world.object_store,

@@ -364,22 +364,14 @@ async def test_users_get_their_names_and_e_mail_from_paperless() -> None:
 
 async def test_an_existing_user_keeps_what_they_have() -> None:
     lekto = FakeLekto()
-    lekto.users["u-erika"] = {"id": "u-erika", "username": "erika", "role": "user", "active": True}
-    lekto.spaces["personal:u-erika"] = fake_lekto._personal("u-erika")
-    lekto.profiles["u-erika"] = {"email": "own@mail.example"}
-    lekto.users["u-carla"] = {
-        "id": "u-carla",
-        "username": "carla",
-        "display_name": "Bob",
-        "role": "user",
-        "active": True,
-    }
-    lekto.spaces["personal:u-carla"] = fake_lekto._personal("u-carla")
+    erika = lekto.add_user("erika")
+    lekto.profiles[erika] = {"email": "own@mail.example"}
+    lekto.add_user("carla", display_name="Bob")
     actions, _ = await prepared(World(), lekto)
     users = by(actions, "user")
     assert users["erika"].status == UPDATED
-    assert lekto.users["u-erika"]["display_name"] == "Erika Mustermann"
-    assert lekto.profiles["u-erika"]["email"] == "own@mail.example"  # never overwritten
+    assert lekto.users[erika]["display_name"] == "Erika Mustermann"
+    assert lekto.profiles[erika]["email"] == "own@mail.example"  # never overwritten
     assert "display name 'Bob' is taken: left out" in users["bob"].notes
 
 
@@ -387,8 +379,7 @@ async def test_filling_a_profile_is_no_open_need_and_is_planned_once() -> None:
     """An existing user without a display name gets what Paperless knows (`FILL`), which `run`
     does not wait for; once an earlier `prepare` filled it (the state's `profiled`), nothing."""
     lekto = FakeLekto()
-    lekto.users["u-erika"] = {"id": "u-erika", "username": "erika", "role": "user", "active": True}
-    lekto.spaces["personal:u-erika"] = fake_lekto._personal("u-erika")
+    id = lekto.add_user("erika")
     client = Lekto("http://lekto", fake_lekto.TOKEN, transport=lekto.transport(), delays=())
     try:
         directory = await Directory.of(client)
@@ -400,7 +391,7 @@ async def test_filling_a_profile_is_no_open_need_and_is_planned_once() -> None:
     infos = field_infos(plan, directory, snapshot)
     erika = by(needs(plan, directory, snapshot, world.all(), infos), "user")["erika"]
     assert erika.status == FILL and not is_open([erika])
-    again = needs(plan, directory, snapshot, world.all(), infos, profiled=frozenset({"u-erika"}))
+    again = needs(plan, directory, snapshot, world.all(), infos, profiled=frozenset({id}))
     assert by(again, "user")["erika"].status == EXISTS
 
 

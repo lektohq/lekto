@@ -1,5 +1,5 @@
 <script lang="ts">
-	import CircleAlert from '@lucide/svelte/icons/circle-alert';
+	import CircleAlert from '@lucide/svelte/icons/circle-exclamation-point';
 	import type { Snippet } from 'svelte';
 	import { disputed, type Candidate } from '#lib/candidates.ts';
 	import CandidateSources from '#lib/components/document/CandidateSources.svelte';

@@ -32,7 +32,7 @@ def version_row_id(rule: RuleId, number: int) -> UUID:
 
 
 class MemoryRuleRepository(MemoryRepository[RuleId, Rule]):
-    def __init__(self, uow: "MemoryUnitOfWork", table: Table[Rule]) -> None:
+    def __init__(self, uow: MemoryUnitOfWork, table: Table[Rule]) -> None:
         super().__init__(uow, table)
         self._versions = MemoryRepository[UUID, VersionRow](uow, RULE_VERSIONS)
         self._applications = MemoryRepository[RuleApplicationId, RuleApplication](
@@ -48,7 +48,7 @@ class MemoryRuleRepository(MemoryRepository[RuleId, Rule]):
         await self._store_version(rule.current)
 
     async def list_for(
-        self, *, spaces: "Collection[SpaceId] | None", include_global: bool
+        self, *, spaces: Collection[SpaceId] | None, include_global: bool
     ) -> list[Rule]:
         wanted = None if spaces is None else set(spaces)
         return [

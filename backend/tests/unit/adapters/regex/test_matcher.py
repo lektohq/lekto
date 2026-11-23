@@ -80,7 +80,8 @@ def test_a_pattern_too_large_names_the_limit(pattern_matcher: RegexPatternMatche
 async def test_flags_regex_cannot_combine_make_an_invalid_pattern(
     pattern_matcher: RegexPatternMatcher, pattern: str, detail: str
 ) -> None:
-    """`regex` fails on them with a KeyError or a ValueError, not with its syntax error."""
+    """`regex` fails on them with a ValueError (on V1 before 2026.11 a KeyError), not with its
+    syntax error."""
     with pytest.raises(ValidationError, match=detail) as caught:
         pattern_matcher.validate(pattern)
     assert caught.value.reason.code is ReasonCode.PATTERN_INVALID

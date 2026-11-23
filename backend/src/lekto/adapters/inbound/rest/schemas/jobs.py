@@ -35,7 +35,7 @@ class KindSummaryOut(BaseModel):
     done: int = Field(description="Done, within the retention period.")
 
     @classmethod
-    def of(cls, summary: KindSummary) -> "KindSummaryOut":
+    def of(cls, summary: KindSummary) -> KindSummaryOut:
         return cls(
             kind=summary.kind,
             running=summary.running,
@@ -59,7 +59,7 @@ class JobsSummaryOut(BaseModel):
     )
 
     @classmethod
-    def of(cls, summary: JobsSummary) -> "JobsSummaryOut":
+    def of(cls, summary: JobsSummary) -> JobsSummaryOut:
         return cls(
             kinds=[KindSummaryOut.of(item) for item in summary.kinds],
             last_started_at=summary.last_started,
@@ -100,7 +100,7 @@ class JobOut(BaseModel):
     )
 
     @classmethod
-    def of(cls, view: JobView) -> "JobOut":
+    def of(cls, view: JobView) -> JobOut:
         job = view.job
         return cls(
             id=job.id,
@@ -131,7 +131,7 @@ class JobPageOut(BaseModel):
     )
 
     @classmethod
-    def of(cls, page: JobsPage, offset: int) -> "JobPageOut":
+    def of(cls, page: JobsPage, offset: int) -> JobPageOut:
         return cls(
             items=[JobOut.of(view) for view in page.jobs],
             total=page.total,
@@ -148,7 +148,7 @@ class KindDurationsOut(BaseModel):
     run_p90_ms: float = Field(description="From started to done, 90th percentile.")
 
     @classmethod
-    def of(cls, durations: KindDurations) -> "KindDurationsOut":
+    def of(cls, durations: KindDurations) -> KindDurationsOut:
         return cls(
             kind=durations.kind,
             count=durations.count,
@@ -164,7 +164,7 @@ class JobDurationsOut(BaseModel):
     since: datetime = Field(description="The jobs done from then on count.")
 
     @classmethod
-    def of(cls, durations: JobDurations) -> "JobDurationsOut":
+    def of(cls, durations: JobDurations) -> JobDurationsOut:
         return cls(
             kinds=[KindDurationsOut.of(item) for item in durations.kinds], since=durations.since
         )

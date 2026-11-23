@@ -8,7 +8,7 @@ from typing import Any
 from lekto_migration.config import public
 from lekto_migration.fake_paperless import pdf
 from tests.conftest import PDF, Setup
-from tests.fake_lekto import ADMIN
+from tests.fake_lekto import ADMIN, personal_id
 
 
 def add_document(setup: Setup, id: int, owner: int | None, **changes: Any) -> None:
@@ -196,12 +196,12 @@ async def test_further_versions_of_a_file_are_reported(setup: Setup) -> None:
 async def test_a_document_a_person_moved_stays_where_it_is(setup: Setup) -> None:
     assert await setup.migrate() == 0
     document = titled(setup, "Document 12")  # erika's, in her personal space
-    document["space_id"] = f"personal:{ADMIN['id']}"  # a rule or a person filed it elsewhere
+    document["space_id"] = personal_id(ADMIN["id"])  # a rule or a person filed it elsewhere
     assert await setup.run("check") == 0
     differences = row(setup, "check", 12)["differences"]
     assert [(d["what"], d["action"]) for d in differences] == [("space", "kept")]
     assert await setup.run("run") == 0
-    assert document["space_id"] == f"personal:{ADMIN['id']}"
+    assert document["space_id"] == personal_id(ADMIN["id"])
 
 
 async def test_a_duplicate_gets_its_lane_too(setup: Setup) -> None:

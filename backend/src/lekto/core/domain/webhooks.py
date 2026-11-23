@@ -431,7 +431,7 @@ class Webhook:
         id: WebhookId | None = None,
         max_open_tasks: int = DEFAULT_OPEN_TASKS,
         api_token_id: ApiTokenId | None = None,
-    ) -> "Webhook":
+    ) -> Webhook:
         """`id`: given when the secret or header values were encrypted for it beforehand."""
         return cls(
             id=WebhookId(new_id()) if id is None else id,
@@ -606,7 +606,7 @@ class WebhookDelivery:
         error: str | None = None,
         next_attempt_at: datetime | None = None,
         reason: Reason | None = None,
-    ) -> "WebhookDelivery":
+    ) -> WebhookDelivery:
         """A new attempt, with an id of its own."""
         return cls(
             id=DeliveryId(new_id()),

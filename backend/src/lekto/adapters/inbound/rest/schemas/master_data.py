@@ -270,7 +270,7 @@ class LogoOut(BaseModel):
     )
 
     @classmethod
-    def of(cls, contact: Contact, logo: ContactLogo) -> "LogoOut":
+    def of(cls, contact: Contact, logo: ContactLogo) -> LogoOut:
         version = int(logo.stored_at.timestamp() * 1_000_000)
         return cls(
             source=logo.source,
@@ -305,7 +305,7 @@ class ContactOut(MasterDataOut):
     )
 
     @classmethod
-    def of(cls, item: Contact) -> "ContactOut":
+    def of(cls, item: Contact) -> ContactOut:
         return cls(
             id=item.id,
             name=item.name,
@@ -403,7 +403,7 @@ class DocumentTypeOut(MasterDataOut):
     )
 
     @classmethod
-    def of(cls, item: DocumentType) -> "DocumentTypeOut":
+    def of(cls, item: DocumentType) -> DocumentTypeOut:
         return cls(
             id=item.id,
             name=item.name,
@@ -530,7 +530,7 @@ class TagOut(MasterDataOut):
     )
 
     @classmethod
-    def of(cls, item: Tag, tree: TagTree) -> "TagOut":
+    def of(cls, item: Tag, tree: TagTree) -> TagOut:
         path = tree.path(item.id) if item.id in tree else [item.name]
         return cls(
             id=item.id,
@@ -693,7 +693,7 @@ class FieldOut(BaseModel):
     )
 
     @classmethod
-    def of(cls, item: FieldDefinition) -> "FieldOut":
+    def of(cls, item: FieldDefinition) -> FieldOut:
         return cls(
             id=item.id,
             name=item.name,

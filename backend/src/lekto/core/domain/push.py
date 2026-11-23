@@ -58,7 +58,7 @@ def push_service_of(endpoint: str) -> str | None:
 def _key(value: str, length: int) -> bytes | None:
     try:
         raw = base64.urlsafe_b64decode(value + "=" * (-len(value) % 4))
-    except (binascii.Error, ValueError):
+    except binascii.Error, ValueError:
         return None
     return raw if len(raw) == length else None
 

@@ -113,7 +113,7 @@ def convert_value(custom_field: dict[str, Any], raw: Any, currency: str) -> Conv
                 if label is None:
                     return Converted(note=f"option {_short(raw)} does not exist")
                 return Converted(label)
-    except (ValueError, InvalidOperation):
+    except ValueError, InvalidOperation:
         return Converted(note=f"invalid {kind} value: {_short(raw)}")
     return Converted(note=f"{kind}: not taken over")
 

@@ -9,7 +9,7 @@
 # Container Toolkit on the host).
 services:
   ollama:
-    image: ollama/ollama:0.40.13
+    image: ollama/ollama:0.40.16
     restart: unless-stopped
     environment:
       # Ollama cuts longer prompts silently; Lekto's need 8192 tokens.
@@ -31,7 +31,7 @@ services:
       retries: 20
 
   ollama-models:
-    image: ollama/ollama:0.40.13
+    image: ollama/ollama:0.40.16
     restart: "no"
     entrypoint: ["sh", "-c"]
     command:

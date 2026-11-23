@@ -65,8 +65,8 @@ class TextFacts:
     normalised: str
 
     @classmethod
-    async def read(cls, text: str) -> "TextFacts":
-        def reading() -> "TextFacts":
+    async def read(cls, text: str) -> TextFacts:
+        def reading() -> TextFacts:
             in_text = frozenset(identifiers_in(text))
             return cls(
                 text,

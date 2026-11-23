@@ -5,7 +5,7 @@
  * (`text-primary-foreground`), and a primary button wrote dark on petrol.
  */
 import { extendTailwindMerge } from 'tailwind-merge';
-import { createTV } from 'tailwind-variants';
+import { createTV } from 'tailwind-variants/config';
 
 /** The steps of the type scale beyond Tailwind's own (`--text-*` in `app.css`). */
 export const TEXT_STEPS = ['nano', 'micro', 'meta', 'md', 'figure', 'title'];

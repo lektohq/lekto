@@ -73,7 +73,7 @@ class NodeStateOut(BaseModel):
     )
 
     @classmethod
-    def of(cls, node: Node, state: NodeState) -> "NodeStateOut":
+    def of(cls, node: Node, state: NodeState) -> NodeStateOut:
         return cls(
             node=node,
             status=state.status,
@@ -238,7 +238,7 @@ class DocumentDetails(BaseModel):
     updated_at: datetime
 
     @classmethod
-    def of(cls, document: Document, access: SpaceRole) -> "DocumentDetails":
+    def of(cls, document: Document, access: SpaceRole) -> DocumentDetails:
         state = document.processing
         return cls(
             id=document.id,
@@ -287,7 +287,7 @@ class ListedDocument(DocumentDetails):
     )
 
     @classmethod
-    def listed(cls, document: Document, access: SpaceRole, in_inbox: bool) -> "ListedDocument":
+    def listed(cls, document: Document, access: SpaceRole, in_inbox: bool) -> ListedDocument:
         return cls(**DocumentDetails.of(document, access).model_dump(), in_inbox=in_inbox)
 
 
@@ -342,7 +342,7 @@ class DocumentFacetsOut(BaseModel):
     undated: int = Field(description="Documents without a document date.")
 
     @classmethod
-    def of(cls, facets: DocumentFacets) -> "DocumentFacetsOut":
+    def of(cls, facets: DocumentFacets) -> DocumentFacetsOut:
         def counted(counts: Mapping[Any, int]) -> list[ValueCount]:
             ranked = sorted(counts.items(), key=lambda item: (-item[1], str(item[0])))
             return [ValueCount(id=id, count=count) for id, count in ranked]
@@ -588,7 +588,7 @@ class LogEntry(BaseModel):
     duration_ms: float
 
     @classmethod
-    def of(cls, run: NodeRun) -> "LogEntry":
+    def of(cls, run: NodeRun) -> LogEntry:
         result = run.result
         return cls(
             node=run.node,
@@ -636,7 +636,7 @@ class ModelCallOut(BaseModel):
     )
 
     @classmethod
-    def of(cls, call: ModelCall) -> "ModelCallOut":
+    def of(cls, call: ModelCall) -> ModelCallOut:
         return cls(
             system=call.system,
             user=call.user,
@@ -660,7 +660,7 @@ class RunExchangeOut(BaseModel):
     )
 
     @classmethod
-    def of(cls, exchange: RunExchange) -> "RunExchangeOut":
+    def of(cls, exchange: RunExchange) -> RunExchangeOut:
         return cls(run=exchange.run, calls=[ModelCallOut.of(call) for call in exchange.calls])
 
 
@@ -701,7 +701,7 @@ class VisibilityOut(BaseModel):
     )
 
     @classmethod
-    def of(cls, document: Document, space: Space) -> "VisibilityOut":
+    def of(cls, document: Document, space: Space) -> VisibilityOut:
         return cls(
             space_id=space.id,
             members=[
@@ -793,7 +793,7 @@ class ReadingOut(BaseModel):
     )
 
     @classmethod
-    def of(cls, reading: DocumentReading) -> "ReadingOut":
+    def of(cls, reading: DocumentReading) -> ReadingOut:
         return cls(
             vision=reading.vision,
             pages=[

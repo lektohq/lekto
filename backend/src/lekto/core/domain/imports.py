@@ -92,7 +92,7 @@ class ImportedReview:
         return data
 
     @classmethod
-    def from_json(cls, data: JsonValue) -> "ImportedReview":
+    def from_json(cls, data: JsonValue) -> ImportedReview:
         data = require_object(data, "review")
         code = as_text(data.get("code"))
         try:
@@ -156,7 +156,7 @@ class ImportedMetadata:
     @classmethod
     def from_json(
         cls, data: JsonValue, definitions: Mapping[FieldId, FieldDefinition]
-    ) -> "ImportedMetadata":
+    ) -> ImportedMetadata:
         """Read what `to_json` wrote; the field values are checked against `definitions`."""
         data = require_object(data, "imported metadata")
         try:

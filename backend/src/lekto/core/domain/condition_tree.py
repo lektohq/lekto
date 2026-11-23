@@ -24,7 +24,7 @@ class Group[C]:
     """`all` (and) or `any` (or) of its items; `negate` turns the result around."""
 
     mode: GroupMode
-    items: tuple["C | Group[C]", ...]
+    items: tuple[C | Group[C], ...]
     negate: bool = False
 
     def __post_init__(self) -> None:

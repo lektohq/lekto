@@ -101,7 +101,7 @@ class ApplyRulesNode:
         self._desk = desk
         self._links = links
 
-    async def run(self, document: Document) -> "RulesResult":
+    async def run(self, document: Document) -> RulesResult:
         async with self._uow() as uow:
             rules = await reachable_rules(
                 uow, document.space_id, Trigger.INGEST, include_global=True
@@ -418,7 +418,7 @@ class FileNode:
     the rules of this run send through webhooks go now (Tobi, 25.10.2026): a green document at
     once, a yellow one once a person confirmed it, a red one never, and none twice."""
 
-    async def run(self, document: Document) -> "FileResult":
+    async def run(self, document: Document) -> FileResult:
         return FileResult()
 
 

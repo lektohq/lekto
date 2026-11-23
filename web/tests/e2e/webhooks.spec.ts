@@ -43,7 +43,8 @@ test('a webhook is created, tested, changed and deleted', async ({ page }) => {
 
 	// Created on its own page, with a header of its own; the secret is shown once.
 	await page.goto('/ui/webhooks');
-	await page.getByRole('link', { name: 'New webhook' }).click();
+	// The header's link; an empty list leads to the new one too.
+	await page.getByRole('link', { name: 'New webhook' }).first().click();
 	await page.waitForURL('**/ui/webhooks/new');
 	await expect(page.getByRole('heading', { name: 'New webhook', level: 1 })).toBeVisible();
 	const create = page.getByRole('button', { name: 'Create', exact: true });

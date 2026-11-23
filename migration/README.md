@@ -1,10 +1,17 @@
 # lekto migration
 
 Command-line client that takes a Paperless-ngx archive over into Lekto. It reads Paperless
-through its REST API and writes into Lekto through the Lekto API, with an admin's API token. It
-uses no back doors, so a complete migration also proves the API is complete. It is a separate
-uv project (`lekto_migration`, Python 3.13; dependencies `httpx2` and `ruamel.yaml`) and not
+through its REST API and writes into Lekto through the Lekto API with
+[pylekto](https://github.com/lektohq/pylekto), with an admin's API token. It uses no back doors,
+so a complete migration also proves the API is complete. It is a separate uv project
+(`lekto_migration`, Python 3.14; dependencies `pylekto`, `httpx2` and `ruamel.yaml`) and not
 part of the Lekto image.
+
+Lekto must speak at least the version of its API that pylekto speaks (`api_version` of
+`GET /auth/me`): with an older Lekto, or one that names no version, every command stops before it
+reads or writes anything and says to update Lekto. A newer Lekto gets a warning and the command
+goes on (pylekto follows a Lekto release); what that Lekto refuses is reported as usual, and the
+client of its release is the safer choice.
 
 A migration is an ingest: Lekto reads every original itself (OCR as always: a page's own text
 layer stays, another program's invisible one is replaced, images are read), the migration plan
@@ -87,8 +94,7 @@ asn: {to: field, name: ASN}
 - `review: true`, or a reason: every document with the object waits in Lekto's inbox (yellow)
   with the reason, the field it is about open; with `drop`, that field stays empty for a person
   to decide. The default reason of `review: true` goes with its code, so Lekto shows it in the
-  user's language (a Lekto from before 0.6.3 is asked first and gets the text alone); a reason
-  you write stays as written. A document left without a contact, document type or date (Paperless has none, or
+  user's language; a reason you write stays as written. A document left without a contact, document type or date (Paperless has none, or
   the plan drops it) waits as well, with that field open: Lekto decides so, as for documents
   of its own, whatever the plan says.
 - **Conflicts**: a document has at most one contact, type, topic, date, space and value per
@@ -179,16 +185,17 @@ come from the environment (or a file) only and are never written to the plan, th
 reports.
 
 Server errors (500, 502, 503, 504) and dropped connections of either API are repeated after
-1, 3 and 10 seconds; a document that fails still is `failed` in the state and the next `run`
-tries it again.
+1, 3 and 10 seconds, Lekto's "too many requests" (429) after the seconds it names (at most 60,
+else 5); a document that fails still is `failed` in the state and the next `run` tries it
+again.
 
 The plan and the state file belong to one Paperless and one Lekto (if Lekto is reset, delete
 the state file, too). The state maps every document to its Lekto document and records what the
 migration set; an interrupted run continues where it stopped and a second run creates nothing
 twice. Reports (`plan`, `check`, `prepare`, `run`, each as `.md` and `.json`) list every object
 and document with what became of it, or why not. Exit codes: 0 fine, 1 problems or failures or
-nothing written, 2 cannot go on (wrong key, unreachable server, a plan that cannot be used, a
-phase missing), 130 stopped.
+nothing written, 2 cannot go on (wrong key, unreachable server, an older Lekto,
+a plan that cannot be used, a phase missing), 130 stopped.
 
 ## Checks
 

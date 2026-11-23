@@ -39,7 +39,7 @@ class World:
             a.documents,
         )
 
-    def set(self, section: str, name: str, entry: str) -> "World":
+    def set(self, section: str, name: str, entry: str) -> World:
         self.changes.setdefault(section, {})[name] = entry
         return self
 

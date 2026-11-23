@@ -39,7 +39,7 @@ class BoxOut(BaseModel):
     height: float
 
     @classmethod
-    def of(cls, box: Box) -> "BoxOut":
+    def of(cls, box: Box) -> BoxOut:
         return cls(x=box.x, y=box.y, width=box.width, height=box.height)
 
 
@@ -50,7 +50,7 @@ class LocationOut(BaseModel):
     boxes: list[BoxOut] = Field(description="What it covers on the page.")
 
     @classmethod
-    def of(cls, location: Location) -> "LocationOut":
+    def of(cls, location: Location) -> LocationOut:
         return cls(page=location.page, boxes=[BoxOut.of(box) for box in location.boxes])
 
 
@@ -72,7 +72,7 @@ class LabelCheckOut(BaseModel):
     )
 
     @classmethod
-    def of(cls, check: LabelCheck) -> "LabelCheckOut":
+    def of(cls, check: LabelCheck) -> LabelCheckOut:
         return cls(text=check.text, outcome=check.outcome)
 
 
@@ -141,7 +141,7 @@ class CandidateSourceOut(BaseModel):
     )
 
     @classmethod
-    def of(cls, source: CandidateSource) -> "CandidateSourceOut":
+    def of(cls, source: CandidateSource) -> CandidateSourceOut:
         return cls(
             signal=Signal(source.signal),
             names=source.names,
@@ -172,7 +172,7 @@ class CandidateOut(BaseModel):
     contradicted: bool = Field(description="A signal named another value against it.")
 
     @classmethod
-    def of(cls, candidate: Candidate) -> "CandidateOut":
+    def of(cls, candidate: Candidate) -> CandidateOut:
         return cls(
             value=candidate.value,
             label=candidate.label,
@@ -281,7 +281,7 @@ class FieldCheckOut(BaseModel):
     )
 
     @classmethod
-    def of(cls, check: FieldCheck) -> "FieldCheckOut":
+    def of(cls, check: FieldCheck) -> FieldCheckOut:
         return cls(
             field=check.field,
             outcome=check.outcome,
@@ -318,7 +318,7 @@ class OpenNodeOut(BaseModel):
     )
 
     @classmethod
-    def of(cls, item: OpenNode) -> "OpenNodeOut":
+    def of(cls, item: OpenNode) -> OpenNodeOut:
         return cls(
             node=item.node,
             outcome=item.outcome,
@@ -352,7 +352,7 @@ class InboxDoneOut(BaseModel):
     )
 
     @classmethod
-    def of(cls, done: Done) -> "InboxDoneOut":
+    def of(cls, done: Done) -> InboxDoneOut:
         via = None if done.via is None else done.via.name
         return cls(how=done.how, at=done.at, by=done.by, via_token=via)
 
@@ -370,7 +370,7 @@ class InboxItemOut(BaseModel):
     done: InboxDoneOut | None = Field(description="How it left the inbox; `done` only.")
 
     @classmethod
-    def of(cls, item: InboxItem) -> "InboxItemOut":
+    def of(cls, item: InboxItem) -> InboxItemOut:
         done = item.state.done
         return cls(
             document=DocumentDetails.of(item.document, item.access),
@@ -420,7 +420,7 @@ class InboxSummaryOut(BaseModel):
     )
 
     @classmethod
-    def of(cls, summary: InboxSummary) -> "InboxSummaryOut":
+    def of(cls, summary: InboxSummary) -> InboxSummaryOut:
         counts = summary.counts
         return cls(
             **{tab.value: counts.get(tab, 0) for tab in InboxTab},
@@ -448,7 +448,7 @@ class NodeReviewOut(BaseModel):
     fields: list[FieldCheckOut]
 
     @classmethod
-    def of(cls, review: NodeReview) -> "NodeReviewOut":
+    def of(cls, review: NodeReview) -> NodeReviewOut:
         return cls(
             node=review.node,
             run=review.run,
@@ -467,7 +467,7 @@ class ReviewOut(BaseModel):
     nodes: list[NodeReviewOut]
 
     @classmethod
-    def of(cls, review: Review) -> "ReviewOut":
+    def of(cls, review: Review) -> ReviewOut:
         return cls(
             document=DocumentDetails.of(review.document, review.access),
             open=[OpenNodeOut.of(node) for node in review.open],

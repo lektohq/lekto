@@ -48,7 +48,7 @@ class Asking:
     desk: TaskDesk
     webhook: WebhookId
 
-    async def run(self, document: Document) -> "AskingResult":
+    async def run(self, document: Document) -> AskingResult:
         return AskingResult(self)
 
 
@@ -206,7 +206,7 @@ async def test_an_answer_nested_deeper_than_the_parser_goes_is_none(world: World
     f = await flow(world)
     await f.arrive()
     (request,) = f.asked()
-    deep = await world.tasks.answer(task_of(request), token_of(request), b"[" * 10_000)
+    deep = await world.tasks.answer(task_of(request), token_of(request), b"[" * 500_000)
     assert deep.problem == "the answer is not JSON" and not deep.too_large
     with pytest.raises(ConflictError):  # it counted: the task is closed
         await world.tasks.answer(task_of(request), token_of(request), b'{"status": "ok"}')

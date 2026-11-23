@@ -19,14 +19,14 @@
 # processes run as PUID:PGID (default 1000:1000), never as root. No secret is part of the
 # image or of its build arguments: configuration is read from the environment at run time.
 
-FROM node:24.21.0-trixie-slim AS node
+FROM node:26.13.1-trixie-slim AS node
 FROM ghcr.io/astral-sh/uv:0.11.33 AS uv
 
 # Set by BuildKit; declared here so that `FROM s6-${TARGETARCH}` can use it.
 ARG TARGETARCH
 
 # --- base: Python and the system packages OCRmyPDF and WeasyPrint need ----------------------------
-FROM python:3.13.18-slim-trixie AS base
+FROM python:3.15.2-slim-trixie AS base
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
@@ -109,7 +109,7 @@ RUN mkdir /s6 && for archive in /archives/*.tar.xz; do tar -C /s6 -Jxpf "$archiv
 # --- web: the web UI, built on the build machine's platform -----------------------------------
 # The result is static files, the same for every target platform: no emulation for arm64.
 # Dependencies first, so that a change of the code alone keeps the install layer.
-FROM --platform=$BUILDPLATFORM node:24.21.0-trixie-slim AS web
+FROM --platform=$BUILDPLATFORM node:26.13.1-trixie-slim AS web
 RUN npm install --global pnpm@12.9.1
 WORKDIR /web
 COPY web/package.json web/pnpm-lock.yaml web/pnpm-workspace.yaml ./
@@ -164,7 +164,7 @@ RUN mkdir -p /home/vscode/.claude /home/vscode/.config/gh
 # release's binary, checked against the checksum of its manifest, installs itself; Anthropic's
 # installer script would fetch the newest binary first. Renovate raises the version.
 # renovate: datasource=npm depName=@anthropic-ai/claude-code
-ARG CLAUDE_CODE_VERSION=2.1.312
+ARG CLAUDE_CODE_VERSION=2.1.323
 RUN set -eu; \
     case "$(uname -m)" in \
       aarch64) platform=linux-arm64 ;; \

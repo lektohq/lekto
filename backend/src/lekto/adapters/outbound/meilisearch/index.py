@@ -256,7 +256,7 @@ class MeilisearchIndex:
         try:
             hits = [_hit_of(item) for item in data["hits"]]
             total = _total(data)
-        except (KeyError, TypeError, ValueError):
+        except KeyError, TypeError, ValueError:
             raise SearchIndexError("Meilisearch sent an unusable search result") from None
         return SearchResult(
             hits=hits, estimated_total=max(total, query.offset + len(hits)), semantic=False
@@ -299,7 +299,7 @@ class MeilisearchIndex:
             estimated = _estimate(
                 items, worded, word_total, total, exhausted=len(mixed["hits"]) < depth, cut=cut
             )
-        except (KeyError, TypeError, ValueError):
+        except KeyError, TypeError, ValueError:
             raise SearchIndexError("Meilisearch sent an unusable search result") from None
         return SearchResult(
             hits=hits,
@@ -343,7 +343,7 @@ class MeilisearchIndex:
                 indexed = str(item.get("text") or "")
                 positions = (item.get("_matchesPosition") or {}).get("text") or []
                 found.update((int(at["start"]), int(at["length"])) for at in positions)
-            except (KeyError, TypeError, ValueError):
+            except KeyError, TypeError, ValueError:
                 raise SearchIndexError("Meilisearch sent unusable matches") from None
         spans = sorted(found)
         return _characters(indexed, spans)
@@ -393,7 +393,7 @@ class MeilisearchIndex:
         data = await self._request("POST", f"/indexes/{self._index}/search", json=body)
         try:
             hits = [_hit_of(item) for item in data["hits"]]
-        except (KeyError, TypeError, ValueError):
+        except KeyError, TypeError, ValueError:
             raise SearchIndexError("Meilisearch sent an unusable search result") from None
         return [hit for hit in hits if hit.id != query.exclude][: query.limit]
 
@@ -605,7 +605,7 @@ class MeilisearchIndex:
         """Wait for the task that a write answered with; raise if it failed."""
         try:
             uid = int(task["taskUid"])
-        except (KeyError, TypeError, ValueError):
+        except KeyError, TypeError, ValueError:
             raise SearchIndexError("Meilisearch sent no task") from None
         loop = asyncio.get_running_loop()
         deadline = loop.time() + self._task_timeout
@@ -813,7 +813,7 @@ def _json(response: httpx2.Response) -> dict[str, Any]:
 def _code(response: httpx2.Response) -> str | None:
     try:
         return str(response.json()["code"])
-    except (ValueError, KeyError, TypeError):
+    except ValueError, KeyError, TypeError:
         return None
 
 
@@ -821,7 +821,7 @@ def _message(response: httpx2.Response) -> str:
     try:
         data = response.json()
         text = f"{data['code']}: {data['message']}"
-    except (ValueError, KeyError, TypeError):
+    except ValueError, KeyError, TypeError:
         text = response.text
     return excerpt(text) or response.reason_phrase
 
@@ -843,7 +843,7 @@ def _state_of(item: Mapping[str, Any]) -> IndexState:
             ),
             layout=int(item.get("layout") or FIRST_LAYOUT),
         )
-    except (KeyError, TypeError, ValueError):
+    except KeyError, TypeError, ValueError:
         raise SearchIndexError("Meilisearch sent an unusable document") from None
 
 
@@ -851,7 +851,7 @@ def _vectors_of(item: Mapping[str, Any]) -> tuple[tuple[float, ...], ...]:
     try:
         embeddings = (item.get("_vectors") or {}).get(EMBEDDER) or {}
         return tuple(tuple(float(x) for x in vector) for vector in embeddings.get("embeddings", ()))
-    except (AttributeError, TypeError, ValueError):
+    except AttributeError, TypeError, ValueError:
         raise SearchIndexError("Meilisearch sent unusable vectors") from None
 
 

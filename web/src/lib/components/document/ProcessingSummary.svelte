@@ -4,7 +4,7 @@
 	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
 	import OctagonX from '@lucide/svelte/icons/octagon-x';
 	import RefreshCw from '@lucide/svelte/icons/refresh-cw';
-	import TriangleAlert from '@lucide/svelte/icons/triangle-alert';
+	import TriangleAlert from '@lucide/svelte/icons/triangle-exclamation-point';
 	import type { Snippet } from 'svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { m } from '#lib/paraglide/messages.js';

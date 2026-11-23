@@ -48,7 +48,7 @@ class ClassifierModel:
         examples_until: datetime | None,
         object_key: str,
         summary: JsonObject,
-    ) -> "ClassifierModel":
+    ) -> ClassifierModel:
         return cls(
             id=ClassifierModelId(new_id()),
             number=number,

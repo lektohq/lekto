@@ -113,7 +113,7 @@ class WeasyPrintMailRenderer:
             return RenderedMail(
                 pages=int(data["pages"]), renderer=str(data["renderer"]), pdfa=bool(data["pdfa"])
             )
-        except (KeyError, TypeError, ValueError):
+        except KeyError, TypeError, ValueError:
             raise RuntimeError("setting the mail gave no usable answer") from None
 
 

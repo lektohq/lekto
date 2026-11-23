@@ -12,7 +12,7 @@ from lekto_migration import plan as plans
 from lekto_migration.config import Config, public
 from lekto_migration.directory import Directory
 from lekto_migration.expect import Context, Expected, FieldInfo, expect, field_infos
-from lekto_migration.lekto import ApiError, Lekto
+from lekto_migration.lekto import ApiError, Lekto, unfit
 from lekto_migration.masterdata import Action, needs
 from lekto_migration.paperless import Paperless, PaperlessError, Snapshot
 from lekto_migration.plan import Plan, PlanError
@@ -47,12 +47,20 @@ class Loaded:
         return id in self.expected
 
 
-async def admin(target: Lekto, *, write: bool) -> dict[str, Any]:
-    """The executing admin; the key must be an admin's, and one that writes to write."""
+async def admin(target: Lekto, *, write: bool, progress: Progress) -> dict[str, Any]:
+    """The executing admin; the key must be an admin's, and one that writes to write. An older
+    Lekto, or one without an API version, stops the command; a newer one gets a warning, and
+    what it refuses is reported as always."""
     try:
         me = await target.me()
     except ApiError as error:
-        raise MigrationError(f"Lekto refused the API key: {error}") from None
+        if error.status in (401, 403):
+            raise MigrationError(f"Lekto refused the API key: {error}") from None
+        raise MigrationError(f"cannot read Lekto: {error}") from None
+    if problem := unfit(me.get("api_version")):
+        if problem.stops:
+            raise MigrationError(problem.reason)
+        progress(f"warning: {problem.reason}; going on")
     if me["user"].get("role") != "admin":
         raise MigrationError("the Lekto API key must belong to an admin")
     if write and me.get("token_scope") != "read_write":
@@ -71,7 +79,7 @@ async def read(
         f"Paperless {snapshot.version}: {len(snapshot.documents)} documents, "
         f"{len(snapshot.users)} users"
     )
-    me = await admin(target, write=write) if target is not None else None
+    me = await admin(target, write=write, progress=progress) if target is not None else None
     try:
         directory = await Directory.of(target, me)
     except ApiError as error:

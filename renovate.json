@@ -11,38 +11,43 @@
   "prConcurrentLimit": 5,
   "minimumReleaseAge": "10 days",
   "osvVulnerabilityAlerts": true,
-  "dependencyDashboardOSVVulnerabilitySummary": "unresolved",
+  "dependencyDashboard": {
+    "osvVulnerabilitySummary": "unresolved"
+  },
   "labels": [
     "dependencies"
   ],
   "packageRules": [
     {
-      "description": "Development dependencies: the dev groups of the Python projects, the web UI's devDependencies",
+      "description": "Development dependencies: the dev groups of the Python projects, the web UI's devDependencies; its own branch prefix keeps every branch to one label (a package in files of two labels gets two pull requests)",
       "matchDepTypes": [
         "devDependencies",
         "dependency-groups"
       ],
       "labels": [
         "dev-deps"
-      ]
+      ],
+      "additionalBranchPrefix": "dev-"
     },
     {
-      "description": "The devcontainer: its features and the services of its compose file",
+      "description": "The devcontainer: its features and the services of its compose file; its own branch prefix keeps every branch to one label (a package in files of two labels gets two pull requests)",
       "matchFileNames": [
         ".devcontainer/**"
       ],
       "labels": [
         "dev-deps"
-      ]
+      ],
+      "additionalBranchPrefix": "dev-"
     },
     {
-      "description": "The actions of the workflows, pinned to their commits",
+      "description": "The actions of the workflows, pinned to their commits; its own branch prefix keeps every branch to one label (a package in files of two labels gets two pull requests)",
       "matchManagers": [
         "github-actions"
       ],
       "labels": [
         "ci"
-      ]
+      ],
+      "additionalBranchPrefix": "ci-"
     },
     {
       "description": "Lekto's own images, which the compose examples name",
@@ -52,13 +57,109 @@
       "enabled": false
     },
     {
-      "description": "Claude Code of the dev container",
+      "description": "Claude Code of the dev container; its own branch prefix keeps every branch to one label (a package in files of two labels gets two pull requests)",
       "matchPackageNames": [
         "@anthropic-ai/claude-code"
       ],
       "labels": [
         "dev-deps"
-      ]
+      ],
+      "additionalBranchPrefix": "dev-"
+    },
+    {
+      "description": "Collective PR: every non-major update of the runtime dependencies (backend, migration client, web UI, images); majors come one by one",
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "pin",
+        "pinDigest",
+        "digest"
+      ],
+      "groupName": "runtime dependencies",
+      "groupSlug": "runtime"
+    },
+    {
+      "description": "Collective PR: every non-major update of the development dependencies, like their label",
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "pin",
+        "pinDigest",
+        "digest"
+      ],
+      "matchDepTypes": [
+        "devDependencies",
+        "dependency-groups"
+      ],
+      "groupName": "development dependencies",
+      "groupSlug": "development"
+    },
+    {
+      "description": "Collective PR: the devcontainer goes with the development dependencies",
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "pin",
+        "pinDigest",
+        "digest"
+      ],
+      "matchFileNames": [
+        ".devcontainer/**"
+      ],
+      "groupName": "development dependencies",
+      "groupSlug": "development"
+    },
+    {
+      "description": "Collective PR: Claude Code of the dev container goes with the development dependencies",
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "pin",
+        "pinDigest",
+        "digest"
+      ],
+      "matchPackageNames": [
+        "@anthropic-ai/claude-code"
+      ],
+      "groupName": "development dependencies",
+      "groupSlug": "development"
+    },
+    {
+      "description": "bits-ui in a pull request of its own: its updates change the behaviour of dialogs, menus and tooltips (2.20 closes them a frame later) and need a look of their own, which would hold up the development dependencies",
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "pin",
+        "pinDigest",
+        "digest"
+      ],
+      "matchPackageNames": [
+        "bits-ui"
+      ],
+      "groupName": "bits-ui",
+      "groupSlug": "bits-ui"
+    },
+    {
+      "description": "GreenMail 2.1.15 refuses a LOGIN whose password is a UTF-8 literal beyond ASCII (the contract test test_a_password_beyond_ascii fails); skip that version",
+      "matchPackageNames": [
+        "greenmail/standalone"
+      ],
+      "allowedVersions": "!/^2\\.1\\.15$/"
+    },
+    {
+      "description": "Collective PR: every non-major update of the actions",
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "pin",
+        "pinDigest",
+        "digest"
+      ],
+      "matchManagers": [
+        "github-actions"
+      ],
+      "groupName": "GitHub Actions",
+      "groupSlug": "actions"
     }
   ],
   "lockFileMaintenance": {

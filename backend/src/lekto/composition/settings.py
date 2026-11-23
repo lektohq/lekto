@@ -367,7 +367,7 @@ class Settings(BaseSettings):
         return values
 
     @model_validator(mode="after")
-    def _check_consistency(self) -> "Settings":
+    def _check_consistency(self) -> Settings:
         problems: list[str] = []
         if self.db_type == "postgres":
             problems += _missing(self, "db_type", "db_host", "db_name", "db_user", "db_password")

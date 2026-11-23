@@ -325,7 +325,7 @@ def _spans(groups: tuple[str | None, ...]) -> list[Period]:
                     date(reading, int(end_month), int(end_day)),
                 )
             )
-        except (ValueError, ValidationError):
+        except ValueError, ValidationError:
             continue
     return spans
 
@@ -353,7 +353,7 @@ def _period(
             case "year":
                 (year,) = groups
                 return Period.year(int(str(year))), False
-    except (ValueError, ValidationError, KeyError):
+    except ValueError, ValidationError, KeyError:
         return None
     return None
 
@@ -579,7 +579,7 @@ _SIGN_AFTER = re.compile(rf"\s*[{_SIGNS}](?:$|[\s)€$£¥])")
 
 
 def read_number(
-    raw: str, facts: "DocumentText | None" = None, *, language: str | None = None
+    raw: str, facts: DocumentText | None = None, *, language: str | None = None
 ) -> Decimal | None:
     """The one number in `raw`, as written: `2.111,68`, `1,234.56`, `84,20`, `-12,50`,
     `12,50-`, `1 234`. None unless `raw` holds exactly one. An ambiguous notation (`1.234`) is
@@ -606,7 +606,7 @@ def read_number(
 
 
 def read_date(
-    raw: str, facts: "DocumentText | None" = None, *, received: date | None = None
+    raw: str, facts: DocumentText | None = None, *, received: date | None = None
 ) -> date | None:
     """The one date in `raw`, in any notation `dates_in` reads (`2026-03-12`, `12.03.2026`,
     `12. März 2026`). Of several, the one `facts` shows, if it is just one; else None. A
@@ -625,7 +625,7 @@ def read_date(
 
 def read_amount(
     raw: str,
-    facts: "DocumentText | None" = None,
+    facts: DocumentText | None = None,
     *,
     language: str | None = None,
     default: str | None = None,
@@ -694,7 +694,7 @@ class DocumentText:
     raw: str
 
     @classmethod
-    def searchable(cls, raw: str) -> "DocumentText":
+    def searchable(cls, raw: str) -> DocumentText:
         """The text with the forms `contains` searches computed at once: for a worker thread,
         as the rules read it (SC-05)."""
         text = cls(raw)
@@ -703,7 +703,7 @@ class DocumentText:
         return text
 
     @classmethod
-    def read(cls, raw: str) -> "DocumentText":
+    def read(cls, raw: str) -> DocumentText:
         """The text with everything in it found at once: for a worker thread, so that the
         event loop does not wait for long texts."""
         text = cls(raw)

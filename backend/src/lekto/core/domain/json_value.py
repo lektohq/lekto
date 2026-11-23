@@ -16,10 +16,11 @@ type JsonObject = dict[str, JsonValue]
 
 def loads(text: str | bytes) -> Any:
     """`json.loads` for what someone else wrote: a document nested deeper than the parser goes
-    (some 10,000 brackets, 10 KB) is a ValueError like any that is no JSON, not the
-    RecursionError the parser raises, which callers of foreign JSON do not expect (XB-08). So is
-    a number that is not finite (`NaN`, `Infinity`, `1e999`), which JSON does not know and
-    Python writes by default: no comparison, template or `jsonb` takes it (DB-04)."""
+    (the C stack decides; some 40,000 brackets, 40 KB, on 8 MB) is a ValueError like any that is
+    no JSON, not the RecursionError the parser raises, which callers of foreign JSON do not
+    expect (XB-08). So is a number that is not finite (`NaN`, `Infinity`, `1e999`), which JSON
+    does not know and Python writes by default: no comparison, template or `jsonb` takes it
+    (DB-04)."""
     try:
         return json.loads(text, parse_constant=_not_finite, parse_float=_finite)
     except RecursionError:
