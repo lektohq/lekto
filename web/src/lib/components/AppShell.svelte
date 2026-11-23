@@ -247,7 +247,7 @@
 											<button
 												{...mergeProps(menu, tip)}
 												type="button"
-												class="relative grid size-10 shrink-0 place-items-center rounded-full bg-primary text-md font-semibold text-primary-foreground uppercase outline-none select-none hover:bg-primary/80 focus-visible:ring-3 focus-visible:ring-ring/50"
+												class="relative grid size-10 shrink-0 place-items-center rounded-full bg-primary text-md font-semibold text-primary-foreground uppercase select-none hover:bg-primary/80 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-hidden"
 												aria-label={accountName}
 											>
 												{username.slice(0, 1)}

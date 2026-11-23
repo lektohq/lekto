@@ -24,7 +24,11 @@ address.
 3. **Quiet paper, one accent.** The ground is warm paper white (dark: deep green-grey). Petrol is
    the one accent: primary actions, links, focus. Lane colours mean state, nothing else.
 4. **State is never colour alone.** A lane, a deadline or a check always shows an icon and a word
-   as well.
+   as well. In a contrast theme of the system (`forced-colors`) grounds and shadows are dropped:
+   what tells its state by a ground has an edge that stays (the knob of a switch, the chosen
+   pill of `Segmented`, the dot of a radio), a transparent one where none shows otherwise, and a
+   focus ring keeps the outline for that theme (`focus-visible:outline-hidden`). No system
+   colours are named.
 5. **The phone is a first-class screen.** Every page works at 390 px without sideways scrolling,
    and reflows down to 320 px (a small phone, or a larger one zoomed in).
    Targets are 44 px. Nothing depends on hover.

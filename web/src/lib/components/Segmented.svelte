@@ -145,7 +145,7 @@
 			data-pill
 			hidden
 			aria-hidden="true"
-			class="pointer-events-none absolute top-0 left-0 rounded-full bg-card shadow-sm data-moving:motion-safe:transition-[transform,width,height] data-moving:motion-safe:duration-300 data-moving:motion-safe:ease-out"
+			class="pointer-events-none absolute top-0 left-0 rounded-full border border-transparent bg-card shadow-sm data-moving:motion-safe:transition-[transform,width,height] data-moving:motion-safe:duration-300 data-moving:motion-safe:ease-out"
 		></span>
 		{#each options as option (option.value)}
 			{@const tip =

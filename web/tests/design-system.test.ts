@@ -863,6 +863,32 @@ describe('the design system (web/DESIGN.md)', () => {
 		expect(sources['/src/lib/components/Select.svelte']).toMatch(/aria-controls=\{listId\}/);
 	});
 
+	it('keeps state and focus visible in a contrast theme, by edges and outlines', () => {
+		// "Principles" 4, with `forced-colors` (a contrast theme of the system): grounds and
+		// shadows are dropped there, edges and outlines stay, also transparent ones. So what
+		// tells a state by its ground alone has an edge, and what shows the focus by a ring
+		// (a shadow) keeps the outline for that theme (`outline-hidden`, never `outline-none`).
+		const knob = sources['/src/lib/components/ui/switch/switch.svelte'];
+		expect(knob).toMatch(/block rounded-full border border-transparent bg-background/);
+		const box = sources['/src/lib/components/ui/choice/choice-box.svelte'];
+		expect(box).toMatch(/checked:before:border-3 checked:before:border-primary-foreground/);
+		expect(box).not.toMatch(/checked:before:bg-primary-foreground/);
+		expect(sources['/src/lib/components/Segmented.svelte']).toMatch(
+			/data-pill[\s\S]*?rounded-full border border-transparent bg-card/
+		);
+		for (const path of [
+			'/src/lib/components/ui/switch/switch.svelte',
+			'/src/lib/components/ui/choice/choice-box.svelte'
+		]) {
+			expect(sources[path]).toContain('focus-visible:outline-hidden');
+			expect(sources[path]).not.toMatch(/(?<![\w:-])outline-none\b/);
+		}
+		// The account's button in the header.
+		expect(sources['/src/lib/components/AppShell.svelte']).toMatch(
+			/rounded-full bg-primary[^"]*focus-visible:ring-3[^"]*focus-visible:outline-hidden/
+		);
+	});
+
 	it('asks in one place whether a script may move things', () => {
 		// "Motion": who asked for less motion gets a place at once. A scroll that code starts
 		// takes its behavior from `lib/motion.ts`; nobody writes `smooth` or asks the system.
