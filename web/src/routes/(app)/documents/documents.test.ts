@@ -1019,6 +1019,28 @@ describe('the archive page', () => {
 		expect(filtersCollapsed()).toBe(false);
 	});
 
+	it('has its tools after the title and the search in the document, for Tab and readers (WZ-09)', async () => {
+		vi.stubGlobal('fetch', fakeApi());
+		render(Page);
+		const title = await screen.findByRole('heading', { level: 1 });
+		const follows = (element: Element) =>
+			Boolean(title.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING);
+		// Sort, "Auswählen" and the layout, of the desktop and of the row below it alike.
+		const tools = [
+			...screen.getAllByRole('button', { name: m.bulk_mode() }),
+			...document.querySelectorAll(`[aria-label="${m.layout_label()}"]`)
+		];
+		expect(tools.length).toBeGreaterThan(1);
+		expect(tools.every(follows)).toBe(true);
+		// And after the page's search field, which stands beside the title.
+		const search = screen.getAllByRole('search')[0];
+		expect(
+			tools.every((tool) =>
+				Boolean(search.compareDocumentPosition(tool) & Node.DOCUMENT_POSITION_FOLLOWING)
+			)
+		).toBe(true);
+	});
+
 	it('opens with the filters collapsed as remembered', async () => {
 		rememberFiltersCollapsed(true);
 		vi.stubGlobal('fetch', fakeApi());

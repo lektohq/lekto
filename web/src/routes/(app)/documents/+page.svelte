@@ -925,41 +925,12 @@ row of filters, on a desktop narrow by the title. -->
 	<!-- From the desktop on (web/DESIGN.md, "Sticky heads"): once the head of the page has gone
 	below the header, a band behind the line below it, across the list. The tools beside the title stay on that
 	line; while the selection bar owns it, they scroll away with the title. Neither takes room. -->
-	<div class="sticky top-16 z-20 -mb-6 hidden h-0 lg:block" aria-hidden="true">
+	<div class="sticky top-16 z-20 -order-2 -mb-6 hidden h-0 lg:block" aria-hidden="true">
 		<div
 			class={['absolute right-0 border-b bg-background', collapsed ? 'left-0' : 'left-80']}
 			class:invisible={!moved}
 			style:height={`${barOnTop ? groupTop - HEADER : HEADER - 8}px`}
 		></div>
-	</div>
-	<div class={['z-30 -mb-6 hidden h-0 lg:block', barOnTop ? 'relative' : 'sticky top-18']}>
-		<div
-			bind:clientWidth={toolsWidth}
-			class="absolute top-0 right-0 flex items-center gap-2 bg-background pl-3"
-		>
-			{#if !streaming}{@render sortMenu(!roomy.current)}{@render selectButton(false)}{/if}
-			<Segmented
-				names="hidden"
-				label={m.layout_label()}
-				value={layout}
-				options={[
-					{ value: 'grid', label: m.layout_grid(), icon: LayoutGrid },
-					{ value: 'list', label: m.layout_list(), icon: List },
-					{ value: 'stream', label: m.layout_stream(), icon: Waypoints }
-				]}
-				onchange={(next) => show(next as Layout)}
-			/>
-			{#if lens && lookup && roomy.current}
-				<Button variant="outline" onclick={() => edit(lens)}>
-					<Pencil aria-hidden="true" />
-					{m.lens_edit()}
-				</Button>
-			{:else if lens && lookup}
-				<IconButton variant="outline" label={m.lens_edit()} onclick={() => edit(lens)}>
-					<Pencil aria-hidden="true" />
-				</IconButton>
-			{/if}
-		</div>
 	</div>
 	<div bind:this={pageHead} class="flex flex-col gap-3" style:--tools-width={`${toolsWidth}px`}>
 		<!-- As high as the head of every other page (`PageHeader`); on a desktop the tools above
@@ -1028,6 +999,39 @@ row of filters, on a desktop narrow by the title. -->
 		</div>
 		<div class={[!collapsed && 'lg:hidden']}>
 			{@render lensLinks('chips')}
+		</div>
+	</div>
+
+	<!-- The tools of a desktop. In the document they follow the title and the search, so that
+	Tab and a screen reader reach them in that order; on the page they stand before the head
+	(`-order-1`), where their holder of no height sticks to the line below the header. -->
+	<div class={['z-30 -order-1 -mb-6 hidden h-0 lg:block', barOnTop ? 'relative' : 'sticky top-18']}>
+		<div
+			bind:clientWidth={toolsWidth}
+			class="absolute top-0 right-0 flex items-center gap-2 bg-background pl-3"
+		>
+			{#if !streaming}{@render sortMenu(!roomy.current)}{@render selectButton(false)}{/if}
+			<Segmented
+				names="hidden"
+				label={m.layout_label()}
+				value={layout}
+				options={[
+					{ value: 'grid', label: m.layout_grid(), icon: LayoutGrid },
+					{ value: 'list', label: m.layout_list(), icon: List },
+					{ value: 'stream', label: m.layout_stream(), icon: Waypoints }
+				]}
+				onchange={(next) => show(next as Layout)}
+			/>
+			{#if lens && lookup && roomy.current}
+				<Button variant="outline" onclick={() => edit(lens)}>
+					<Pencil aria-hidden="true" />
+					{m.lens_edit()}
+				</Button>
+			{:else if lens && lookup}
+				<IconButton variant="outline" label={m.lens_edit()} onclick={() => edit(lens)}>
+					<Pencil aria-hidden="true" />
+				</IconButton>
+			{/if}
 		</div>
 	</div>
 

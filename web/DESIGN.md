@@ -1355,7 +1355,9 @@ The documents list keeps its tools and the group at hand (Tobi, 11.11.2026):
   filters beside the list stay as they are (`top-20`). Below `xl` the sort and "Lens bearbeiten"
   are icons (their names as tooltips), so that the title of a group keeps room beside the tools.
   While the selection bar stands, it owns the line: the tools scroll away with the title, and the
-  titles stick below the bar.
+  titles stick below the bar. In the document the tools follow the title and the search (Tab and
+  a screen reader go left to right); their holder of no height is placed before the head by
+  `order`, where it sticks.
 - **Below the desktop**: the row of search, filters, sort, "Auswählen" and layout sticks below
   the header (`top-16`, across the page, `bg-background`, a line below once it stands there).
   Scrolling down it steps aside behind the header, scrolling up it comes back
