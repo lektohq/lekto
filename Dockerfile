@@ -164,7 +164,7 @@ RUN mkdir -p /home/vscode/.claude /home/vscode/.config/gh
 # release's binary, checked against the checksum of its manifest, installs itself; Anthropic's
 # installer script would fetch the newest binary first. Renovate raises the version.
 # renovate: datasource=npm depName=@anthropic-ai/claude-code
-ARG CLAUDE_CODE_VERSION=2.1.322
+ARG CLAUDE_CODE_VERSION=2.1.323
 RUN set -eu; \
     case "$(uname -m)" in \
       aarch64) platform=linux-arm64 ;; \
