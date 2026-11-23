@@ -157,8 +157,9 @@ class IndexingPolicy:
     job_lease: timedelta
     rebuild_lease: timedelta
     batch_size: int = 50  # documents per request in a rebuild
-    # How far back `status` reads the durations of the index jobs (the jobs' retention).
-    durations_window: timedelta = timedelta(days=7)
+    # How far back `status` reads the durations of the index jobs: the jobs' retention, from
+    # the settings as the rest (no default of its own, SA-K07).
+    durations_window: timedelta
 
     def __post_init__(self) -> None:
         if min(self.max_text, self.chunk_size, self.max_chunks, self.batch_size) < 1:
@@ -353,7 +354,13 @@ class IndexingService:
             await uow.jobs.enqueue(
                 RECONCILE_JOB, {}, run_at=self._clock.now(), dedup_key=RECONCILE_JOB
             )
-            await uow.jobs.enqueue(RECONCILE_JOB, {"once": True}, run_at=self._clock.now())
+            # One waits at most: a worker in a loop of restarts adds no more (SA-K02).
+            await uow.jobs.enqueue(
+                RECONCILE_JOB,
+                {"once": True},
+                run_at=self._clock.now(),
+                coalesce_key=f"{RECONCILE_JOB}.once",
+            )
             await uow.commit()
 
     async def request_rebuild(self, actor: Actor) -> None:
@@ -919,7 +926,9 @@ def split_sections(text: str, size: int, limit: int) -> list[str]:
     for paragraph in (part.strip() for part in _PARAGRAPH_BREAK.split(text)):
         if not paragraph:
             continue
-        while len(paragraph) > size:
+        # Not past the limit: the rest of a long paragraph was cut up and copied to its end
+        # (SA-K06).
+        while len(paragraph) > size and len(sections) < limit:
             cut = paragraph.rfind(" ", size // 2, size)
             cut = size if cut == -1 else cut
             if current:

@@ -65,7 +65,6 @@ from lekto.core.domain.reading import (
 from lekto.core.domain.reasons import Action, Reason, ReasonCode, because
 from lekto.core.domain.rights import Actor, TokenRight
 from lekto.core.domain.rule_planner import given_fields
-from lekto.core.domain.spaces import Space
 from lekto.core.domain.users import User
 from lekto.core.domain.validation import require_name
 from lekto.core.domain.versions import VersionKind
@@ -87,6 +86,7 @@ from lekto.core.services._access import (
 from lekto.core.services._first_runs import keep_first_run, keep_verdicts
 from lekto.core.services._intake import delete_derivatives, store_new_version, store_received
 from lekto.core.services._jobs import (
+    LEASE,
     NODE_JOB,
     STORE_ATTEMPTS,
     JobRunner,
@@ -280,7 +280,7 @@ class PipelineService:
         suggest_contact: float,
         retry: RetryPolicy,
         poor_reading: float,
-        lease: timedelta = timedelta(minutes=10),
+        lease: timedelta = LEASE,
         vision: VisionModel | None = None,
         vision_lease: timedelta | None = None,
         facts: NodeExecutor | None = None,
@@ -368,7 +368,8 @@ class PipelineService:
                 if imported.created_at is not None:
                     received_at(imported.created_at, started)  # before anything is stored
         key = original_key(sha256)
-        if not await self._store.exists(key):
+        stored = not await self._store.exists(key)
+        if stored:
             await self._store.upload(key, file.path, content_type=media_type)
 
         output: JsonObject = {"sha256": sha256.hex, "size": file.size, "media_type": media_type}
@@ -378,29 +379,36 @@ class PipelineService:
             output[IMPORTED] = imported.to_json()
         result = NodeResult(outcome=Outcome.OK, output=output)
         try:
-            return await self._create(
-                actor,
-                uploader,
-                target,
-                sha256,
-                file.path,
-                filename,
-                media_type,
-                channel,
-                result,
-                started,
-                chosen=space is not None,
-                received=None if imported is None else imported.created_at,
-                via=via,
-                also=also,
-            )
-        except ConflictError:
-            # The same file arrived twice at the same moment; the other upload won.
-            async with self._uow() as uow:
-                error = await duplicate_of(uow, await load_actor(uow, actor), sha256)
-            if error is None:
-                raise
-            raise error from None
+            try:
+                return await self._create(
+                    actor,
+                    uploader,
+                    target,
+                    sha256,
+                    file.path,
+                    filename,
+                    media_type,
+                    channel,
+                    result,
+                    started,
+                    chosen=space is not None,
+                    received=None if imported is None else imported.created_at,
+                    via=via,
+                    also=also,
+                )
+            except ConflictError:
+                # The same file arrived twice at the same moment; the other upload won.
+                async with self._uow() as uow:
+                    error = await duplicate_of(uow, await load_actor(uow, actor), sha256)
+                if error is None:
+                    raise
+                raise error from None
+        except BaseException:
+            # As a new version's (SA-K01): the original stored for this upload goes if no
+            # document names it; out of the unit of work, whose lock of the key it takes.
+            if stored:
+                await asyncio.shield(remove_unnamed(self._uow, self._store, [sha256]))
+            raise
 
     async def _create(
         self,
@@ -696,7 +704,7 @@ class PipelineService:
                 if item.node not in again
                 or (item.node is Node.APPLY_RULES and resume_at is Node.APPLY_RULES)
             ]
-            target = None if space is None else await self._move_target(uow, user, source, space)
+            target = None if space is None else await move_target(uow, user, space)
             now = self._clock.now()
             tags_before = frozenset(document.tag_ids)
             space_decided = document.space_confirmed_at is not None
@@ -710,7 +718,7 @@ class PipelineService:
                 for suggested in suggested_spaces(open)
                 if accept_suggestions
                 and target is None
-                and await self._movable(uow, user, source, suggested)
+                and await self._movable(uow, user, suggested)
             ]
             decision = decide(
                 open,
@@ -723,7 +731,7 @@ class PipelineService:
             )
             if target is None and decision.space not in (None, document.space_id):
                 assert decision.space is not None
-                target = await self._move_target(uow, user, source, decision.space)
+                target = await move_target(uow, user, decision.space)
             # The person decided the change as given (with the suggestions they accepted); a
             # topic the new contact does not enable is cleared, but not by their decision.
             decided = given_fields(decision.changes)
@@ -782,19 +790,14 @@ class PipelineService:
             await self._restart(uow, document)
         return None if access is None else DocumentView(document, access)
 
-    async def _movable(self, uow: UnitOfWork, user: User, source: Space, id: SpaceId) -> bool:
-        """Whether `user` may move a document of `source` into the space `id` on confirming
-        it."""
+    async def _movable(self, uow: UnitOfWork, user: User, id: SpaceId) -> bool:
+        """Whether `user` may move a document into the space `id` on confirming it (as
+        `DocumentService.move`)."""
         try:
-            await self._move_target(uow, user, source, id)
+            await move_target(uow, user, id)
         except NotFoundError, SpaceWriteDeniedError:
             return False
         return True
-
-    async def _move_target(self, uow: UnitOfWork, user: User, source: Space, id: SpaceId) -> Space:
-        """The space `user` moves a document of `source` into on confirming it (as
-        `DocumentService.move`)."""
-        return await move_target(uow, user, id)
 
     async def _restart(self, uow: UnitOfWork, document: Document) -> None:
         """Store the document's new run: the tasks of the runs before end (a late answer is

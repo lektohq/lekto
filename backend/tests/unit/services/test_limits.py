@@ -35,4 +35,6 @@ async def test_one_call_makes_at_most_its_decisions(world: World) -> None:
         kind=IdentifierKind.CUSTOMER_NUMBER, value="12345", action=OpenAction.REJECT
     )
     with pytest.raises(ValidationError):
-        await world.open_identifiers.decide(Actor(admin.id), [decision] * (MAX_DECISIONS + 1))
+        await world.open_identifiers.decide(
+            Actor(admin.id), [decision] * (MAX_DECISIONS + 1), session=True
+        )

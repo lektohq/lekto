@@ -1,5 +1,6 @@
 """The search index follows the documents: events lead to jobs, jobs write the index."""
 
+import time
 from collections.abc import Awaitable, Sequence
 from dataclasses import replace
 from datetime import date, timedelta
@@ -687,8 +688,9 @@ async def test_the_reconciliation_repeats_itself(setup: Setup) -> None:
     await setup.indexing.schedule()
     await setup.indexing.schedule()
     jobs = setup.world.database.jobs.values()
-    # One that recurs, and one for each start of a worker, which runs once.
-    assert sorted(j.payload.get("once") is True for j in jobs) == [False, True, True]
+    # One that recurs, and one that runs once: a start of a worker while one waits adds none,
+    # however often a worker starts again (SA-K02).
+    assert sorted(j.payload.get("once") is True for j in jobs) == [False, True]
     assert all(j.kind == RECONCILE_JOB for j in jobs)
     await builders.drain(setup.indexing)
     queued = [j for j in setup.world.database.jobs.values() if j.status is JobStatus.QUEUED]
@@ -945,3 +947,13 @@ async def test_a_conflict_while_indexing_fails_the_attempt_not_the_claim(
     (job,) = index_jobs(setup.world)
     assert job.status is JobStatus.QUEUED
     assert job.last_error is not None and "ConcurrencyError" in job.last_error
+
+
+def test_the_sections_stop_at_their_limit() -> None:
+    """A long text without a paragraph break was cut up to its end whatever the limit: three
+    million characters took half a second for one section (SA-K06)."""
+    text = "wort " * 600_000
+    started = time.perf_counter()
+    (section,) = split_sections(text, 1000, 1)
+    assert time.perf_counter() - started < 0.1
+    assert section == split_sections(text[:5000], 1000, 1)[0]

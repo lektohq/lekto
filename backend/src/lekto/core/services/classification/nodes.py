@@ -1755,7 +1755,8 @@ def _kept(check: FieldCheck, document: Document, current: JsonValue | None) -> F
     if check.ok and check.value == current:
         return check
     if not check.ok and check.suggestion == current:
-        return replace(check, outcome=Outcome.OK, value=current, suggestion=None)
+        # As sure as the person who confirmed it (SA-K09).
+        return replace(check, outcome=Outcome.OK, value=current, suggestion=None, confidence=1.0)
     return replace(
         check,
         outcome=Outcome.UNCERTAIN,

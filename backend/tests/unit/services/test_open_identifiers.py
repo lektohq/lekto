@@ -149,6 +149,7 @@ async def test_decisions_confirm_and_reject_one_by_one(world: World) -> None:
             OpenDecision(kind=SHARED[0], value=SHARED[1], action=OpenAction.CONFIRM),
             OpenDecision(kind=CUSTOMER[0], value="99999999", action=OpenAction.REJECT),
         ],
+        session=True,
     )
     assert [outcome.error is None for outcome in outcomes] == [True, True, False, False]
     assert outcomes[2].error is not None
@@ -163,7 +164,9 @@ async def test_decisions_confirm_and_reject_one_by_one(world: World) -> None:
 async def test_a_suggested_domain_rejected_is_not_suggested_again(world: World) -> None:
     admin, utility, _ = await setting(world)
     (rejected,) = await world.open_identifiers.decide(
-        Actor(admin.id), [OpenDecision(kind=SITE[0], value=SITE[1], action=OpenAction.REJECT)]
+        Actor(admin.id),
+        [OpenDecision(kind=SITE[0], value=SITE[1], action=OpenAction.REJECT)],
+        session=True,
     )
     assert rejected.error is None
     assert (await held(world, utility))[SITE] == "rejected"
@@ -179,13 +182,16 @@ async def test_a_learned_one_is_rejected_or_moved_by_its_contact(world: World) -
             OpenDecision(kind=CUSTOMER[0], value=CUSTOMER[1], action=OpenAction.REJECT),
             OpenDecision(kind=SITE[0], value=SITE[1], action=OpenAction.CONFIRM, contact=bank.id),
         ],
+        session=True,
     )
     assert await held(world, utility) == {CUSTOMER: "rejected"}
     assert await held(world, bank) == {SITE: "manual"}
     user = await world.user()
     with pytest.raises(PermissionDeniedError):
         await world.open_identifiers.decide(
-            Actor(user.id), [OpenDecision(kind=SITE[0], value=SITE[1], action=OpenAction.REJECT)]
+            Actor(user.id),
+            [OpenDecision(kind=SITE[0], value=SITE[1], action=OpenAction.REJECT)],
+            session=True,
         )
 
 
@@ -206,6 +212,7 @@ async def test_a_learned_one_moved_to_another_contact_leaves_its_user(world: Wor
                 kind=CUSTOMER[0], value=CUSTOMER[1], action=OpenAction.CONFIRM, contact=bank.id
             )
         ],
+        session=True,
     )
     assert outcome.error is None
     async with world.uow() as uow:
@@ -240,7 +247,7 @@ async def test_a_suggestion_goes_into_a_profile_or_is_declined_there(world: Worl
     (outcome,) = await world.open_identifiers.decide(Actor(admin.id), [confirm], session=False)
     assert outcome.error is not None
     assert outcome.error.code is ReasonCode.SESSION_NEEDED_PROFILE
-    (outcome,) = await world.open_identifiers.decide(Actor(admin.id), [confirm])
+    (outcome,) = await world.open_identifiers.decide(Actor(admin.id), [confirm], session=True)
     assert outcome.error is None
     async with world.uow() as uow:
         profile = await uow.profiles.get(admin.id)
@@ -252,7 +259,7 @@ async def test_a_suggestion_goes_into_a_profile_or_is_declined_there(world: Worl
         await uow.profiles.update(profile)
         await uow.commit()
     reject = OpenDecision(kind=IBAN[0], value=IBAN[1], action=OpenAction.REJECT)
-    (outcome,) = await world.open_identifiers.decide(Actor(admin.id), [reject])
+    (outcome,) = await world.open_identifiers.decide(Actor(admin.id), [reject], session=True)
     assert outcome.error is None
     async with world.uow() as uow:
         profile = await uow.profiles.get(admin.id)

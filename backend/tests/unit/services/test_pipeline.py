@@ -809,6 +809,28 @@ async def test_a_stored_original_is_not_uploaded_again(world: World) -> None:
     assert await world.object_store.get(key) == b"%PDF-1.7 marker"
 
 
+async def test_an_original_stored_for_a_document_not_made_goes_again(world: World) -> None:
+    """As with a new version: the file stored for the upload goes when the document is not
+    created; one that was there already stays (SA-K01)."""
+    owner = await world.user()
+
+    async def failing(uow: object, document: object) -> None:
+        raise RuntimeError("the transaction failed")
+
+    file = incoming(b"%PDF-1.7 not made")
+    with pytest.raises(RuntimeError):
+        await world.pipeline().receive(Actor(owner.id), file, filename="a.pdf", also=failing)
+    assert not await world.object_store.exists(original_key(file.sha256))
+
+    there = original_key(Sha256.of(PDF))
+    await world.object_store.put(there, PDF, content_type="application/pdf")
+    with pytest.raises(RuntimeError):
+        await world.pipeline().receive(
+            Actor(owner.id), incoming(PDF), filename="b.pdf", also=failing
+        )
+    assert await world.object_store.exists(there)
+
+
 class VanishingStore(MemoryObjectStore):
     """Says an original exists at the first look, then it is gone: as if the files of a deleted
     document were removed right between the two looks of an upload."""
