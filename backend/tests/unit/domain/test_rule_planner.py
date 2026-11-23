@@ -23,7 +23,7 @@ from lekto.core.domain.rule_planner import (
     RulePlan,
     RuleReport,
     Situation,
-    changed_fields,
+    given_fields,
     plan,
     reviewing_rules,
 )
@@ -1026,8 +1026,8 @@ def test_changed_fields() -> None:
 
     changes = DocumentChanges(title="x", contact_id=None, fields={attr: None})
 
-    assert changed_fields(changes) == {"title", "contact", f"field:{attr}"}
-    assert changed_fields(DocumentChanges()) == frozenset()
+    assert given_fields(changes) == {"title", "contact", f"field:{attr}"}
+    assert given_fields(DocumentChanges()) == frozenset()
 
 
 def test_plan_to_json() -> None:
@@ -1146,7 +1146,7 @@ def test_a_contact_a_rule_sets_clears_a_topic_it_does_not_enable() -> None:
 
 
 def test_changed_fields_name_the_topic() -> None:
-    assert changed_fields(DocumentChanges(topic_id=None)) == {"topic"}
+    assert given_fields(DocumentChanges(topic_id=None)) == {"topic"}
 
 
 def test_the_rules_that_forced_a_review_read_back_from_the_log() -> None:

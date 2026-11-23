@@ -76,7 +76,7 @@ from lekto.core.domain.permissions import (
 from lekto.core.domain.pipeline import Node, NodeRun
 from lekto.core.domain.reasons import Action, ReasonCode, because
 from lekto.core.domain.rights import Actor, TokenRight
-from lekto.core.domain.rule_planner import changed_fields
+from lekto.core.domain.rule_planner import given_fields
 from lekto.core.domain.spaces import Space, SpaceRole
 from lekto.core.domain.tag_tree import TagTree
 from lekto.core.domain.text_places import TextPlaces
@@ -1231,7 +1231,7 @@ class DocumentService:
                         Decision.CHANGE,
                         before=before,
                         after=document,
-                        given=changed_fields(given),
+                        given=given_fields(given),
                         definitions=definitions,
                         now=now,
                         via=via,

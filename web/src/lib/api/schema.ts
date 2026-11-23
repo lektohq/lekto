@@ -5812,7 +5812,7 @@ export interface components {
 			outcome: components['schemas']['Outcome'];
 			/**
 			 * Confidence
-			 * @description 0 to 1, the rule's summary, not a probability: 1 for a value the judge or the checks accept, at most 0.89 for an uncertain one. The measured values are in `candidates` (their `sources`).
+			 * @description 0 to 1, the rule's summary, not a probability: 1 for a value the judge or the checks accept, just below the confidence threshold (`LEKTO_CONFIDENCE_THRESHOLD`) at most for an uncertain one. The measured values are in `candidates` (their `sources`).
 			 */
 			confidence: number;
 			/**

@@ -341,7 +341,9 @@ def field_from_json(definition: FieldDefinition, data: object) -> FieldValue:
             case FieldType.NUMBER if _numeric(data):
                 value = Decimal(str(data))
             case FieldType.AMOUNT if isinstance(data, dict) and set(data) == _AMOUNT_KEYS:
-                if _numeric(data["amount"]):
+                # An active ISO 4217 code as the text's reading takes it, not any three
+                # capitals (`PCS`); `Money` itself takes those, so a stored value still loads.
+                if _numeric(data["amount"]) and is_currency_code(str(data["currency"])):
                     value = Money(Decimal(str(data["amount"])), data["currency"])
             case FieldType.DATE if isinstance(data, str):
                 value = date.fromisoformat(data)

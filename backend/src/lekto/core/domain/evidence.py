@@ -411,14 +411,13 @@ def read_period(
 
 # --- numbers ----------------------------------------------------------------------------------
 
-# Digits with separators between them: `1.234,56`, `1,234.56`, `1 234,56`, `1'234.56`, `84,20`.
-
 
 def truth_value(text: str) -> bool | None:
     """Yes or no as a document or a model writes it (German, English); None for other text."""
     return TRUTH_WORDS.get(text.strip().casefold())
 
 
+# Digits with separators between them: `1.234,56`, `1,234.56`, `1 234,56`, `1'234.56`, `84,20`.
 _NUMBER = re.compile(r"(?<![\d])\d(?:[\d]|[.,'](?=\d)| (?=\d{3}(?!\d)))*")
 
 

@@ -64,7 +64,7 @@ from lekto.core.domain.reading import (
 )
 from lekto.core.domain.reasons import Action, Reason, ReasonCode, because
 from lekto.core.domain.rights import Actor, TokenRight
-from lekto.core.domain.rule_planner import changed_fields
+from lekto.core.domain.rule_planner import given_fields
 from lekto.core.domain.spaces import Space
 from lekto.core.domain.users import User
 from lekto.core.domain.validation import require_name
@@ -726,7 +726,7 @@ class PipelineService:
                 target = await self._move_target(uow, user, source, decision.space)
             # The person decided the change as given (with the suggestions they accepted); a
             # topic the new contact does not enable is cleared, but not by their decision.
-            decided = changed_fields(decision.changes)
+            decided = given_fields(decision.changes)
             checked = await checked_changes(uow, decision.changes, document, user)
             decision = replace(decision, changes=checked)
             before = copy.deepcopy(document)

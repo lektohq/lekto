@@ -15,7 +15,7 @@ from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
-from lekto.core.domain.documents import UNSET, Unset
+from lekto.core.domain.changes import UNSET, Unset
 from lekto.core.domain.errors import (
     ConflictError,
     NotFoundError,

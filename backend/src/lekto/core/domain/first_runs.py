@@ -297,9 +297,7 @@ def _automatic(
     value = before.get(name)
     if check is None:
         return value, None
-    if check.ok:
-        return value, check.suggestion
-    if name == SPACE:
+    if name == SPACE and not check.ok:
         return None, check.suggestion
     return value, check.suggestion
 

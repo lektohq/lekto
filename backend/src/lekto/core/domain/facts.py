@@ -35,6 +35,7 @@ from lekto.core.domain.identifiers import (
     CONTACT_KINDS,
     Identifier,
     IdentifierKind,
+    Key,
     identifiers_in,
     matches,
     of_person,
@@ -52,8 +53,6 @@ MOST = 20
 _SPANS = 20  # places of one fact in the text
 # How a folded name may be written: `ae` as `ä` or `ae`, and so on.
 _SPELLINGS = {plain: f"(?:{letter}|{plain})" for letter, plain in {**UMLAUTS, "ß": "ss"}.items()}
-
-type Key = tuple[IdentifierKind, str]
 
 
 @dataclass(frozen=True)
@@ -168,12 +167,13 @@ def facts_in(
     in_codes: set[Key] = set()
     for code in codes:
         in_codes |= code_identifiers(code)
+    keys = in_text | in_codes  # once, not per identifier of every contact (DA-K06)
     owners: dict[Key, ContactId] = {}
     topics: dict[Key, TagId | None] = {}
     refused: dict[Key, ContactId] = {}
     for contact in contacts:
         for identifier in contact.identifiers:
-            for key in in_text | in_codes:
+            for key in keys:
                 if matches(identifier, key):
                     if identifier.counts:
                         if key not in owners:
@@ -182,7 +182,7 @@ def facts_in(
                     else:
                         refused.setdefault(key, contact.id)
     numbers = [item for contact in contacts for item in contact.evidence() if item.user_id]
-    found_persons = _persons(text, text_key, in_text | in_codes, numbers, persons, places=places)
+    found_persons = _persons(text, text_key, keys, numbers, persons, places=places)
     personal = {key for person in persons for item in person.identifiers for key in [item.key]}
     found = [
         FoundIdentifier(
@@ -195,7 +195,7 @@ def facts_in(
             topic_id=topics.get((kind, value)),
             rejected_at=None if (kind, value) in owners else refused.get((kind, value)),
         )
-        for kind, value in sorted(in_text | in_codes, key=lambda key: (key[0].value, key[1]))
+        for kind, value in sorted(keys, key=lambda key: (key[0].value, key[1]))
         if kind in CONTACT_KINDS
         and (
             (kind, value) in owners

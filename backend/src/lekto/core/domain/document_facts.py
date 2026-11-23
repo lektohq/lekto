@@ -315,7 +315,7 @@ def merged(kept: Iterable[DocumentFact], found: Iterable[DocumentFact]) -> list[
     return sorted([*decided.values(), *new], key=reading_order)
 
 
-def check_found(facts: Iterable[DocumentFact]) -> None:
+def check_found(facts: Collection[DocumentFact]) -> None:
     """Facts as sources found them, each kind and value once; ValidationError otherwise."""
     keys = [fact.key for fact in facts if fact.state is FactState.FOUND]
     if len(keys) != len(list(facts)) or len(set(keys)) != len(keys):

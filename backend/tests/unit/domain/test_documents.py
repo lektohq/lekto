@@ -1,4 +1,5 @@
 from copy import deepcopy
+from dataclasses import replace
 from datetime import UTC, date, datetime, timedelta, timezone
 from decimal import Decimal
 
@@ -95,6 +96,15 @@ def test_receive_takes_over_when_it_came_in_but_never_a_moment_ahead() -> None:
     for wrong in (LATER, datetime(2023, 1, 2, 8, 30)):  # ahead; no time zone
         with pytest.raises(ValidationError):
             received(wrong)
+
+
+def test_every_moment_of_a_document_is_utc() -> None:
+    """When it was confirmed too, as the other four moments (DA-K04)."""
+    document = builders.received()
+    berlin = timezone(timedelta(hours=2))
+    for wrong in (datetime(2026, 9, 30, 18, 0), datetime(2026, 9, 30, 18, 0, tzinfo=berlin)):
+        with pytest.raises(ValidationError, match="confirmed_at"):
+            replace(document, confirmed_at=wrong)
 
 
 def test_when_it_came_in_is_set_alone_and_confirms_nothing() -> None:

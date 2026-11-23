@@ -10,7 +10,7 @@ from lekto.adapters.inbound.rest.context import Context
 from lekto.adapters.inbound.rest.params import AllSpaces
 from lekto.adapters.inbound.rest.problems import problem_responses
 from lekto.adapters.inbound.rest.schemas.spaces import MemberIn, SpaceCreate, SpaceOut, SpacePatch
-from lekto.core.domain.documents import UNSET
+from lekto.core.domain.changes import UNSET
 from lekto.core.domain.ids import SpaceId, UserId
 from lekto.core.domain.permissions import space_role
 from lekto.core.domain.rights import TokenRight

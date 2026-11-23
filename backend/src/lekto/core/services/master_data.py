@@ -5,7 +5,8 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from uuid import UUID
 
-from lekto.core.domain.documents import UNSET, DocumentChanges, Unset
+from lekto.core.domain.changes import UNSET, Unset
+from lekto.core.domain.documents import DocumentChanges
 from lekto.core.domain.errors import (
     ConflictError,
     NotFoundError,

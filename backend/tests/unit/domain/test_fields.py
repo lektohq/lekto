@@ -95,9 +95,13 @@ def test_one_json_form_for_api_rules_and_the_log() -> None:
         {"amount": "7"},
         {"amount": True, "currency": "EUR"},
         {"amount": "7", "currency": "eu"},
+        # Three capitals that are no currency (DA-K09), as reading the text refuses them too.
+        {"amount": "7", "currency": "PCS"},
     ):
         with pytest.raises(ValidationError, match="does not accept"):
             field_from_json(definition(FieldType.AMOUNT), refused)
+    # A value stored before still loads.
+    assert Money(Decimal("7"), "PCS").currency == "PCS"
     with pytest.raises(ValidationError, match="does not accept"):
         field_from_json(definition(FieldType.NUMBER), True)
     # What comes from anyone is shortened in the message.
