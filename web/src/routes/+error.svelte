@@ -33,7 +33,7 @@
 
 <svelte:head><title>{title}</title></svelte:head>
 
-<main class="mx-auto flex min-h-screen max-w-xl flex-col justify-center gap-6 px-6">
+<main class="mx-auto flex min-h-dvh max-w-xl flex-col justify-center gap-6 px-6">
 	<!-- A page that does not exist gets the owl in place of the logo; a real error keeps the
 	     logo, the owl would be too playful there (web/DESIGN.md, "Logo and owl"). -->
 	{#if notFound}

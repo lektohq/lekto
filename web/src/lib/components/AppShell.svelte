@@ -157,7 +157,7 @@
 	width on it fills the window, and only its own areas scroll. One that only needs the width
 	(the documents) marks itself `data-roomy`: as wide, and it scrolls as a page. -->
 <div
-	class="flex min-h-screen flex-col pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)] lg:has-[[data-wide]]:h-dvh"
+	class="flex min-h-dvh flex-col pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)] lg:has-[[data-wide]]:h-dvh"
 >
 	<header class="sticky top-0 z-40 border-b bg-card">
 		<!-- Narrower gaps on a phone, and a little narrower below 380 pixels, so that the wordmark,

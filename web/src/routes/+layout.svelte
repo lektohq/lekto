@@ -31,6 +31,8 @@
 
 <!-- No transition-blocking <style> element: the CSP allows no inline style elements. -->
 <ModeWatcher disableHeadScriptInjection disableTransitions={false} />
+{@render children()}
+<!-- After the page: not the first stop of Tab. -->
 <!-- Above the home indicator of the installed app and beside the notch (web/DESIGN.md,
      "App"): the library takes `mobileOffset` up to 600 px of width only, a phone held sideways
      is wider and takes `offset`. -->
@@ -50,4 +52,3 @@
 		left: 'calc(16px + env(safe-area-inset-left))'
 	}}
 />
-{@render children()}

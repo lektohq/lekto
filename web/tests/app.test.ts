@@ -266,6 +266,10 @@ describe('the safe areas of the installed app', () => {
 		expect(html).toContain('viewport-fit=cover');
 	});
 
+	it('shrinks with the keyboard of Android rather than standing under it (WM-K03)', () => {
+		expect(html).toContain('interactive-widget=resizes-content');
+	});
+
 	// A surface that covers the whole phone screen or stands at its bottom edge keeps the insets
 	// free: full-screen editors, bars stuck to the bottom, sheets from below, fixed buttons, and
 	// a sheet from the right, which is the whole screen on a phone (the Beam, the template editor).

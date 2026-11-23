@@ -92,7 +92,7 @@
 
 <svelte:head><title>{m.login_submit()} · {m.app_name()}</title></svelte:head>
 
-<div class="flex min-h-screen">
+<div class="flex min-h-dvh">
 	<aside class="hidden w-[560px] shrink-0 flex-col justify-between bg-panel p-14 lg:flex">
 		<Logo class="text-xl" />
 		<div class="flex flex-col gap-5">
