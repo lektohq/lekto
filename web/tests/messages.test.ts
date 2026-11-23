@@ -5,6 +5,12 @@ import en from '../messages/en.json';
 
 const catalogues: Record<string, Record<string, string>> = { de, en };
 
+// The code that shows texts: components and modules, without tests and the generated catalogue.
+const used = import.meta.glob<string>(
+	['/src/**/*.svelte', '/src/**/*.ts', '!/src/**/*.test.ts', '!/src/lib/paraglide/**'],
+	{ query: '?raw', import: 'default', eager: true }
+);
+
 function keys(catalogue: Record<string, string>): string[] {
 	return Object.keys(catalogue)
 		.filter((key) => key !== '$schema')
@@ -152,6 +158,15 @@ describe('messages', () => {
 		// The list holds only what it is for.
 		const stale = [...NO_SINGULAR].filter((key) => !counting.includes(key) || `${key}_one` in de);
 		expect(stale).toEqual([]);
+	});
+
+	it('are each used somewhere in the UI (WY-08)', () => {
+		// The UI never reads a text by a computed key (`m[…]`), so a key that stands nowhere as
+		// `m.<key>` is a text nobody reads; it is deleted with what showed it.
+		const code = Object.values(used).join('\n');
+		expect(code).not.toMatch(/\bm\[/);
+		const called = new Set([...code.matchAll(/\bm\.(\w+)\b/g)].map(([, key]) => key));
+		expect(keys(de).filter((key) => !called.has(key))).toEqual([]);
 	});
 
 	it('have the same keys in every language', () => {
