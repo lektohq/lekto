@@ -35,32 +35,17 @@ describe('a condition on the mail', () => {
 });
 
 describe('a condition on a date', () => {
-	it('takes the document date in the date field of the UI, not of the browser', async () => {
-		const condition = $state({
-			...newCondition('document_date'),
-			op: 'gt' as const,
-			value: '2026-10-26'
-		});
+	it.each([
+		['the document date', { ...newCondition('document_date') }, '2026-11-01'],
+		['a step after a date', { ...newCondition('step'), path: 'answer.due' }, '2026-12-24']
+	])('compares %s in the date field of the UI, not of the browser', async (_, base, typed) => {
+		const condition = $state({ ...base, op: 'gt' as const, value: '2026-10-26' });
 		render(ConditionRow, { condition, lookup, onremove: vi.fn() });
 		const field = screen.getByLabelText(m.rule_condition_value()) as HTMLInputElement;
 		expect(field.dataset.stand).toBe('DateInput');
 		expect(field.value).toBe('2026-10-26');
-		await fireEvent.input(field, { target: { value: '2026-11-01' } });
-		expect(condition.value).toBe('2026-11-01');
-	});
-
-	it('compares a step after a date in the date field of the UI', async () => {
-		const condition = $state({
-			...newCondition('step'),
-			path: 'answer.due',
-			op: 'gt' as const,
-			value: '2026-10-26'
-		});
-		render(ConditionRow, { condition, lookup, onremove: vi.fn() });
-		const field = screen.getByLabelText(m.rule_condition_value()) as HTMLInputElement;
-		expect(field.dataset.stand).toBe('DateInput');
-		await fireEvent.input(field, { target: { value: '2026-12-24' } });
-		expect(condition.value).toBe('2026-12-24');
+		await fireEvent.input(field, { target: { value: typed } });
+		expect(condition.value).toBe(typed);
 	});
 
 	it('keeps a number of a step as it is typed, and none where the field is empty (WD-13)', async () => {

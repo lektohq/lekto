@@ -6,10 +6,10 @@ import { changeSwitchedOff, createSwitchedOff, GLOBAL } from './save.ts';
 const definition = {
 	name: 'Muster Telefon',
 	priority: 100,
-	triggers: ['document_processed'],
-	conditions: { all: [] },
+	triggers: ['ingest'],
+	conditions: { all: [], not: false },
 	actions: []
-} as unknown as ApiDefinition;
+} satisfies ApiDefinition;
 const rule = { id: 'r1', enabled: true, name: 'Muster Telefon' };
 
 function stub() {

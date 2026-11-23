@@ -70,6 +70,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+	events.stop();
 	session.clear();
 });
 
@@ -111,7 +112,6 @@ describe('the classifier tab', () => {
 		expect(
 			await screen.findByRole('heading', { name: m.classifier_model_title({ number: 3 }) })
 		).toBeTruthy();
-		events.stop();
 	});
 
 	it('keeps the newest answer when an earlier one comes last (WE-K09)', async () => {
@@ -134,7 +134,6 @@ describe('the classifier tab', () => {
 		expect(
 			screen.getByRole('heading', { name: m.classifier_model_title({ number: 3 }) })
 		).toBeTruthy();
-		events.stop();
 	});
 
 	it('says so when the model could not be read anew: the one shown is the old one (WE-02)', async () => {
@@ -154,7 +153,6 @@ describe('the classifier tab', () => {
 		emit('classifier.trained', { number: 3 });
 		expect((await screen.findByRole('alert')).textContent).toContain('boom');
 		expect(model()).toBeTruthy();
-		events.stop();
 	});
 
 	it('draws the accuracy over the models', async () => {

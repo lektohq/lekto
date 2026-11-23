@@ -19,7 +19,6 @@ let usedStep = 0;
 let userId = '';
 
 test.beforeAll(async ({ playwright, baseURL }) => {
-	test.skip(!ADMIN_PASSWORD, 'LEKTO_ADMIN_PASSWORD is not set');
 	const admin = await playwright.request.newContext({ baseURL });
 	const adminToken = await signIn(admin, ADMIN, ADMIN_PASSWORD);
 	const created = await admin.post('/api/v1/users', {

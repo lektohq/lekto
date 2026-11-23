@@ -7,9 +7,7 @@ const ADMIN = process.env.LEKTO_ADMIN_USERNAME ?? 'admin';
 const ADMIN_PASSWORD = process.env.LEKTO_ADMIN_PASSWORD ?? '';
 const NAME = `e2e-webhook-${Date.now()}`;
 
-test.beforeAll(() => {
-	test.skip(!ADMIN_PASSWORD, 'LEKTO_ADMIN_PASSWORD is not set');
-});
+test.beforeAll(() => {});
 
 /** The webhook the test made, once it has one: deleted afterwards if the test did not. */
 let made = '';

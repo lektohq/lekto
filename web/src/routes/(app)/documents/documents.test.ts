@@ -91,6 +91,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+	events.stop();
 	localStorage.clear();
 	session.clear();
 	vi.useRealTimers();
@@ -144,7 +145,6 @@ describe('the archive page', () => {
 		expect(all).toContain('GET /api/v1/documents/facets');
 		// The list's own count and that of "all documents" beside the lenses.
 		expect(all.filter((call) => call === 'GET /api/v1/documents/count').length).toBeGreaterThan(1);
-		events.stop();
 	});
 
 	describe('comes back to the place it was left at (WF-03)', () => {
@@ -371,7 +371,6 @@ describe('the archive page', () => {
 		await vi.waitFor(() => expect(listed()).toHaveLength(2));
 		expect(listed().at(-1)).toContain('offset=50');
 		expect(goto).not.toHaveBeenCalled();
-		events.stop();
 	});
 
 	// Opens two menus and a dialog and follows a poll: the longest test of the page, longer
@@ -820,7 +819,6 @@ describe('the archive page', () => {
 		const searches = calls(api).filter((call) => call.startsWith('POST /api/v1/documents/search'));
 		expect(searches[0]).not.toContain('semantic_ratio');
 		expect(searches.at(-1)).not.toContain('semantic_ratio');
-		events.stop();
 	});
 
 	it('shows nothing of the meaning where the installation has no search by it', async () => {

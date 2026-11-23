@@ -3,6 +3,14 @@ import { defineConfig, devices } from '@playwright/test';
 // The specs run against a running API that serves the built UI (`pnpm build`, then the API with
 // LEKTO_UI_DIR=web/build and LEKTO_COOKIE_SECURE=false); see README.md. Locally, and the layout
 // spec and the texts spec in CI (`.github/workflows/ci.yml`, job `layout`).
+// The specs sign in as the admin: without the password every one would fail at the sign-in or
+// skip, a green run that tested nothing. It stops at once and says why (WT2-K11).
+if (!process.env.LEKTO_ADMIN_PASSWORD) {
+	throw new Error(
+		'LEKTO_ADMIN_PASSWORD is not set: the specs sign in as the admin of the instance (README.md)'
+	);
+}
+
 export default defineConfig({
 	testDir: './tests/e2e',
 	// Long enough to wait for a fresh TOTP step.

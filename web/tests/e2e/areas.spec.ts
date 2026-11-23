@@ -7,9 +7,7 @@ const ADMIN = process.env.LEKTO_ADMIN_USERNAME ?? 'admin';
 const ADMIN_PASSWORD = process.env.LEKTO_ADMIN_PASSWORD ?? '';
 const NAME = `e2e-${Date.now()}`;
 
-test.beforeEach(() => {
-	test.skip(!ADMIN_PASSWORD, 'LEKTO_ADMIN_PASSWORD is not set');
-});
+test.beforeEach(() => {});
 
 test('every area opens, and the dialogs create things', async ({ page }) => {
 	const problems = watch(page);

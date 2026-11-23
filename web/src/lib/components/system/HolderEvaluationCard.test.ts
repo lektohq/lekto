@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/svelte';
+import { render, screen, within, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { kindLabel } from '#lib/identifiers.ts';
@@ -63,16 +63,14 @@ describe('the holders against the decisions', () => {
 
 	it('opens the cases behind a number, each value showing its documents in the Beam', async () => {
 		const DOC = '0199a6c4-0000-7000-8000-0000000000d1';
+		const asked: Record<string, string>[] = [];
 		const api = fakeApi({
 			'GET /api/v1/automation/holders': () => ({
 				kinds: [{ kind: 'iban', ...tally({ right: 41, learned_rejected: 2 }) }],
 				recommendation: tally({ right: 40 })
 			}),
 			'GET /api/v1/automation/holders/cases': (_, url) => {
-				expect(Object.fromEntries(url.searchParams)).toEqual({
-					measure: 'iban',
-					outcome: 'learned_rejected'
-				});
+				asked.push(Object.fromEntries(url.searchParams));
 				return {
 					cases: [
 						{
@@ -106,6 +104,8 @@ describe('the holders against the decisions', () => {
 		expect(testPage.state.holders).toEqual({ measure: 'iban', outcome: 'learned_rejected' });
 		const dialog = await screen.findByRole('dialog');
 		expect(dialog.textContent).toContain(m.holders_cases_learned_rejected());
+		// An expectation in the fake would fail inside fetch, where nothing reports it (WT2-K03).
+		await waitFor(() => expect(asked).toEqual([{ measure: 'iban', outcome: 'learned_rejected' }]));
 		const value = await within(dialog).findByRole('button', {
 			name: m.holders_cases_view({ value: 'DE89 3704 0044 0532 0130 00' })
 		});

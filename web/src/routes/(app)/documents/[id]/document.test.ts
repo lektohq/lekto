@@ -72,6 +72,23 @@ function serve(current: () => Document, routes: Parameters<typeof fakeApi>[0] = 
 	return api;
 }
 
+/** doc-1 waiting for a decision (yellow), with what its review asks and without an original. */
+function waiting() {
+	const yellow = documentOf({
+		lane: 'yellow',
+		processing: { ...documentOf().processing, status: 'review' }
+	});
+	const routes = {
+		'GET /api/v1/documents/doc-1/review': () => ({
+			document: yellow,
+			open: [{ node: 'judge', outcome: 'uncertain', reason: 'Widerspruch', fields: [] }],
+			nodes: []
+		}),
+		'GET /api/v1/documents/doc-1/original': () => new Response('', { status: 404 })
+	};
+	return { yellow, routes };
+}
+
 const seen = (api: ReturnType<typeof fakeApi>) =>
 	calls(api).filter((call) => call === 'PUT /api/v1/documents/doc-1/seen');
 
@@ -83,6 +100,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+	// jsdom has none: some tests give one.
+	delete (Element.prototype as Partial<Element>).scrollIntoView;
 	phone.override(null);
 	events.stop();
 	session.clear();
@@ -331,17 +350,9 @@ describe('the inbox while one document is open', () => {
 describe('confirming from the inbox', () => {
 	it('opens next the document that waits for a decision', async () => {
 		goTo('/ui/documents/doc-1?from=inbox', { id: 'doc-1' });
-		const yellow = documentOf({
-			lane: 'yellow',
-			processing: { ...documentOf().processing, status: 'review' }
-		});
+		const { yellow, routes } = waiting();
 		const api = serve(() => yellow, {
-			'GET /api/v1/documents/doc-1/review': () => ({
-				document: yellow,
-				open: [{ node: 'judge', outcome: 'uncertain', reason: 'Widerspruch', fields: [] }],
-				nodes: []
-			}),
-			'GET /api/v1/documents/doc-1/original': () => new Response('', { status: 404 }),
+			...routes,
 			'GET /api/v1/inbox': () => ({
 				items: [
 					inboxItem('review', { id: 'doc-1' }),
@@ -362,17 +373,9 @@ describe('confirming from the inbox', () => {
 
 	it('goes back to the inbox when nothing else waits for a decision', async () => {
 		goTo('/ui/documents/doc-1?from=inbox', { id: 'doc-1' });
-		const yellow = documentOf({
-			lane: 'yellow',
-			processing: { ...documentOf().processing, status: 'review' }
-		});
+		const { yellow, routes } = waiting();
 		serve(() => yellow, {
-			'GET /api/v1/documents/doc-1/review': () => ({
-				document: yellow,
-				open: [{ node: 'judge', outcome: 'uncertain', reason: 'Widerspruch', fields: [] }],
-				nodes: []
-			}),
-			'GET /api/v1/documents/doc-1/original': () => new Response('', { status: 404 }),
+			...routes,
 			'GET /api/v1/inbox': () => ({
 				items: [inboxItem('review', { id: 'doc-1' }), inboxItem('new', { id: 'doc-new' })],
 				next_cursor: null

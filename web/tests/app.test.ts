@@ -272,12 +272,15 @@ describe('the safe areas of the installed app', () => {
 	const EDGE =
 		/\bh-dvh max-h-dvh\b|\bsticky bottom-0\b|\bfixed\b[^'"]*\bbottom-|data-\[side=bottom\]:inset-x-0|data-\[side=right\]:w-full/;
 
-	it.each(Object.entries(sources).filter(([, source]) => EDGE.test(source)))(
-		'%s keeps the safe area free',
-		(_, source) => {
-			expect(source).toContain('env(safe-area-inset-');
-		}
-	);
+	const atEdge = Object.entries(sources).filter(([, source]) => EDGE.test(source));
+
+	it('finds the surfaces at the edge at all: an each over none would test nothing', () => {
+		expect(atEdge.length).toBeGreaterThan(5);
+	});
+
+	it.each(atEdge)('%s keeps the safe area free', (_, source) => {
+		expect(source).toContain('env(safe-area-inset-');
+	});
 });
 
 describe('the safe areas beside the notch, a phone held sideways (WM-07)', () => {
