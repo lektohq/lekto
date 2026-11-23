@@ -27,7 +27,7 @@ from lekto.core.domain.ids import (
 from lekto.core.domain.mail import MailStep, StepOutcome
 from lekto.core.domain.mail_message import MAX_FORWARDS, Address, MailMessage, MailPart
 from lekto.core.domain.mail_traits import Importance, MailMarks
-from lekto.core.domain.reasons import Reason
+from lekto.core.domain.reasons import Reason, ReasonCode, because
 from lekto.core.domain.validation import require_utc
 
 HEADROOM = 1024 * 1024
@@ -82,6 +82,19 @@ class Letter:
                 fits = len(taken) < MAX_ATTACHMENTS and readable(part)
                 (taken if fits else left).append(part)
         return tuple(taken), tuple(left)
+
+
+def attachments_left(message: MailMessage) -> Reason | None:
+    """The note on a mail's record that Lekto took no more of its attachments: how many it could
+    read beyond `MAX_ATTACHMENTS` in a letter, across its letters (SB-K10); None for none."""
+    count = sum(
+        sum(1 for part in letter.message.attachments if kept(part) and readable(part))
+        - len(letter.taken)
+        for letter in letters(message)
+    )
+    if count == 0:
+        return None
+    return because(ReasonCode.MAIL_ATTACHMENTS_LEFT, count=count, max=MAX_ATTACHMENTS)
 
 
 def readable(part: MailPart) -> bool:

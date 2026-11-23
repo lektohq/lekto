@@ -69,6 +69,13 @@ describe('the log of a mailbox', () => {
 		expect(noteOf(ITEM)).toBe('');
 	});
 
+	it('notes at a taken mail the attachments it left beyond the limit (SB-K10)', () => {
+		const reason = { code: 'mail_attachments_left', params: { count: 3, max: 100 } } as const;
+		expect(noteOf({ ...ITEM, reason })).toBe(
+			m.reason_mail_attachments_left({ count: '3', max: '100' })
+		);
+	});
+
 	it('puts the steps done apart from a refused one', () => {
 		expect(stepsDone(ITEM)).toBe(m.mail_rule_after_read());
 		expect(failedSteps(ITEM)).toHaveLength(1);

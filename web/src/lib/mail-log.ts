@@ -70,12 +70,16 @@ export function takenText(item: MailItem): string {
 	return parts.join(' · ');
 }
 
+// The outcomes whose reason stands under the badge.
+const NOTED = new Set<MailItem['outcome']>(['too_large', 'failed', 'taken', 'nothing']);
+
 /** A line under the badge that wants attention: the rule that takes a waiting mail at the next
- * fetch, a mail gone from its folder, why it was left out or failed. */
+ * fetch, a mail gone from its folder, why it was left out or failed, the attachments a taken
+ * one left beyond the limit (SB-K10). */
 export function noteOf(item: MailItem): string {
 	if (item.next_rule) return m.mailbox_next_rule({ name: item.next_rule.name });
 	if (item.outcome === 'no_rule' && item.gone_at) return m.mailbox_gone();
-	if (item.reason && (item.outcome === 'too_large' || item.outcome === 'failed')) {
+	if (item.reason && NOTED.has(item.outcome)) {
 		return reasonText(item.reason);
 	}
 	return '';

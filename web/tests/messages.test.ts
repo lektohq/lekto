@@ -118,6 +118,7 @@ const NO_SINGULAR: ReadonlySet<string> = new Set([
 	'prompt_requests',
 	'push_waiting_many',
 	'push_waiting_new',
+	'reason_mail_attachments_left',
 	'reason_recommend_confirm',
 	'reason_recommend_confirm_named',
 	'reason_recommend_reject_contacts',

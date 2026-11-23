@@ -56,6 +56,7 @@ from lekto.core.domain.mail_intake import (
     MailParts,
     MailRecord,
     OriginRole,
+    attachments_left,
     letters,
     mail_limit,
     record_id,
@@ -403,6 +404,7 @@ class MailIntakeService:
         taken = replace(
             decided,
             outcome=MailOutcome.TAKEN if documents else MailOutcome.NOTHING,
+            reason=_left(message, decision),
             documents=documents,
             steps_due=decision.after,
         )
@@ -535,6 +537,7 @@ class MailIntakeService:
         record = replace(
             record,
             outcome=MailOutcome.TAKEN if documents else MailOutcome.NOTHING,
+            reason=_left(message, decision),
             rule=decision.rule,
             rule_id=decision.rule_id,
             documents=documents,
@@ -860,3 +863,11 @@ def _stem(subject: str) -> str:
     """A file name of a subject: no separators, at most 100 characters."""
     cleaned = "".join("_" if char in '/\\:*?"<>|' else char for char in subject).strip(" .")
     return cleaned[:100] or "Mail"
+
+
+def _left(message: MailMessage, decision: MailDecision) -> Reason | None:
+    """The note on a taken mail's record that attachments beyond the limit were left (SB-K10);
+    none where the decision takes no attachments."""
+    if decision.parts not in (MailParts.ALL, MailParts.ATTACHMENTS):
+        return None
+    return attachments_left(message)

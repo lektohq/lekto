@@ -502,6 +502,7 @@ export const REASONS: Record<Exclude<ReasonCode, 'text' | 'error'>, ReasonEntry>
 	mail_password_again: entry(m.reason_mail_password_again),
 	mailbox_paused: entry(m.reason_mailbox_paused),
 	mail_too_large: entry(m.reason_mail_too_large, { size: 'number', max: 'number' }),
+	mail_attachments_left: entry(m.reason_mail_attachments_left, { count: 'number', max: 'number' }),
 	mail_step_failed: entry(m.reason_mail_step_failed, { step: 'thing' }),
 	mail_step_gone: entry(m.reason_mail_step_gone),
 	mail_rule_person_gone: entry(m.reason_mail_rule_person_gone),

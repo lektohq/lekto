@@ -13,6 +13,7 @@ import pytest
 from lekto.adapters.outbound.memory.mail_records import MemoryMailOriginRepository
 from lekto.adapters.outbound.memory.mail_server import MemoryMailSession
 from lekto.adapters.outbound.regex import RegexPatternMatcher
+from lekto.core.domain import mail_intake as intake_domain
 from lekto.core.domain import mail_message
 from lekto.core.domain.condition_tree import Group
 from lekto.core.domain.documents import Channel, Document
@@ -1400,6 +1401,42 @@ async def test_a_missing_folder_ends_the_fetch_after_the_others(world: World) ->
     assert status.error is not None and status.error.code is ReasonCode.MAIL_FOLDER_MISSING
     assert status.error.params == {"folder": "Nirgends"}
     assert (status.mails, status.last_success_at) == (1, None)
+
+
+async def test_attachments_beyond_the_limit_are_left_and_noted_at_the_record(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The others are named in the head of the cover letter; the record says how many (Tobi,
+    23.11.2026, SB-K10). A limit of two stands in for the hundred."""
+    monkeypatch.setattr(intake_domain, "MAX_ATTACHMENTS", 2)
+    _, person, mailbox = await _setup(world)
+    message = EmailMessage()
+    message["From"] = "a@example.test"
+    message["Date"] = "Wed, 04 Nov 2026 10:00:00 +0100"
+    message["Subject"] = "Unterlagen"
+    message.set_content("Anbei.")
+    for number in range(1, 5):
+        message.add_attachment(
+            mails.PDF + bytes([number]),
+            maintype="application",
+            subtype="pdf",
+            filename=f"{number}.pdf",
+        )
+    _deliver(world, bytes(message))
+    await _fetch(world, world.mail_intake())
+    names = sorted(d.original_filename for d in await world.visible(person.id))
+    assert names == ["1.pdf", "2.pdf", "Unterlagen.eml"]
+    (record,) = await _records(world, mailbox)
+    assert (record.outcome, record.documents) == (MailOutcome.TAKEN, 3)
+    assert record.reason == because(ReasonCode.MAIL_ATTACHMENTS_LEFT, count=2, max=2)
+
+
+async def test_a_mail_within_the_limit_has_no_note(world: World) -> None:
+    _, _, mailbox = await _setup(world)
+    _deliver(world, mails.rich_mail())
+    await _fetch(world, world.mail_intake())
+    (record,) = await _records(world, mailbox)
+    assert record.outcome is MailOutcome.TAKEN and record.reason is None
 
 
 async def test_an_attachment_larger_than_an_upload_is_left_out(world: World) -> None:

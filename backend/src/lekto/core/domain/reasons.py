@@ -460,6 +460,7 @@ class ReasonCode(StrEnum):
     MAIL_PASSWORD_AGAIN = "mail_password_again"
     MAILBOX_PAUSED = "mailbox_paused"
     MAIL_TOO_LARGE = "mail_too_large"
+    MAIL_ATTACHMENTS_LEFT = "mail_attachments_left"
     MAIL_STEP_FAILED = "mail_step_failed"
     MAIL_STEP_GONE = "mail_step_gone"
     MAIL_RULE_PERSON_GONE = "mail_rule_person_gone"
@@ -1071,6 +1072,10 @@ TEMPLATES: Mapping[ReasonCode, str] = {
     ReasonCode.MAIL_TOO_LARGE: (
         "the mail '{subject}' has {size:number} MB; Lekto fetches mails of up to {max:number} MB "
         "(LEKTO_UPLOAD_MAX_SIZE)"
+    ),
+    ReasonCode.MAIL_ATTACHMENTS_LEFT: (
+        "only the first {max:number} attachments were taken; not taken: {count:number} (the "
+        "cover letter names them)"
     ),
     ReasonCode.MAIL_STEP_FAILED: (
         "on the server, '{step:thing}' failed for the mail '{subject}': {detail}"

@@ -9947,6 +9947,7 @@ export interface components {
 			| 'mail_password_again'
 			| 'mailbox_paused'
 			| 'mail_too_large'
+			| 'mail_attachments_left'
 			| 'mail_step_failed'
 			| 'mail_step_gone'
 			| 'mail_rule_person_gone'
