@@ -195,7 +195,7 @@ test('a rule is built, dry-run, applied, changed and deleted', async ({ page }) 
 	await expect(page.getByRole('link', { name: 'Version 3' })).toHaveCount(0);
 
 	// Deleted: gone from the list.
-	await page.getByRole('button', { name: `Delete ${NAME} v2` }).click();
+	await page.getByRole('button', { name: `Delete “${NAME} v2”` }).click();
 	await page.getByRole('alertdialog').getByRole('button', { name: 'Delete' }).click();
 	await page.waitForURL('**/ui/rules');
 	await expect(page.getByText(`${NAME} v2`)).toHaveCount(0);

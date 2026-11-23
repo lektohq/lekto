@@ -182,7 +182,7 @@ const FRAMES: Frame[] = [
 	{
 		name: 'question (delete a webhook)',
 		path: () => `/ui/webhooks/${made.webhook}`,
-		open: (page) => page.getByRole('button', { name: new RegExp(`^Delete ${NAME}`) }).click()
+		open: (page) => page.getByRole('button', { name: new RegExp(`^Delete “${NAME}`) }).click()
 	},
 	{
 		name: 'menu (more of a document)',

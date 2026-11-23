@@ -49,7 +49,7 @@ test('every area opens, and the dialogs create things', async ({ page }) => {
 	await page.getByRole('button', { name: 'Create' }).click();
 	await expect(page.getByText(NAME)).toBeVisible();
 	await page.getByRole('button', { name: `Edit ${NAME}` }).click();
-	await page.getByRole('button', { name: `Delete ${NAME}` }).click();
+	await page.getByRole('button', { name: `Delete “${NAME}”` }).click();
 	await page.getByRole('alertdialog').getByRole('button', { name: 'Delete' }).click();
 	await expect(page.getByText(NAME)).toHaveCount(0);
 
@@ -69,7 +69,7 @@ test('every area opens, and the dialogs create things', async ({ page }) => {
 	await page.getByRole('button', { name: 'I have stored it' }).click();
 	await page.waitForURL(/\/ui\/webhooks\/(?!new$)[^/]+$/);
 	// Deleted on its page (web/DESIGN.md: list rows hold no delete).
-	await page.getByRole('button', { name: `Delete ${NAME}` }).click();
+	await page.getByRole('button', { name: `Delete “${NAME}”` }).click();
 	await page.getByRole('alertdialog').getByRole('button', { name: `Delete` }).click();
 	await page.waitForURL('**/ui/webhooks');
 	await expect(page.getByText(NAME)).toHaveCount(0);
@@ -81,7 +81,7 @@ test('every area opens, and the dialogs create things', async ({ page }) => {
 	await page.getByRole('button', { name: 'Create', exact: true }).click();
 	await expect(page.getByTestId('secret')).toContainText('lekto_');
 	await page.getByRole('button', { name: 'I have stored it' }).click();
-	await page.getByRole('button', { name: `Revoke ${NAME}` }).click();
+	await page.getByRole('button', { name: `Revoke “${NAME}”` }).click();
 	await page.getByRole('alertdialog').getByRole('button', { name: 'Revoke' }).click();
 	await expect(page.getByText(NAME)).toHaveCount(0);
 
