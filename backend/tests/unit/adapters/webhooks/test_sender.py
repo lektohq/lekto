@@ -131,7 +131,7 @@ async def test_a_name_that_does_not_resolve_is_refused_like_one_in_the_own_netwo
     (`postgres`, `meilisearch`) and which do not (XB-K02)."""
     network = _Network({})
     response = await _sender(network).send(request("https://hooks.example.org/in", private=False))
-    refused = await _sender(_Network({"ollama": ["172.18.0.4"]})).send(
+    refused = await _sender(_Network({"ollama": ["127.128.129.23"]})).send(
         request("http://ollama:11434/api/pull", private=False)
     )
     assert (response.status_code, response.refused, response.error) == (
