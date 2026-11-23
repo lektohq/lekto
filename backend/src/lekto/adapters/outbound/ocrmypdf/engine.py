@@ -70,6 +70,7 @@ from PIL import Image, ImageSequence, TiffImagePlugin
 
 from lekto.adapters.outbound.http_client import endpoint_of
 from lekto.adapters.outbound.imaging import (
+    DOCUMENT_FORMATS,
     check_pixels,
     flatten_on_white,
     image_dpi,
@@ -409,7 +410,7 @@ def prepare_image(source: Path, prepared: Path) -> tuple[Path, int]:
     pages that Pillow keeps at a byte per pixel, about 8 MB each at A4 and 300 dpi, so holding
     all of them at once took gigabytes."""
     try:
-        with Image.open(source) as image:
+        with Image.open(source, formats=DOCUMENT_FORMATS) as image:
             check_pixels(image)
             dpi = image_dpi(image.size, image.info.get("dpi"))
             if getattr(image, "n_frames", 1) == 1:

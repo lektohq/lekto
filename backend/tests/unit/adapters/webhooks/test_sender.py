@@ -126,11 +126,19 @@ async def test_a_target_with_an_address_that_is_not_public_is_refused(
     assert network.sent == []
 
 
-async def test_a_name_that_does_not_resolve_is_a_failure_not_a_refusal() -> None:
+async def test_a_name_that_does_not_resolve_is_refused_like_one_in_the_own_network() -> None:
+    """Else the log tells someone who may not reach the own network which names exist there
+    (`postgres`, `meilisearch`) and which do not (XB-K02)."""
     network = _Network({})
     response = await _sender(network).send(request("https://hooks.example.org/in", private=False))
-    assert (response.status_code, response.refused) == (None, False)
-    assert response.error
+    refused = await _sender(_Network({"ollama": ["172.18.0.4"]})).send(
+        request("http://ollama:11434/api/pull", private=False)
+    )
+    assert (response.status_code, response.refused, response.error) == (
+        None,
+        True,
+        refused.error,
+    )
     assert network.sent == []
 
 

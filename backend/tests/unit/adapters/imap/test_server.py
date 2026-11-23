@@ -8,7 +8,13 @@ from types import MethodType
 
 import pytest
 
-from lekto.adapters.outbound.imap.server import ImapMailServer, _folders, _guarded, _leave
+from lekto.adapters.outbound.imap.server import (
+    NO_IMAP,
+    ImapMailServer,
+    _folders,
+    _guarded,
+    _leave,
+)
 from lekto.core.domain.mail import MailLogin, MailSecurity
 from lekto.core.domain.reasons import ReasonCode, because
 from lekto.core.ports.mail_server import MailServerError
@@ -136,3 +142,19 @@ def test_a_failed_logout_still_closes_the_connection() -> None:
     imap = Leaving()
     _leave(imap)  # type: ignore[arg-type]
     assert imap.closed
+
+
+def test_a_service_that_is_no_imap_server_is_not_quoted(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A test of a mailbox may name any host and port: what answers there is not shown, it may
+    be any service in the network (XB-K01)."""
+
+    class NotImap(imaplib.IMAP4_SSL):
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            raise imaplib.IMAP4.abort("unexpected response: b'HTTP/1.1 400 Bad Request'")
+
+    monkeypatch.setattr(imaplib, "IMAP4_SSL", NotImap)
+    server = ImapMailServer(timeout=DEFAULT_SETTINGS.mail_timeout)
+    with pytest.raises(MailServerError) as caught:
+        server._connect(LOGIN)
+    assert caught.value.reason == because(ReasonCode.MAIL_SERVER_ERROR, detail=NO_IMAP)
+    assert "HTTP" not in str(caught.value)

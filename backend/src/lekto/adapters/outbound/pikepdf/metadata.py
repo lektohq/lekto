@@ -17,6 +17,7 @@ from typing import BinaryIO
 import pikepdf
 from PIL import ExifTags, Image, UnidentifiedImageError
 
+from lekto.adapters.outbound.imaging import DOCUMENT_FORMATS
 from lekto.core.domain import media_types
 from lekto.core.domain.errors import UnprocessableDocumentError
 from lekto.core.domain.reasons import ReasonCode, because
@@ -115,7 +116,7 @@ def _read_pdf(pdf: pikepdf.Pdf) -> FileMetadata:
 
 def _image(source: Path) -> FileMetadata:
     try:
-        with Image.open(source) as image:
+        with Image.open(source, formats=DOCUMENT_FORMATS) as image:
             dpi = image.info.get("dpi")
             entries: list[MetadataEntry] = []
             exif = image.getexif()

@@ -24,6 +24,7 @@ import pikepdf
 from PIL import ExifTags, Image, ImageOps, ImageSequence
 
 from lekto.adapters.outbound.imaging import (
+    DOCUMENT_FORMATS,
     check_pixels,
     flatten_on_white,
     image_dpi,
@@ -57,7 +58,7 @@ def _count(source: PageSource) -> int:
             return len(pdf.pages)
     if source.media_type in _IMAGES:
         try:
-            with Image.open(source.path) as image:
+            with Image.open(source.path, formats=DOCUMENT_FORMATS) as image:
                 return int(getattr(image, "n_frames", 1))
         except (OSError, Image.DecompressionBombError) as error:
             raise _unreadable_image(error) from None
@@ -131,7 +132,7 @@ def _image_pdf(path: Path) -> pikepdf.Pdf:
     """A PDF of the frames of the image at `path`, one page each."""
     pdf = pikepdf.new()
     try:
-        with Image.open(path) as image:
+        with Image.open(path, formats=DOCUMENT_FORMATS) as image:
             as_is = image.format == "JPEG" and image.mode in ("L", "RGB")
             for frame in ImageSequence.Iterator(image):
                 check_pixels(frame)

@@ -157,11 +157,20 @@ async def test_other_images_are_embedded_without_loss_upright_on_white(
         assert [read.getpixel(spot) for spot in ((12, 6), (12, 5), (0, 6))] == [0, 255, 255]
 
 
+def _gif() -> bytes:
+    buffer = io.BytesIO()
+    Image.new("RGB", (20, 20), "white").save(buffer, "GIF")
+    return buffer.getvalue()
+
+
 @pytest.mark.parametrize(
     ("name", "data", "media_type"),
     [
         ("mail.eml", b"From: a@example.org\r\n\r\nHello\r\n", media_types.EML),
         ("broken.png", b"\x89PNG\r\n\x1a\nbroken", media_types.PNG),
+        # Another format said to be one Lekto takes: Pillow's other decoders are not asked
+        # (XB-K03).
+        ("picture.png", _gif(), media_types.PNG),
     ],
 )
 async def test_what_it_cannot_read_is_unprocessable(

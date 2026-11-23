@@ -19,6 +19,10 @@ MAX_DETAIL = 200
 INBOX = "INBOX"
 
 
+# What a test of a mailbox says when no IMAP server answers at the host and port.
+NO_IMAP = "no IMAP server answered"
+
+
 class ImapMailServer:
     """`timeout` holds for connecting and for every answer. `ssl_context` checks the server's
     certificate (the system's trusted ones unless given)."""
@@ -66,7 +70,11 @@ class ImapMailServer:
             imap = imaplib.IMAP4(login.host, login.port, timeout=self._timeout)
         except ssl.SSLError as error:
             raise MailServerError(_tls_failed(login)) from error
-        except imaplib.IMAP4.error as error:
+        except imaplib.IMAP4.abort as error:
+            # No IMAP greeting (`unexpected response`), or none at all: not the words of what
+            # answered, which may be any service in the network (XB-K01).
+            raise MailServerError(because(ReasonCode.MAIL_SERVER_ERROR, detail=NO_IMAP)) from error
+        except imaplib.IMAP4.error as error:  # an IMAP server's refusal in its greeting (BYE)
             raise MailServerError(_server_error(error)) from error
         except (OSError, EOFError) as error:
             raise MailServerError(because(ReasonCode.MAIL_UNREACHABLE, host=login.host)) from error

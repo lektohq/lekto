@@ -61,7 +61,9 @@ class HttpWebhookSender:
                 if not request.private:
                     try:
                         address = await checked_address(self._resolve, url.raw_host.decode("ascii"))
-                    except NotPublicError:
+                    except NotPublicError, OSError:
+                        # A name that does not resolve too: else the log would tell which names
+                        # the own network has (XB-K02).
                         refused = True
                         raise _RefusedError from None
                     url, headers["Host"], extensions = pinned(url, address)

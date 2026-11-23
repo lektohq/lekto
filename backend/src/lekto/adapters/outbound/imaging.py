@@ -29,6 +29,12 @@ def check_pixels(image: Image.Image) -> None:
         )
 
 
+DOCUMENT_FORMATS = ("JPEG", "PNG", "TIFF")
+"""The decoders a document's image is opened with (`Image.open(..., formats=...)`): those of the
+images Lekto takes (`media_types.SUPPORTED`). Without them Pillow tries each of its plugins in
+turn, and some are old and rarely checked (XB-K03)."""
+
+
 def flatten_on_white(image: Image.Image) -> Image.Image:
     """`image` on white: one with transparency (an alpha channel, or a palette with a
     transparent colour) becomes an RGB copy on white; any other is returned as it is."""
