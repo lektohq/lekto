@@ -52,9 +52,14 @@ test('a webhook is created, tested, changed and deleted', async ({ page }) => {
 	await expect(page.getByText('No deliveries yet.')).toBeVisible();
 	await page.getByRole('button', { name: 'Send test' }).click();
 	await expect(page.getByText(/^Test failed/)).toBeVisible();
-	// A test is sent once: its row says what came of it, the next row why.
-	await expect(page.getByRole('cell', { name: 'Gave up' })).toBeVisible();
-	await expect(page.getByRole('cell', { name: 'cannot connect' })).toBeVisible();
+	// A test is sent once: its row says what came of it, the next row why. The webhook takes
+	// every event, so what else happens in the instance meanwhile has rows of its own here.
+	const sent = page
+		.getByRole('row')
+		.filter({ has: page.getByRole('cell', { name: 'Test', exact: true }) });
+	await expect(sent).toHaveCount(1);
+	await expect(sent.getByRole('cell', { name: 'Gave up' })).toBeVisible();
+	await expect(sent.locator('xpath=following-sibling::tr[1]')).toHaveText(/cannot connect/);
 
 	// Changed on the edit page: the stored header keeps its value, signing stops, a new name.
 	await page.getByRole('link', { name: 'Edit' }).click();
