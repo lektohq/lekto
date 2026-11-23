@@ -1,5 +1,6 @@
 <script lang="ts">
 	import ArrowUp from '@lucide/svelte/icons/arrow-up';
+	import { scrollBehavior } from '#lib/motion.ts';
 	import { formatNumber } from '#lib/i18n.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import { cn } from '#lib/utils.ts';
@@ -16,8 +17,7 @@
 	const counted = $derived(total > 1 && current >= 1);
 
 	function up() {
-		const still = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
-		window.scrollTo({ top: 0, behavior: still ? 'auto' : 'smooth' });
+		window.scrollTo({ top: 0, behavior: scrollBehavior() });
 	}
 </script>
 

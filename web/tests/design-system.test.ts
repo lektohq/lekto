@@ -846,6 +846,19 @@ describe('the design system (web/DESIGN.md)', () => {
 		).toEqual([]);
 	});
 
+	it('asks in one place whether a script may move things', () => {
+		// "Motion": who asked for less motion gets a place at once. A scroll that code starts
+		// takes its behavior from `lib/motion.ts`; nobody writes `smooth` or asks the system.
+		const own = /behavior:\s*'smooth'|\? 'smooth'|prefers-reduced-motion/;
+		expect(own.test("el.scrollIntoView({ block: 'nearest', behavior: 'smooth' })")).toBe(true);
+		expect(own.test('window.scrollTo({ top: 0, behavior: scrollBehavior() })')).toBe(false);
+		expect(
+			[...Object.entries(sources), ...Object.entries(scripts)]
+				.filter(([path, source]) => path !== '/src/lib/motion.ts' && own.test(source))
+				.map(([path]) => path)
+		).toEqual([]);
+	});
+
 	it('writes a moment through formatMoment', () => {
 		// "Formats": one way each. Nobody builds a date with a time of their own.
 		expect(

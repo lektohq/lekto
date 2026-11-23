@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { scrollBehavior } from '#lib/motion.ts';
 	import * as Alert from '#lib/components/ui/alert/index.ts';
 	import LayoutGrid from '@lucide/svelte/icons/layout-grid';
 	import PanelLeftClose from '@lucide/svelte/icons/panel-left-close';
@@ -795,8 +796,7 @@
 		if (!field) return;
 		rowAside = { hidden: false, anchor: window.scrollY };
 		if (desktop.current && window.scrollY > 0) {
-			const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-			window.scrollTo({ top: 0, behavior: still ? 'auto' : 'smooth' });
+			window.scrollTo({ top: 0, behavior: scrollBehavior() });
 		}
 		field.focus({ preventScroll: true });
 	}

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
+	import { reducedMotion } from '#lib/motion.ts';
 	import * as Sheet from '#lib/components/ui/sheet/index.ts';
 	import { cn } from '#lib/utils.ts';
 
@@ -89,7 +90,7 @@
 		}
 		gone = true;
 		offset = sheet?.offsetHeight ?? offset;
-		const still = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+		const still = reducedMotion();
 		window.setTimeout(
 			() => {
 				open = false;

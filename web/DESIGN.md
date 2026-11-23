@@ -1375,7 +1375,8 @@ documents' tools stepping aside ("Sticky heads"), opening sheets and dialogs. No
 A spinner, a pulse of what runs and a turning chevron are `motion-safe:` too (or stop with
 `motion-reduce:transition-none`), and so is the growing or sliding of what opens (a dialog, a
 sheet, a menu, a popover): with reduced motion it only fades. `tests/design-system.test.ts`
-refuses one without.
+refuses one without. A scroll that code starts (to a place on a page, to a step's details, to the top)
+glides only for who did not ask for less motion: its behavior comes from `lib/motion.ts`.
 
 ## App
 

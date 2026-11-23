@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { scrollBehavior } from '#lib/motion.ts';
 	import { formatNumber } from '#lib/i18n.ts';
 	import { cardVariants } from '#lib/components/ui/card/index.ts';
 	import Columns2 from '@lucide/svelte/icons/columns-2';
@@ -192,7 +193,7 @@
 	 * every Beam that revealed a place (Tobi, 11.11.2026). */
 	function scrollOutside(top: number, smooth: boolean) {
 		if (!container) return;
-		const behavior = smooth ? 'smooth' : 'auto';
+		const behavior = smooth ? scrollBehavior() : 'auto';
 		const dialog = container.closest('[role="dialog"]');
 		if (!dialog) {
 			window.scrollBy({ top, behavior });
@@ -260,9 +261,9 @@
 			container.scrollWidth > container.clientWidth + 1 ? x - (seen.left + seen.width / 2) : 0;
 		if (scrollsItself()) {
 			const top = y - (container.getBoundingClientRect().top + container.clientHeight / 3);
-			container.scrollBy({ left, top, behavior: 'smooth' });
+			container.scrollBy({ left, top, behavior: scrollBehavior() });
 		} else {
-			if (left) container.scrollBy({ left, behavior: 'smooth' });
+			if (left) container.scrollBy({ left, behavior: scrollBehavior() });
 			scrollOutside(y - window.innerHeight / 3, true);
 		}
 	}
