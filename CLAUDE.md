@@ -73,7 +73,9 @@ image gets the tags); the tags (version, `beta`/`stable`, `latest`) come from
 `.github/scripts/image_tags.py`
 (`python3 -m unittest discover -s .github/scripts`). For a release that got `latest`, a last job
 tells the homelab its version (`workflow_dispatch` of its `lekto-release.yml`, secrets
-`HOMELAB_DISPATCH_REPO` and `HOMELAB_DISPATCH_TOKEN`; see `deploy/README.md`). The repository carries the version `0.0.0.dev0`.
+`HOMELAB_DISPATCH_REPO` and `HOMELAB_DISPATCH_TOKEN`; see `deploy/README.md`).
+`.github/workflows/site.yml` asks lekto.dev to rebuild (`repository_dispatch` `lekto-release`,
+organization secret `LEKTO_DEV_DISPATCH_TOKEN`), which then shows the new version. The repository carries the version `0.0.0.dev0`.
 Every action in a workflow is pinned to its commit with the version in a comment
 (`uses: actions/checkout@<sha> # v6.1.0`, which Renovate updates); a test in `.github/scripts`
 fails on a tag.
