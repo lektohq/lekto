@@ -125,7 +125,7 @@ async def run_search_evaluation(
             uow, clock, store, index, indexing_policy, embeddings=embeddings
         ),
         search=lambda index, embeddings: SearchService(
-            uow, index, search_policy, embeddings=embeddings
+            uow, clock, index, search_policy, embeddings=embeddings
         ),
     )
     started = datetime.now(UTC)

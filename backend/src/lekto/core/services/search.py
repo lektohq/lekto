@@ -22,7 +22,7 @@ from bisect import bisect_right
 from collections import defaultdict
 from collections.abc import Callable
 from dataclasses import dataclass, replace
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from enum import StrEnum
 
 from lekto.core.domain.document_facts import fact_tokens
@@ -155,19 +155,14 @@ class _OtherLengthError(Exception):
         self.got, self.wanted = got, wanted
 
 
-class _UtcNow:
-    def now(self) -> datetime:
-        return datetime.now(UTC)
-
-
 class SearchService:
     def __init__(
         self,
         uow: UnitOfWorkFactory,
+        clock: Clock,
         index: SearchIndex,
         policy: SearchPolicy,
         embeddings: Embeddings | None = None,
-        clock: Clock | None = None,
         store: ObjectStore | None = None,
     ) -> None:
         """`store`: where the texts and the words of the pages are, for `places`; without it
@@ -177,7 +172,7 @@ class SearchService:
         self._index = index
         self._embeddings = embeddings
         self._policy = policy
-        self._clock: Clock = clock or _UtcNow()
+        self._clock = clock
         self._vectors: dict[str, tuple[datetime, tuple[float, ...]]] = {}
         self._pending: dict[str, asyncio.Task[tuple[float, ...]]] = {}
         self._waiting: dict[str, set[tuple[UserId, str]]] = defaultdict(set)
@@ -486,7 +481,7 @@ def _worth_marking(content: str, matches: list[TextMatch], text: str) -> list[Te
 
 def _best(content: str, matches: list[TextMatch]) -> TextMatch:
     """The first place in the line that holds the most different words of the search."""
-    breaks = [at for at, character in enumerate(content) if character == "\n"]
+    breaks = [found.start() for found in re.finditer("\n", content)]
     by_line: dict[int, set[str]] = defaultdict(set)
     first: dict[int, TextMatch] = {}
     for match in matches:

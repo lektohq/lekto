@@ -270,15 +270,20 @@ class LogoService:
         return None
 
     async def _run(self, job: Job) -> None:
-        if self._fetcher is None:
+        if self._fetcher is None:  # switched off on purpose: no failure to tell the admins of
             log.info("logo not fetched: fetching is off", extra={"job_id": str(job.id)})
-            await self._jobs.end(job, error=FETCHING_OFF)
+            await self._jobs.end(job, result={"skipped": FETCHING_OFF})
             return
         payload = job.payload
         try:
-            domain = payload.get("domain")
+            contact = ContactId(UUID(str(payload["contact_id"])))
+        except (KeyError, ValueError) as error:
+            await self._jobs.invalid(job, error)
+            return
+        domain = payload.get("domain")
+        try:
             await self.fetch(
-                ContactId(UUID(str(payload["contact_id"]))),
+                contact,
                 domain=domain if isinstance(domain, str) else None,
                 asked=bool(payload.get("asked")),
             )

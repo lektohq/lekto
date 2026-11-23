@@ -40,7 +40,9 @@ class Tags:
         return {view.document.id for view in views}
 
     async def searched(self, filter: DocumentFilter) -> set[DocumentId]:
-        search = SearchService(self.setup.world.uow, self.setup.index, builders.SEARCH)
+        search = SearchService(
+            self.setup.world.uow, self.setup.world.clock, self.setup.index, builders.SEARCH
+        )
         page = await search.search(Actor(self.owner.id), "Schreiben", filter)
         return {item.document.id for item in page.items}
 

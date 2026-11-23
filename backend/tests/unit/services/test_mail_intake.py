@@ -16,11 +16,11 @@ from lekto.adapters.outbound.regex import RegexPatternMatcher
 from lekto.core.domain import mail_message
 from lekto.core.domain.condition_tree import Group
 from lekto.core.domain.documents import Channel, Document
-from lekto.core.domain.errors import PermissionDeniedError, ValidationError
+from lekto.core.domain.errors import ConflictError, PermissionDeniedError, ValidationError
 from lekto.core.domain.events import MailboxFetched
 from lekto.core.domain.identifiers import Identifier, IdentifierKind
 from lekto.core.domain.ids import DocumentTypeId, new_id
-from lekto.core.domain.jobs import JobState
+from lekto.core.domain.jobs import JobState, JobStatus
 from lekto.core.domain.mail import (
     Fallback,
     FetchStart,
@@ -43,7 +43,7 @@ from lekto.core.domain.mail_rules import (
 from lekto.core.domain.mail_traits import FlagColor, Importance, MailMarks
 from lekto.core.domain.master_data import DocumentType
 from lekto.core.domain.pipeline import Node
-from lekto.core.domain.reasons import ReasonCode
+from lekto.core.domain.reasons import ReasonCode, because
 from lekto.core.domain.rights import Actor
 from lekto.core.domain.rules import Condition, ConditionField, Operator, RuleScope
 from lekto.core.domain.spaces import SpaceRole
@@ -1203,6 +1203,19 @@ async def test_a_mail_that_cannot_be_taken_is_recorded_as_failed_with_its_rule(
     assert (await _status(world, mailbox)).error is None  # the fetch itself went well
 
 
+async def test_a_type_a_mailbox_files_mail_texts_as_stays(world: World) -> None:
+    """The mailbox's type for the mail text is a use like a field's: deleting the type is
+    refused, not left to the database's foreign key (SB-K09)."""
+    letter = DocumentType.create(name="E-Mail", now=world.clock.now())
+    async with world.uow() as uow:
+        await uow.document_types.add(letter)
+        await uow.commit()
+    admin, _, _ = await _setup(world, body_type_id=letter.id)
+    with pytest.raises(ConflictError) as raised:
+        await world.master_data.delete_document_type(Actor(admin.id), letter.id)
+    assert raised.value.reason == because(ReasonCode.IN_USE, name="E-Mail")
+
+
 async def test_a_rule_whose_space_or_type_is_gone_pauses_with_the_reason(world: World) -> None:
     admin, person, mailbox = await _setup(world)
     household = await world.spaces.create(
@@ -1306,6 +1319,34 @@ async def test_the_worker_start_queues_the_fetch_of_every_enabled_mailbox(world:
         )
     assert [job.dedup_key for job in queued] == [fetch_key(mailbox.id)]  # not the paused one
     assert paused.enabled is False
+
+
+async def test_a_fetch_whose_claim_was_lost_stores_nothing(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Another worker took the job after its lease ran out: what this one found is not stored,
+    and no ConcurrencyError reaches the worker's loop after five tries (SB-K05)."""
+    await _setup(world)
+    service = world.mail_intake()
+    finish = MailIntakeService._finish
+
+    taken: list[Any] = []
+
+    async def overtaken(self: MailIntakeService, job: Any, *args: Any) -> None:
+        async with world.uow() as uow:
+            world.clock.advance(2 * LEASE)
+            taken.append(
+                await uow.jobs.claim(now=world.clock.now(), lease=LEASE, kinds=[FETCH_JOB])
+            )
+            await uow.commit()
+        await finish(self, job, *args)
+
+    monkeypatch.setattr(MailIntakeService, "_finish", overtaken)
+    world.clock.advance(2 * LATER)
+    assert await service.run_next_job()  # ran, and left the job to the other worker
+    async with world.uow() as uow:
+        job = await uow.jobs.get(taken[0].id)
+    assert job.status is JobStatus.RUNNING  # still the other worker's, not completed here
 
 
 async def test_the_job_of_a_deleted_mailbox_ends(world: World) -> None:

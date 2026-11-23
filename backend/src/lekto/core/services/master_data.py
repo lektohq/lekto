@@ -800,11 +800,12 @@ class MasterDataService:
 
     async def delete_document_type(self, actor: Actor, id: DocumentTypeId) -> None:
         async def used(uow: UnitOfWork) -> bool:
+            """By documents, by fields and by mailboxes that file the mail text as it."""
             if await uow.documents.exists(document_type=id):
                 return True
-            return any(
-                id in (field.document_type_ids or ()) for field in await uow.fields.list_all()
-            )
+            if any(id in (field.document_type_ids or ()) for field in await uow.fields.list_all()):
+                return True
+            return any(mailbox.body_type_id == id for mailbox in await uow.mailboxes.list_all())
 
         async def drop_title_rule(uow: UnitOfWork) -> None:
             rule = await _title_rule(uow, id)

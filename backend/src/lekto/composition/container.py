@@ -895,7 +895,7 @@ def build_services(container: Container, settings: Settings | None = None) -> Se
         None
         if index is None
         else SearchService(
-            uow, index, search_policy_of(settings), embeddings=embeddings, clock=clock, store=store
+            uow, clock, index, search_policy_of(settings), embeddings=embeddings, store=store
         )
     )
     return Services(

@@ -41,6 +41,11 @@ def mail_limit(upload_max: int) -> int:
     return upload_max * 4 // 3 + HEADROOM
 
 
+MAX_ATTACHMENTS = 100
+"""The attachments of one letter Lekto makes documents of at most: a mail with more is no
+household's; the others are named in the head of its cover letter, as those it cannot read
+(Tobi, 23.11.2026, SB-K10)."""
+
 SMALL_IMAGE = 20 * 1024
 """An image smaller than this (bytes) is a logo or a signature: left out without a word."""
 SMALL_EDGE = 300
@@ -59,12 +64,24 @@ class Letter:
 
     @property
     def taken(self) -> tuple[MailPart, ...]:
-        return tuple(part for part in self.message.attachments if kept(part) and readable(part))
+        """The attachments Lekto takes: those it can read, the first `MAX_ATTACHMENTS`."""
+        return self._parted[0]
 
     @property
     def left(self) -> tuple[MailPart, ...]:
-        """Attachments Lekto cannot read, named in the head of the cover letter."""
-        return tuple(part for part in self.message.attachments if kept(part) and not readable(part))
+        """Attachments Lekto cannot read or takes no more of, named in the head of the cover
+        letter, in the mail's order."""
+        return self._parted[1]
+
+    @property
+    def _parted(self) -> tuple[tuple[MailPart, ...], tuple[MailPart, ...]]:
+        taken: list[MailPart] = []
+        left: list[MailPart] = []
+        for part in self.message.attachments:
+            if kept(part):
+                fits = len(taken) < MAX_ATTACHMENTS and readable(part)
+                (taken if fits else left).append(part)
+        return tuple(taken), tuple(left)
 
 
 def readable(part: MailPart) -> bool:

@@ -292,7 +292,7 @@ class MailIntakeService:
                     )
                 await uow.commit()
 
-        await retrying(store, attempts=STORE_ATTEMPTS, backoff=True)
+        await self._jobs.storing(job, store)
 
     async def _folder(
         self, session: MailSession, mailbox: Mailbox, folder: str, count: _Count
