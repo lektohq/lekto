@@ -1,6 +1,7 @@
 """Webhooks and the log of their deliveries."""
 
 from datetime import datetime, timedelta
+from typing import Any, Self
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -253,7 +254,7 @@ class WebhookOut(BaseModel):
     updated_at: datetime
 
     @classmethod
-    def of(cls, webhook: Webhook) -> WebhookOut:
+    def of(cls, webhook: Webhook, **more: Any) -> Self:
         reason = webhook.disabled_reason
         return cls(
             id=webhook.id,
@@ -274,6 +275,7 @@ class WebhookOut(BaseModel):
             previous_secret_valid_until=webhook.previous_valid_until,
             created_at=webhook.created_at,
             updated_at=webhook.updated_at,
+            **more,
         )
 
 
@@ -289,7 +291,7 @@ class WebhookCreated(WebhookOut):
 
     @classmethod
     def created(cls, created: CreatedWebhook) -> WebhookCreated:
-        return cls(**WebhookOut.of(created.webhook).model_dump(), secret=created.secret)
+        return cls.of(created.webhook, secret=created.secret)
 
 
 class DeliveryOut(BaseModel):

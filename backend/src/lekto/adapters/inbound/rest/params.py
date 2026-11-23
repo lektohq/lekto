@@ -97,7 +97,7 @@ def _fact(written: str, refs: RefCipher) -> FactCriterion:
     if kind and kind not in IdentifierKind:
         raise ValidationError(because(ReasonCode.FACT_KIND_UNKNOWN, kind=kind))
     if role and role not in FactRole:
-        raise ValidationError(because(ReasonCode.FACT_KIND_UNKNOWN, kind=role))
+        raise ValidationError(because(ReasonCode.FACT_ROLE_UNKNOWN, role=role))
     return fact_criterion(
         refs,
         IdentifierKind(kind) if kind else None,

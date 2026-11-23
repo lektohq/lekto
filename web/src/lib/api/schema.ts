@@ -3076,7 +3076,7 @@ export interface paths {
 		};
 		/**
 		 * The decisions behind a number of the holders
-		 * @description Admins only. The decisions behind one number of `GET /holders`: measured by the holders of `measure` (a kind with a holder) or by the `recommendation`, with `outcome` (a column), at most a hundred, each with the confirmed documents of its contact that show it.
+		 * @description Admins only. The decisions behind one number of `GET /holders`: measured by the holders of `measure` (a kind with a holder) or by the `recommendation`, with `outcome` (a column), at most 100, each with the confirmed documents of its contact that show it.
 		 */
 		get: operations['holder_cases_api_v1_automation_holders_cases_get'];
 		put?: never;
@@ -5256,7 +5256,7 @@ export interface components {
 			description: string | null;
 			/**
 			 * Title Pattern
-			 * @example Lohn {document_date:YYYY-MM}
+			 * @example Lohn {{ document_date | date: '%Y-%m' }}
 			 */
 			title_pattern: string | null;
 			/**
@@ -6364,7 +6364,7 @@ export interface components {
 		HolderCasesOut: {
 			/**
 			 * Cases
-			 * @description At most a hundred.
+			 * @description At most 100.
 			 */
 			cases: components['schemas']['HolderCaseOut'][];
 		};
@@ -9829,6 +9829,7 @@ export interface components {
 			| 'not_customer_number'
 			| 'not_of_kind'
 			| 'fact_kind_unknown'
+			| 'fact_role_unknown'
 			| 'fact_not_in_text'
 			| 'fact_not_asked'
 			| 'holder_not_listed'

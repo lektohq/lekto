@@ -358,8 +358,7 @@ async def create_token(
         body.chosen(),
         expires_at=None if body.expires_at is None else to_utc(body.expires_at, "expires_at"),
     )
-    out = TokenOut.of(token, admin=principal.user.is_active_admin)
-    return TokenCreated(**out.model_dump(), token=value)
+    return TokenCreated.of(token, admin=principal.user.is_active_admin, token=value)
 
 
 @router.delete(

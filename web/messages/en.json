@@ -2223,6 +2223,7 @@
 	"facts_state_rejected": "rejected",
 	"reason_not_of_kind": "{kind}: “{value}” is not valid",
 	"reason_fact_kind_unknown": "“{kind}” is no kind of fact Lekto knows",
+	"reason_fact_role_unknown": "“{role}” is no role of a fact Lekto knows",
 	"reason_fact_not_in_text": "“{value}” does not appear in the text",
 	"reason_relation_exists": "the documents are related already",
 	"reason_relation_not_found": "the documents are not related",

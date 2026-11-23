@@ -278,6 +278,12 @@ async def test_documents_are_found_by_their_facts(facts_api: Api) -> None:
     assert await listed("letter_date:15.08.2026 10:30:") == []  # a value may hold colons
     unknown = await api.client.get(DOCUMENTS, params={"fact": "bogus::"}, headers=auth(owner))
     assert (unknown.status_code, unknown.json()["reason"]["code"]) == (422, "fact_kind_unknown")
+    # A role it does not know is no kind either (RB-K06).
+    role = await api.client.get(DOCUMENTS, params={"fact": "::boss"}, headers=auth(owner))
+    assert (role.status_code, role.json()["reason"]) == (
+        422,
+        {"code": "fact_role_unknown", "params": {"role": "boss"}},
+    )
     # The value as written, or a reference of another kind, names nothing.
     invoice = await ref("invoice_number", "R-1001")
     for fact in ("invoice_number:R1001:", f"customer_number:{invoice}:"):

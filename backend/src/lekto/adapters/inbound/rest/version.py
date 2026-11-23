@@ -10,5 +10,5 @@ that only adds. The path stays `/api/v1` during the beta.
 (`tests/unit/test_api_version.py`): a test fails while the API changed and the version did not.
 """
 
-API_VERSION = "0.7"
-FINGERPRINT = "3db58d2345ca15594d7e35e7f379d3ce448381a527b92a99a1e9449f43a06efe"
+API_VERSION = "0.8"
+FINGERPRINT = "c42425ff9b3c710d40ba17898709fb5b352c3a750c72a2f49202450cff3b6a86"

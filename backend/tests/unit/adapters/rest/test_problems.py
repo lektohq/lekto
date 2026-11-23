@@ -5,6 +5,8 @@ import importlib
 import pkgutil
 from uuid import UUID, uuid4
 
+import pytest
+
 import lekto.adapters
 import lekto.core
 from lekto.adapters.inbound.rest import PREFIX
@@ -87,6 +89,21 @@ async def test_an_unexpected_error_is_marked_like_every_answer(api: Api) -> None
     assert response.headers["cache-control"] == "no-store"
     assert response.headers["x-content-type-options"] == "nosniff"
     assert response.headers["referrer-policy"] == "no-referrer"
+
+
+async def test_an_unexpected_error_is_logged_with_its_request(
+    api: Api, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Method and path, without the query: which request broke (RB-K08)."""
+
+    async def broken() -> None:
+        raise RuntimeError("broken")
+
+    api.app.add_api_route(f"{PREFIX}/broken", broken, methods=["POST"])
+    async with api.new_client(raise_app_exceptions=False) as client:
+        await client.post(f"{PREFIX}/broken?secret=1")
+    (record,) = [item for item in caplog.records if item.getMessage() == "request failed"]
+    assert (vars(record)["method"], vars(record)["path"]) == ("POST", f"{PREFIX}/broken")
 
 
 async def test_a_number_beyond_what_the_database_holds_is_a_422(api: Api) -> None:

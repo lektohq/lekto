@@ -340,6 +340,7 @@ class ReasonCode(StrEnum):
     NOT_CUSTOMER_NUMBER = "not_customer_number"
     NOT_OF_KIND = "not_of_kind"
     FACT_KIND_UNKNOWN = "fact_kind_unknown"
+    FACT_ROLE_UNKNOWN = "fact_role_unknown"
     FACT_NOT_IN_TEXT = "fact_not_in_text"
     FACT_NOT_ASKED = "fact_not_asked"
     HOLDER_NOT_LISTED = "holder_not_listed"
@@ -878,6 +879,7 @@ TEMPLATES: Mapping[ReasonCode, str] = {
     ReasonCode.NOT_IBAN: "'{value}' is not a valid IBAN",
     ReasonCode.NOT_VAT_ID: "'{value}' is not a VAT number",
     ReasonCode.FACT_KIND_UNKNOWN: "'{kind}' is no kind of fact Lekto knows",
+    ReasonCode.FACT_ROLE_UNKNOWN: "'{role}' is no role of a fact Lekto knows",
     ReasonCode.FACT_NOT_IN_TEXT: "'{value}' does not appear in the text",
     ReasonCode.FACT_NOT_ASKED: "a fact '{kind}' in the role '{role}' was not asked for",
     ReasonCode.HOLDER_NOT_LISTED: "'{value}' was not among the numbers asked about",

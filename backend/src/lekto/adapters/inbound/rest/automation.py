@@ -21,7 +21,7 @@ from lekto.core.domain.documents import Channel
 from lekto.core.domain.holder_evaluation import HolderOutcome
 from lekto.core.domain.identifiers import IdentifierKind
 from lekto.core.domain.rights import TokenRight
-from lekto.core.services.automation import ALL_MONTHS, DEFAULT_CHANNELS, Period
+from lekto.core.services.automation import ALL_MONTHS, DEFAULT_CHANNELS, MAX_CASES, Period
 
 SYSTEM_AREA = area(TokenRight.SYSTEM_READ, TokenRight.SYSTEM_WRITE)
 router = APIRouter(
@@ -135,7 +135,7 @@ async def holders(user: CurrentUser, context: Context) -> HoldersOut:
     description=(
         ADMINS_ONLY + " The decisions behind one number of `GET /holders`: measured by the "
         "holders of `measure` (a kind with a holder) or by the `recommendation`, with "
-        "`outcome` (a column), at most a hundred, each with the confirmed documents of its "
+        f"`outcome` (a column), at most {MAX_CASES}, each with the confirmed documents of its "
         "contact that show it."
     ),
     response_model=HolderCasesOut,

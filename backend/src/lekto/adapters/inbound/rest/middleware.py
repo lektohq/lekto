@@ -89,9 +89,9 @@ class NoStore:
     API names no address to the links in it), also errors and redirects: the API's answers are
     personal (documents, users, logs) and some carry CSRF tokens, TOTP secrets, recovery codes
     and API tokens, which no browser or proxy cache may keep. `public` names the paths below
-    the prefix that are not personal (health, the API description). On `cacheable` paths, a
-    successful answer keeps the `Cache-Control` its route gives (a logo with its version in the
-    URL); every other answer there is marked as well."""
+    the prefix that are not personal (health, the API description): they are only `nosniff`.
+    On `cacheable` paths, a successful answer keeps the `Cache-Control` its route gives (a logo
+    with its version in the URL); every other answer there is marked as well."""
 
     def __init__(
         self,
@@ -108,12 +108,19 @@ class NoStore:
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         path = scope.get("path", "")
-        if (
-            scope["type"] != "http"
-            or not (path == self._prefix or path.startswith(self._prefix + "/"))
-            or path in self._public
+        if scope["type"] != "http" or not (
+            path == self._prefix or path.startswith(self._prefix + "/")
         ):
             await self._app(scope, receive, send)
+            return
+        if path in self._public:  # not personal, but not to be sniffed either (RB-K09)
+
+            async def unsniffed(message: Message) -> None:
+                if message["type"] == "http.response.start":
+                    MutableHeaders(scope=message)["X-Content-Type-Options"] = "nosniff"
+                await send(message)
+
+            await self._app(scope, receive, unsniffed)
             return
         cacheable = scope["method"] in ("GET", "HEAD") and any(
             pattern.fullmatch(path) for pattern in self._cacheable

@@ -1,7 +1,7 @@
 """Sign-in and the caller's own account: password, TOTP, sessions, API tokens, provider links."""
 
 from datetime import datetime
-from typing import Annotated, Literal, Self
+from typing import Annotated, Any, Literal, Self
 from uuid import UUID
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, SecretStr, model_validator
@@ -9,6 +9,8 @@ from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, SecretStr, mod
 from lekto.adapters.inbound.schemas import RequestBody
 from lekto.core.domain.identity import (
     MAX_TOKEN_NAME,
+    PASSWORD_MAX_LENGTH,
+    PASSWORD_MIN_LENGTH,
     ApiToken,
     ExternalIdentity,
     LoginMethod,
@@ -76,7 +78,7 @@ class UserOut(BaseModel):
         )
 
     @classmethod
-    def of(cls, user: User, *, personal_space: SpaceId | None = None) -> UserOut:
+    def of(cls, user: User, *, personal_space: SpaceId | None = None, **more: Any) -> Self:
         return cls(
             id=user.id,
             username=user.username,
@@ -85,6 +87,7 @@ class UserOut(BaseModel):
             role=user.role,
             active=user.active,
             created_at=user.created_at,
+            **more,
         )
 
 
@@ -184,7 +187,9 @@ class PasswordChange(RequestBody):
     )
 
     current_password: Password
-    new_password: Password = Field(description="12 to 256 characters, not the username.")
+    new_password: Password = Field(
+        description=f"{PASSWORD_MIN_LENGTH} to {PASSWORD_MAX_LENGTH} characters, not the username."
+    )
     revoke_tokens: bool = Field(
         default=False, description="Also revoke all API tokens. Other sessions end anyway."
     )
@@ -278,7 +283,7 @@ class TokenOut(BaseModel):
     last_used_at: datetime | None
 
     @classmethod
-    def of(cls, token: ApiToken, *, admin: bool) -> TokenOut:
+    def of(cls, token: ApiToken, /, *, admin: bool, **more: Any) -> Self:
         """`token` of a user who is an admin or not (whose presets carry the admin rights)."""
         return cls(
             id=token.id,
@@ -288,6 +293,7 @@ class TokenOut(BaseModel):
             created_at=token.created_at,
             expires_at=token.expires_at,
             last_used_at=token.last_used_at,
+            **more,
         )
 
 

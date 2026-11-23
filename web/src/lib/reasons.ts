@@ -382,6 +382,7 @@ export const REASONS: Record<Exclude<ReasonCode, 'text' | 'error'>, ReasonEntry>
 	not_customer_number: entry(m.reason_not_customer_number, { min: 'number', max: 'number' }),
 	not_of_kind: entry(m.reason_not_of_kind, { kind: 'identifier_kind' }),
 	fact_kind_unknown: entry(m.reason_fact_kind_unknown),
+	fact_role_unknown: entry(m.reason_fact_role_unknown),
 	fact_not_in_text: entry(m.reason_fact_not_in_text),
 	relation_exists: entry(m.reason_relation_exists),
 	relation_not_found: entry(m.reason_relation_not_found),

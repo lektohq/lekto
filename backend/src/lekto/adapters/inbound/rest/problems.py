@@ -122,7 +122,12 @@ def install(app: FastAPI) -> None:
     async def unexpected_error(request: Request, error: Exception) -> JSONResponse:
         # Details stay in the server log; the client learns only that something broke. The
         # answer passes no middleware: it marks itself as `NoStore` would (RB-03).
-        log.error("request failed", exc_info=error)
+        # Which request broke, without its query (it may carry a value, RB-K08).
+        log.error(
+            "request failed",
+            exc_info=error,
+            extra={"method": request.method, "path": request.url.path},
+        )
         return problem(500, PROBLEMS[500][1], headers=PRIVATE_HEADERS)
 
     for kind, _ in STATUSES:

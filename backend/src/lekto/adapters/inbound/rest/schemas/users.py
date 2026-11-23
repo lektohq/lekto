@@ -9,6 +9,7 @@ from lekto.adapters.inbound.problems import BlockingSpaceOut
 from lekto.adapters.inbound.rest.schemas.account import LinkOut, Password, UserOut
 from lekto.adapters.inbound.rest.schemas.common import each_once
 from lekto.adapters.inbound.schemas import RequestBody
+from lekto.core.domain.identity import PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH
 from lekto.core.domain.ids import SpaceId, UserId
 from lekto.core.domain.users import MAX_DISPLAY_NAME, MAX_USERNAME, Role, Settle, Settlement
 from lekto.core.domain.validation import MAX_REFERENCES
@@ -29,7 +30,11 @@ class UserCreate(RequestBody):
     )
     role: Role = Role.USER
     password: Password | None = Field(
-        default=None, description="Optional; 12 to 256 characters, not the username."
+        default=None,
+        description=(
+            f"Optional; {PASSWORD_MIN_LENGTH} to {PASSWORD_MAX_LENGTH} characters, not the "
+            "username."
+        ),
     )
 
 

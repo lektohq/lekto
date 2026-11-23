@@ -394,7 +394,7 @@ class DocumentTypePatch(RequestBody):
 
 class DocumentTypeOut(MasterDataOut):
     description: str | None = Field(examples=["Entgeltbescheinigung"])
-    title_pattern: str | None = Field(examples=["Lohn {document_date:YYYY-MM}"])
+    title_pattern: str | None = Field(examples=["Lohn {{ document_date | date: '%Y-%m' }}"])
     group_ids: list[UUID] = Field(description="The document type groups it is in.")
     icon: str | None = Field(description="The name of a Lucide icon.", examples=["receipt"])
     relation_target: bool = Field(

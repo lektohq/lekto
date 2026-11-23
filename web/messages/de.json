@@ -2223,6 +2223,7 @@
 	"facts_state_rejected": "verworfen",
 	"reason_not_of_kind": "{kind}: „{value}“ ist nicht gültig",
 	"reason_fact_kind_unknown": "„{kind}“ ist keine Art von Fakt, die Lekto kennt",
+	"reason_fact_role_unknown": "„{role}“ ist keine Rolle eines Fakts, die Lekto kennt",
 	"reason_fact_not_in_text": "„{value}“ steht nicht im Text",
 	"reason_relation_exists": "die Dokumente sind schon verbunden",
 	"reason_relation_not_found": "die Dokumente sind nicht verbunden",

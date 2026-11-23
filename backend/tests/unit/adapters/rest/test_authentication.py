@@ -455,6 +455,8 @@ async def test_auth_answers_are_not_stored(api: Api) -> None:
         public = await api.client.get(PREFIX + path)
         assert public.status_code == 200
         assert "cache-control" not in public.headers, path
+        # Not personal, but not sniffed either (RB-K09).
+        assert public.headers["x-content-type-options"] == "nosniff", path
 
 
 async def test_token_expiry_may_have_any_offset(api: Api) -> None:
