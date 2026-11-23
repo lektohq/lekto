@@ -34,7 +34,7 @@ signs out. `areas.spec.ts` signs in as that admin (without a second factor), ope
 without a console error (a CSP violation is one) and creates and removes a contact, a space, a
 webhook and an API token; `webhooks.spec.ts` creates a webhook on its page, tests, changes and
 deletes it; `rules.spec.ts` does the same with a rule; `layout.spec.ts` measures every area and
-every frame at three widths against the layout rules of `DESIGN.md` ("Enforcement"), with data
+every frame at four widths against the layout rules of `DESIGN.md` ("Enforcement"), with data
 of its own; a worker beside the API takes its document out of processing; `texts.spec.ts` reads
 what the libraries say on a German page (a date field with its calendar, a toast) and fails on
 their English defaults. CI runs these two for every pull request that touches `web/` (job

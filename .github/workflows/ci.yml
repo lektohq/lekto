@@ -305,7 +305,7 @@ jobs:
       - run: ${{ matrix.run }}
 
   # The layout rules of web/DESIGN.md in a browser (web/tests/e2e/layout.spec.ts): every area and
-  # every frame at three widths, with data the spec creates. The built UI behind an API and a
+  # every frame at four widths, with data the spec creates. The built UI behind an API and a
   # worker of its own, with SQLite and the filesystem and secrets made here; the worker takes
   # the spec's document out of processing (without the OCR programs it fails, which is a state
   # as any). Chromium is the one of the Playwright version the lock file pins. Only for a pull

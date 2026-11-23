@@ -1,5 +1,5 @@
-// The layout rules of web/DESIGN.md in a browser, for every area at a phone's, a laptop's and a
-// desktop's width: nothing scrolls sideways, every control is a finger's size on the phone (44
+// The layout rules of web/DESIGN.md in a browser, for every area at the narrowest width a page
+// must reflow to, a phone's, a laptop's and a desktop's: nothing scrolls sideways, every control is a finger's size on the phone (44
 // pixels, a larger invisible hit area counts) and at least 24 pixels wider, and no page logs an
 // error. Every area, with something in it: the spec creates what the pages show (a contact, a
 // type with a title pattern, a tag, a rule, a webhook, a paused mailbox, a document) and
@@ -74,10 +74,13 @@ function madePaths(): string[] {
 	];
 }
 
+// The narrowest: 320 px is what a page must reflow to without scrolling sideways (WCAG 1.4.10),
+// a small phone or a larger one zoomed in.
 const WIDTHS = [
-	{ name: 'phone', width: 390, height: 844, target: 44 },
-	{ name: 'laptop', width: 1024, height: 768, target: 24 },
-	{ name: 'desktop', width: 1440, height: 900, target: 24 }
+	{ name: 'narrow', width: 320, height: 640, target: 44, phone: true },
+	{ name: 'phone', width: 390, height: 844, target: 44, phone: true },
+	{ name: 'laptop', width: 1024, height: 768, target: 24, phone: false },
+	{ name: 'desktop', width: 1440, height: 900, target: 24, phone: false }
 ];
 
 /** What sticks out of `root` sideways (the page, or a frame open above it), and its controls
@@ -278,7 +281,7 @@ for (const size of WIDTHS) {
 	test(`every area holds the layout rules at ${size.width} px`, async ({ browser }) => {
 		const context = await browser.newContext({
 			viewport: { width: size.width, height: size.height },
-			hasTouch: size.name === 'phone'
+			hasTouch: size.phone
 		});
 		const page = await context.newPage();
 		const problems: string[] = [];
@@ -305,7 +308,7 @@ for (const size of WIDTHS) {
 		}
 		// What a page opens above itself: the frame alone, the page behind it was measured.
 		for (const frame of FRAMES) {
-			if (frame.phone && size.name !== 'phone') continue;
+			if (frame.phone && !size.phone) continue;
 			await page.goto(frame.path());
 			await page.waitForLoadState('networkidle');
 			await frame.open(page);

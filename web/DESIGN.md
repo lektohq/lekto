@@ -25,7 +25,8 @@ address.
    the one accent: primary actions, links, focus. Lane colours mean state, nothing else.
 4. **State is never colour alone.** A lane, a deadline or a check always shows an icon and a word
    as well.
-5. **The phone is a first-class screen.** Every page works at 390 px without sideways scrolling.
+5. **The phone is a first-class screen.** Every page works at 390 px without sideways scrolling,
+   and reflows down to 320 px (a small phone, or a larger one zoomed in).
    Targets are 44 px. Nothing depends on hover.
 6. **Same thing, same look, same place.** The same action has the same name, the same component
    and the same position on every page.
@@ -1714,7 +1715,7 @@ LayerChart stand here without one: no rule reaches into a shadow root or `app.cs
 
   Their lists of exceptions may only shrink.
 
-- **Layout spec** (Playwright, `tests/e2e/layout.spec.ts`): every area at 390, 1024 and 1440 px.
+- **Layout spec** (Playwright, `tests/e2e/layout.spec.ts`): every area at 320, 390, 1024 and 1440 px.
   No horizontal overflow, 44 px targets on the phone and 24 px wider (a larger invisible hit area
   counts), no console error. It creates what the pages show (a contact, a type with a title
   pattern, a tag, a rule, a webhook, a paused mailbox, a document) and deletes it again, visits

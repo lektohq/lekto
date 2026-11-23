@@ -456,8 +456,10 @@
 				class="max-sm:w-full"
 			/>
 		{/if}
-		<!-- Search, help and adding wrap as one, under the source where the row is narrow. -->
-		<div class="flex min-w-72 flex-1 items-center gap-2">
+		<!-- Search, help and adding wrap as one, under the source where the row is narrow. On a
+		     phone they take the row's width, whatever it is: a width of their own (288 px) stuck
+		     out of the card at 320 px, and the page scrolled sideways. -->
+		<div class="flex min-w-0 flex-1 items-center gap-2 max-sm:basis-full sm:min-w-72">
 			<SearchField bind:value={query} label={m.identifier_search()} class="flex-1" />
 			{#if hint}<InfoHint text={hint} about={m.master_identifiers()} />{/if}
 			{#if phone.current}
