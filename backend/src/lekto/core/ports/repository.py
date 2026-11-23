@@ -53,6 +53,7 @@ from lekto.core.domain.ids import (
     UserId,
     WebhookId,
     ends_with,
+    id_reference,
 )
 from lekto.core.domain.inbox import Confirmation, InboxTab
 from lekto.core.domain.lenses import Lens
@@ -267,6 +268,8 @@ class DocumentFilter:
         ):
             if chosen is not None and not chosen:
                 raise ValueError(f"a set of {name} in a filter is never empty")
+        if self.ids is not None and any(id_reference(item) != item for item in self.ids):
+            raise ValueError("an id in a filter is a short id or the whole one (`id_reference`)")
 
     def matches(self, view: FilterView) -> bool:
         """Whether a document (as `view` shows it) matches; for the core and the in-memory

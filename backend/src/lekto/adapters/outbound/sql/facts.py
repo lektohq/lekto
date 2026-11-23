@@ -29,9 +29,6 @@ from lekto.core.domain.open_identifiers import Sighting
 
 type Key = tuple[IdentifierKind, str]
 
-_BATCH = 500
-"""Documents per query of `of_documents` (the parameters of an `IN`)."""
-
 
 class SqlDocumentFactRepository:
     def __init__(self, transaction: Transaction) -> None:
@@ -48,8 +45,8 @@ class SqlDocumentFactRepository:
         table = t.document_facts
         found: dict[DocumentId, list[DocumentFact]] = {}
         ids = list(documents)
-        for start in range(0, len(ids), _BATCH):
-            chunk = ids[start : start + _BATCH]
+        for start in range(0, len(ids), KEYS_PER_QUERY):
+            chunk = ids[start : start + KEYS_PER_QUERY]
             for row in await self._tx.read(select(table).where(table.c.document_id.in_(chunk))):
                 found.setdefault(DocumentId(row.document_id), []).append(_fact(row))
         return {id: sorted(facts, key=reading_order) for id, facts in found.items()}

@@ -122,6 +122,22 @@ class TestPostgresMigrations(MigrationSuite):
 # --- events of transactions that commit out of order ---------------------------------------------
 
 
+async def test_a_connection_the_database_dropped_is_replaced_before_use(
+    database: Database, uow_factory: UnitOfWorkFactory
+) -> None:
+    """After a restart of Postgres the pool holds dead connections: the next request gets a
+    new one, not an error (SQ-K07)."""
+    async with database.engine.connect() as pooled:  # back in the pool afterwards
+        pid = (await pooled.execute(select(func.pg_backend_pid()))).scalar_one()
+    killer = await database.connect_raw()  # outside the pool
+    try:
+        assert await killer.fetchval("SELECT pg_terminate_backend($1)", pid)
+    finally:
+        await killer.close()
+    async with uow_factory() as uow:
+        assert await uow.users.find_by_username("nobody") is None
+
+
 async def test_an_event_written_first_but_committed_last_is_not_skipped(
     uow_factory: UnitOfWorkFactory,
     event_bus_factory: Callable[[], EventBus],

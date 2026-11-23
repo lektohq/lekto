@@ -104,7 +104,6 @@ user_identifiers = Table(
     Column("user_id", Uuid, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
     Column("kind", Text, primary_key=True),
     Column("value", Text, primary_key=True),
-    Index("ix_user_identifiers_kind_value", "kind", "value"),
 )
 
 # Identifiers suggested as a user's that a person declined (`Profile.declined`).

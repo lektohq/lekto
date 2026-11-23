@@ -114,9 +114,7 @@ class SqlDocumentRepository(SqlRepository[DocumentId, Document]):
         limit: int,
         offset: int = 0,
     ) -> list[Document]:
-        return await self._query(
-            [visible_to(user)], filter, order=order, after=after, limit=limit, offset=offset
-        )
+        return await self._query(user, filter, order=order, after=after, limit=limit, offset=offset)
 
     async def query(
         self,
@@ -127,12 +125,10 @@ class SqlDocumentRepository(SqlRepository[DocumentId, Document]):
         limit: int,
         offset: int = 0,
     ) -> list[Document]:
-        return await self._query([], filter, order=order, after=after, limit=limit, offset=offset)
+        return await self._query(None, filter, order=order, after=after, limit=limit, offset=offset)
 
     async def count(self, filter: DocumentFilter, user: UserId | None) -> int:
-        documents = t.documents
-        criteria = [*([] if user is None else [visible_to(user)]), *_matching(filter)]
-        statement = select(func.count()).select_from(documents).where(*criteria)
+        statement = select(func.count()).select_from(t.documents).where(*_criteria(user, filter))
         return int((await self._tx.read(statement)).scalar_one())
 
     async def count_grouped(
@@ -145,10 +141,9 @@ class SqlDocumentRepository(SqlRepository[DocumentId, Document]):
             FacetBy.TOPIC: documents.c.topic_id,
             FacetBy.DOCUMENT_DATE: documents.c.document_date,
         }[by]
-        criteria = [*([] if user is None else [visible_to(user)]), *_matching(filter)]
         statement = (
             select(column.label("key"), func.count().label("documents"))
-            .where(*criteria)
+            .where(*_criteria(user, filter))
             .group_by(column)
         )
         rows = (await self._tx.read(statement)).all()
@@ -156,7 +151,7 @@ class SqlDocumentRepository(SqlRepository[DocumentId, Document]):
 
     async def count_by(self, by: CountBy, user: UserId | None) -> dict[UUID, int]:
         documents = t.documents
-        criteria: list[ColumnElement[bool]] = [] if user is None else [visible_to(user)]
+        criteria = _criteria(user)
         column: ColumnElement[Any]
         source: FromClause = documents
 
@@ -196,9 +191,7 @@ class SqlDocumentRepository(SqlRepository[DocumentId, Document]):
         """One query per `KEYS_PER_QUERY` keys: each a count of the distinct documents among the
         rows of the key's tags."""
         documents, tags = t.documents, t.document_tags
-        criteria: list[ColumnElement[bool]] = [] if user is None else [visible_to(user)]
-        if filter is not None:
-            criteria += _matching(filter)
+        criteria = _criteria(user, filter)
         keys = list(sets)
         counts: dict[UUID, int] = {}
         for start in range(0, len(keys), KEYS_PER_QUERY):
@@ -222,7 +215,7 @@ class SqlDocumentRepository(SqlRepository[DocumentId, Document]):
 
     async def _query(
         self,
-        criteria: list[ColumnElement[bool]],
+        user: UserId | None,
         filter: DocumentFilter,
         *,
         order: DocumentOrder,
@@ -241,9 +234,9 @@ class SqlDocumentRepository(SqlRepository[DocumentId, Document]):
             ).scalar_one_or_none()
             numeric = kind in {FieldType.NUMBER, FieldType.AMOUNT}
         sorting, behind = _sorting(order, after, numeric=numeric)
+        criteria = _criteria(user, filter)
         if behind is not None:
             criteria.append(behind)
-        criteria.extend(_matching(filter))
         rows = (
             await self._tx.read(
                 select(documents).where(*criteria).order_by(*sorting).offset(offset).limit(limit)
@@ -593,6 +586,17 @@ def _iso(value: datetime | None) -> str | None:
 
 def _from_iso(value: str | None) -> datetime | None:
     return None if value is None else datetime.fromisoformat(value)
+
+
+def _criteria(
+    user: UserId | None, filter: DocumentFilter | None = None
+) -> list[ColumnElement[bool]]:
+    """What a document must meet: one `user` may read (None: any) that matches `filter`; the
+    same for every query and count of documents."""
+    return [
+        *([] if user is None else [visible_to(user)]),
+        *([] if filter is None else _matching(filter)),
+    ]
 
 
 def _matching(filter: DocumentFilter) -> list[ColumnElement[bool]]:

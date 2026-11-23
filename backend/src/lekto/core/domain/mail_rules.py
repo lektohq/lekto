@@ -34,7 +34,7 @@ from lekto.core.domain.condition_tree import Group, check_limits, group_from_jso
 from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.ids import DocumentTypeId, MailboxId, MailRuleId, SpaceId, UserId, new_id
 from lekto.core.domain.json_value import JsonObject, JsonValue, require_object
-from lekto.core.domain.mail import MAX_FOLDER, MailAction, MailStep, check_steps
+from lekto.core.domain.mail import MAX_FOLDER, MailAction, MailStep, check_steps, step_to_json
 from lekto.core.domain.mail_intake import MailDecision, MailParts, MailRecord, letters
 from lekto.core.domain.mail_message import MailMessage, address_texts
 from lekto.core.domain.mail_traits import (
@@ -178,13 +178,7 @@ def conditions_from_json(data: JsonValue) -> MailConditions | None:
 
 def steps_to_json(steps: tuple[MailStep, ...]) -> list[JsonValue]:
     """The steps in the JSON form a rule's are stored in."""
-    found: list[JsonValue] = []
-    for step in steps:
-        data: JsonObject = {"action": step.action.value}
-        if step.value is not None:
-            data["value"] = step.value
-        found.append(data)
-    return found
+    return [step_to_json(step) for step in steps]
 
 
 def steps_from_json(data: JsonValue) -> tuple[MailStep, ...]:

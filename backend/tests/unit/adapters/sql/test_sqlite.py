@@ -6,8 +6,10 @@ from decimal import Decimal
 import pytest
 from sqlalchemy import text
 
-from lekto.adapters.outbound.sql import Database
+from lekto.adapters.outbound.sql import Database, SqlUnitOfWorkFactory
+from lekto.adapters.outbound.sql import database as sql_database
 from lekto.core.domain.documents import DocumentChanges
+from lekto.core.domain.errors import ConcurrencyError
 from lekto.core.domain.fields import FieldDefinition, FieldType, Money
 from lekto.core.ports.unit_of_work import UnitOfWorkFactory
 from tests import builders
@@ -177,6 +179,30 @@ async def test_a_failed_unit_releases_the_task(uow_factory: UnitOfWorkFactory) -
     async with uow_factory() as uow:
         await uow.users.add(builders.user("b"))
         await uow.commit()
+
+
+async def test_a_writer_held_up_past_the_busy_timeout_meets_a_concurrent_change(
+    database: Database, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Another process holds the write lock past the busy timeout: a ConcurrencyError, which
+    a job tries again, not the driver's OperationalError (SQ-K08)."""
+    assert database.sqlite_path is not None
+    short = (*sql_database._SQLITE_PRAGMAS[:-1], "PRAGMA busy_timeout=50")
+    monkeypatch.setattr(sql_database, "_SQLITE_PRAGMAS", short)
+    other, late = Database.sqlite(database.sqlite_path), Database.sqlite(database.sqlite_path)
+    try:
+        async with other.engine.connect() as holder:
+            await holder.exec_driver_sql("BEGIN IMMEDIATE")  # as another process would
+            with pytest.raises(ConcurrencyError):
+                async with SqlUnitOfWorkFactory(late)() as uow:
+                    await uow.users.add(builders.user("late"))
+            await holder.rollback()
+        async with SqlUnitOfWorkFactory(late)() as uow:  # the lock is free again
+            await uow.users.add(builders.user("late"))
+            await uow.commit()
+    finally:
+        await other.dispose()
+        await late.dispose()
 
 
 class TestSqlitePushDevices(PushDeviceRepositoryContract):

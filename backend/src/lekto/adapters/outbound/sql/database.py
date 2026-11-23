@@ -101,7 +101,10 @@ class Database:
             database=name,
         )
         arguments = {} if tls is None else {"connect_args": {"ssl": tls}}
-        return cls(create_async_engine(url, hide_parameters=True, **arguments), tls=tls)
+        # A connection the database dropped (a restart) is replaced before it is used, not
+        # handed to the first request after it (SQ-K07).
+        engine = create_async_engine(url, hide_parameters=True, pool_pre_ping=True, **arguments)
+        return cls(engine, tls=tls)
 
     @property
     def is_sqlite(self) -> bool:
