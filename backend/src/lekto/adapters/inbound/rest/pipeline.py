@@ -35,7 +35,7 @@ router = APIRouter(route_class=SYSTEM_AREA, tags=["pipeline"], dependencies=PROT
     response_model=PipelineOut,
     responses=problem_responses(401),
 )
-async def pipeline(user: CurrentUser, context: Context) -> PipelineOut:
+async def pipeline(context: Context) -> PipelineOut:  # PROTECTED: signed in
     vision = context.pipeline.vision
     return PipelineOut(
         nodes=[

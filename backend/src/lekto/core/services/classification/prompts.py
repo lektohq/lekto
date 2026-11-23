@@ -15,6 +15,7 @@ alike.
 import hashlib
 from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import Final
 
 from lekto.core.domain.document_facts import FactRole, HolderKind
 from lekto.core.domain.fields import FieldDefinition, FieldType
@@ -27,7 +28,7 @@ PROPOSE_PROMPT = "propose-6"
 FACTS_PROMPT = "facts-3"
 PROPOSE_SCHEMA = "proposal"
 EXTRACT_SCHEMA = "fields"
-FACTS_SCHEMA = "facts"
+FACTS_SCHEMA: Final = "facts"  # a literal for the API's `ModelCallOut.request`
 """Names of the JSON schemas of the two requests (`StructuredRequest.schema_name`)."""
 
 TITLE_CHARACTERS = 80  # the title the model is asked for; `MAX_TITLE` is what the domain takes

@@ -18,7 +18,7 @@ from lekto.adapters.inbound.rest.problems import problem, problem_responses
 from lekto.core.domain.errors import AuthenticationError
 from lekto.core.domain.ids import TaskId
 from lekto.core.domain.links import TASK_FILE, TASK_RESULT
-from lekto.core.domain.tasks import MAX_ANSWER_BYTES
+from lekto.core.domain.tasks import MAX_ANSWER_BYTES, MAX_REASON
 from lekto.core.services.tasks.service import UNKNOWN_LINK, UNKNOWN_TOKEN
 
 PREFIX = "/external"
@@ -70,8 +70,9 @@ SignedLink = Annotated[FileLink, Depends(file_link)]
         "`Authorization: Bearer`. The token holds for one answer, until the deadline.\n\n"
         "The body is an envelope: `status` `ok` with `answer` (any JSON; a rule step's "
         "answer is `steps.<name>` for the steps after it), or `status` `error` with `reason` "
-        "(a text, shown cut to 300 characters); `producer` (optional) names what answered. "
-        "`error`, an envelope that is not valid (422) and an answer larger than 1 MB (413) "
+        f"(a text, shown cut to {MAX_REASON} characters); `producer` (optional) names what "
+        "answered. `error`, an envelope that is not valid (422) and an answer larger than "
+        f"{MAX_ANSWER_BYTES // 1_000_000} MB (413) "
         "count as no answer: the step goes on as it says for a missing answer, and the token "
         "is used up. 409: the task was answered before, or its document was processed again "
         "or deleted. 401: unknown task or token, or the deadline has passed."

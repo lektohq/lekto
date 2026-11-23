@@ -5,7 +5,7 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 from lekto.core.domain.classifier import ClassifierModel
-from lekto.core.services.classifier import ClassifierStatus
+from lekto.core.services.classifier import HOLDOUT_FROM, ClassifierStatus
 
 
 class ClassesOut(BaseModel):
@@ -42,7 +42,9 @@ class ClassifierModelOut(BaseModel):
         description="Identifiers of contacts training learned from the same documents."
     )
     accuracy: AccuracyOut | None = Field(
-        description="Measured from 50 examples on: trained on four fifths, tested on the rest."
+        description=(
+            f"Measured from {HOLDOUT_FROM} examples on: trained on four fifths, tested on the rest."
+        )
     )
     method: str | None = Field(examples=["scikit-learn 1.9.1 lekto-tfidf-logreg/1"])
 

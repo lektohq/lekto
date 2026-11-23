@@ -6,10 +6,9 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from lekto.adapters.inbound.rest.schemas.refs import MAX_REF, opened, seal
+from lekto.adapters.inbound.rest.schemas.refs import MAX_REF, fact_criterion, seal
 from lekto.adapters.inbound.schemas import RequestBody
 from lekto.core.domain.document_facts import FactCriterion, FactRole
-from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.identifiers import IdentifierKind
 from lekto.core.domain.ids import (
     ContactId,
@@ -31,7 +30,6 @@ from lekto.core.domain.lenses import (
     LensSort,
     RelativePeriod,
 )
-from lekto.core.domain.reasons import ReasonCode, because
 from lekto.core.domain.validation import MAX_REFERENCES
 from lekto.core.ports.identity import RefCipher
 
@@ -52,12 +50,7 @@ class FactFilterBody(BaseModel):
     role: FactRole | None = None
 
     def domain(self, refs: RefCipher) -> FactCriterion:
-        value = None
-        if self.ref:
-            if self.kind is None:
-                raise ValidationError(because(ReasonCode.FACT_CRITERION_EMPTY))
-            value = opened(refs, self.kind, self.ref)
-        return FactCriterion.written(self.kind, value, self.role)
+        return fact_criterion(refs, self.kind, self.ref, self.role)
 
 
 class FactFilterOut(BaseModel):

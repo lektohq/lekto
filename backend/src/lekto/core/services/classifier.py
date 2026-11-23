@@ -60,7 +60,7 @@ CHECK_JOB = "classifier.check"
 TRAIN_JOB = "classifier.train"
 _TRAIN_RETRY = RetryPolicy(max_attempts=3, delay=timedelta(minutes=5))
 _COMMIT_ATTEMPTS = 3  # a contact changed while the learned identifiers were written: again
-_HOLDOUT_FROM = 50  # examples from which a share is held out to measure the model
+HOLDOUT_FROM = 50  # examples from which a share is held out to measure the model
 _HOLDOUT_EVERY = 5  # every fifth example: a fifth held out
 _MODEL_TYPE = "application/octet-stream"
 
@@ -384,7 +384,7 @@ class ClassifierService:
     async def _accuracy(self, examples: Sequence[_Example]) -> JsonObject | None:
         """The share of held-out confirmed examples whose contact and type the model trained on
         the rest names first; None with too few examples to tell."""
-        if len(examples) < _HOLDOUT_FROM:
+        if len(examples) < HOLDOUT_FROM:
             return None
         ordered = sorted(examples, key=lambda item: item.document.id)
         held = ordered[::_HOLDOUT_EVERY]

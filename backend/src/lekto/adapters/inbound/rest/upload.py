@@ -60,6 +60,7 @@ class Upload:
     file: IncomingFile
     filename: str
     fields: dict[str, str]
+    skipped: tuple[str, ...] = ()  # text fields not asked for, by name
 
     async def remove(self) -> None:
         """Remove the temporary file."""
@@ -76,6 +77,7 @@ class ReceivedFile:
 class Uploads:
     files: list[ReceivedFile]
     fields: dict[str, str]
+    skipped: tuple[str, ...] = ()  # text fields not asked for, by name
 
     async def remove(self) -> None:
         """Remove the temporary files."""
@@ -103,7 +105,12 @@ async def read_upload(
     if not uploads.files:
         raise MalformedUploadError(f"the form has no file part '{FILE_FIELD}'")
     (received,) = uploads.files
-    return Upload(file=received.file, filename=received.filename, fields=uploads.fields)
+    return Upload(
+        file=received.file,
+        filename=received.filename,
+        fields=uploads.fields,
+        skipped=uploads.skipped,
+    )
 
 
 async def read_uploads(
@@ -159,6 +166,7 @@ async def read_uploads(
                 for item in state.files
             ],
             fields=state.fields,
+            skipped=tuple(state.skipped),
         )
     except BaseException:
         await asyncio.shield(state.discard())
@@ -188,6 +196,7 @@ class _State:
     size: int = 0  # of all files
     files: list[_File] = field(default_factory=list)
     fields: dict[str, str] = field(default_factory=dict)
+    skipped: list[str] = field(default_factory=list)  # text fields not asked for
     finished: bool = False
     _pending: list[tuple[_File, bytes]] = field(default_factory=list)
     _headers: dict[str, str] = field(default_factory=dict)
@@ -276,6 +285,8 @@ class _State:
             self._part = self.files[-1]
         elif b"filename" in options or name not in self.wanted:
             self._part = None  # other files and unknown fields are skipped
+            if b"filename" not in options and name not in self.skipped:
+                self.skipped.append(name)  # named, for a route that refuses them (RA-K05)
         else:
             self._part = name
 

@@ -3,7 +3,7 @@
 from collections.abc import Mapping
 from datetime import date, datetime
 from enum import StrEnum
-from typing import Any, ClassVar, Literal
+from typing import Any, ClassVar, Literal, Self
 from uuid import UUID
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, Json, field_validator
@@ -32,6 +32,7 @@ from lekto.core.domain.pipeline import (
 from lekto.core.domain.reading import DocumentReading, VisionAdvice
 from lekto.core.domain.reasons import ReasonCode
 from lekto.core.domain.spaces import Space, SpaceRole
+from lekto.core.services.classification.prompts import FACTS_SCHEMA
 from lekto.core.services.documents import DocumentFacets
 from lekto.core.services.objects import EXCHANGE_NODES
 
@@ -238,7 +239,9 @@ class DocumentDetails(BaseModel):
     updated_at: datetime
 
     @classmethod
-    def of(cls, document: Document, access: SpaceRole) -> DocumentDetails:
+    def of(cls, document: Document, access: SpaceRole, **more: Any) -> Self:
+        """The details of `document`, and of a subclass its `more` fields: built once, not
+        dumped and validated again (RA-K02)."""
         state = document.processing
         return cls(
             id=document.id,
@@ -269,6 +272,7 @@ class DocumentDetails(BaseModel):
             ),
             created_at=document.created_at,
             updated_at=document.updated_at,
+            **more,
         )
 
 
@@ -288,7 +292,7 @@ class ListedDocument(DocumentDetails):
 
     @classmethod
     def listed(cls, document: Document, access: SpaceRole, in_inbox: bool) -> ListedDocument:
-        return cls(**DocumentDetails.of(document, access).model_dump(), in_inbox=in_inbox)
+        return cls.of(document, access, in_inbox=in_inbox)
 
 
 class DocumentPage(BaseModel):
@@ -643,7 +647,7 @@ class ModelCallOut(BaseModel):
             document=call.document,
             task=call.task,
             retry=call.retry,
-            request="facts" if call.request == "facts" else "",
+            request=FACTS_SCHEMA if call.request == FACTS_SCHEMA else "",
             answer=call.answer,
             model=call.model,
             usage=dict(call.usage),
@@ -701,7 +705,7 @@ class VisibilityOut(BaseModel):
     )
 
     @classmethod
-    def of(cls, document: Document, space: Space) -> VisibilityOut:
+    def of(cls, space: Space) -> VisibilityOut:
         return cls(
             space_id=space.id,
             members=[

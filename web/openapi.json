@@ -7174,7 +7174,7 @@
           "identifiers"
         ],
         "summary": "The open identifiers",
-        "description": "Admins only. Open are the identifiers no person has confirmed: those training learned at a contact (`learned`), and suggestions (`suggested`): an e-mail domain whose name fits the contact of its documents while it has none, an IBAN its documents give to a person. A person's value (a user's profile) is never open. The most documents first, then the newest. `recommended` keeps those whose documents recommend confirming or rejecting them (`recommendation`). To find words: `POST /search`.",
+        "description": "Admins only. Open are the identifiers no person has confirmed: those training learned at a contact (`learned`), and suggestions (`suggested`): an e-mail domain whose name fits the contact of its documents while it has none, an IBAN its documents give to a person. A person's value (a user's profile) is never open. The most documents first, then the newest. `recommended` keeps those whose documents recommend confirming or rejecting them (`recommendation`). To find words: `POST /identifiers/open/search`.",
         "operationId": "open_identifiers_api_v1_identifiers_open_get",
         "parameters": [
           {

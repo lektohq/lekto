@@ -6,7 +6,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 from lekto.adapters.inbound.rest.schemas.common import IdentifierKeyOut, NamedOut
-from lekto.core.domain.series import Cadence, SeriesState
+from lekto.core.domain.series import SOON, Cadence, SeriesState
 from lekto.core.services.expected import Expected
 
 
@@ -37,8 +37,8 @@ class ExpectedOut(BaseModel):
         "the series carries one."
     )
     state: SeriesState = Field(
-        description="`overdue` (its date and spread are over), `soon` (in the next 30 days), "
-        "`later`, or `ended` (two dates missed)."
+        description=f"`overdue` (its date and spread are over), `soon` (in the next {SOON.days} "
+        "days), `later`, or `ended` (two dates missed)."
     )
 
     @classmethod

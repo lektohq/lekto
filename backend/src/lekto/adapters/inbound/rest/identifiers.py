@@ -83,7 +83,11 @@ Listing = Annotated[_Listing, Depends()]
 @router.get(
     "",
     summary="The open identifiers",
-    description=ADMINS_ONLY + " " + _OPEN + _LIST + " To find words: `POST /search`.",
+    description=ADMINS_ONLY
+    + " "
+    + _OPEN
+    + _LIST
+    + " To find words: `POST /identifiers/open/search`.",
     response_model=OpenPageOut,
     responses=problem_responses(401, 403, 422),
 )

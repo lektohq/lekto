@@ -208,6 +208,23 @@ async def test_the_server_works_over_a_real_connection() -> None:
 # --- reading ------------------------------------------------------------------------------------
 
 
+async def test_documents_list_is_in_rest_s_order(api: Api, scene: Scene) -> None:
+    """Newest first by when they came in, as REST lists them without `sort`, not by arrival: a
+    corrected receipt moves a document (RA-K10)."""
+    owner = scene.headers["owner"]
+    changed = await api.client.patch(
+        f"/api/v1/documents/{scene.yellow}",
+        json={"created_at": "2020-01-01T00:00:00Z"},
+        headers=owner,
+    )
+    assert changed.status_code == 200, changed.text
+    rest = await api.client.get("/api/v1/documents", headers=owner)
+    by_rest = [item["id"] for item in rest.json()["items"]]
+    listed = data(await call(api, owner, "documents_list"))["items"]
+    assert [item["id"] for item in listed] == [short_id(UUID(id)) for id in by_rest]
+    assert by_rest[-1] == scene.yellow
+
+
 async def test_documents_list_lists_by_filters_and_counts_by_groups(api: Api, scene: Scene) -> None:
     owner = scene.headers["owner"]
     admin = await api.admin()

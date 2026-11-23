@@ -9,9 +9,11 @@ from lekto.adapters.inbound.rest.context import Context
 from lekto.adapters.inbound.rest.problems import problem_responses
 from lekto.adapters.inbound.rest.schemas.lenses import LensCreate, LensOrder, LensOut, LensPatch
 from lekto.core.domain.changes import UNSET
+from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.ids import FieldId, LensId
 from lekto.core.domain.lenses import LensChanges
 from lekto.core.domain.rights import TokenRight
+from lekto.core.services.lenses import MAX_LENSES
 
 LENSES_AREA = area(TokenRight.LENSES_READ, TokenRight.LENSES_WRITE)
 router = APIRouter(
@@ -45,7 +47,7 @@ async def list_lenses(user: CurrentUser, context: Context) -> list[LensOut]:
         "its cards show and the date field that is their deadline; it goes after the caller's "
         "other lenses. The card fields must exist, the deadline must be a date field, the sort "
         "field one of type date, period, number or amount (422). 409: the caller has a lens of "
-        "that name (regardless of case) or 100 lenses."
+        f"that name (regardless of case) or {MAX_LENSES} lenses."
     ),
     response_model=LensOut,
     responses=problem_responses(401, 409, 422),
@@ -96,6 +98,10 @@ async def get_lens(id: UUID, user: CurrentUser, context: Context) -> LensOut:
 )
 async def update_lens(id: UUID, body: LensPatch, user: CurrentUser, context: Context) -> LensOut:
     given = body.model_fields_set
+    # What a lens always has takes no null, as a document's title (RA-K06): left out, it stays.
+    for name in ("name", "filter", "grouping", "layout", "card_field_ids"):
+        if name in given and getattr(body, name) is None:
+            raise ValidationError(f"{name}: must not be null")
 
     def field(value: UUID | None) -> FieldId | None:
         return None if value is None else FieldId(value)
