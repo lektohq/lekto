@@ -10,6 +10,7 @@ import { api } from '#lib/api/client.ts';
 import type { components } from '#lib/api/schema.ts';
 import { events, NODE_EVENTS } from '#lib/events.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
+import { latest } from '#lib/latest.ts';
 import { scope } from '#lib/scope.svelte.ts';
 import { TONE_EDGE, TONE_FILL } from '#lib/tones.ts';
 
@@ -59,7 +60,7 @@ class Inbox {
 	#timer: ReturnType<typeof setTimeout> | undefined;
 	#stop: (() => void) | null = null;
 	// An answer overtaken by a later request (the scope changed meanwhile) is dropped.
-	#request = 0;
+	#begin = latest();
 
 	/** Everything open: the counter's number. */
 	get open(): number {
@@ -68,18 +69,17 @@ class Inbox {
 
 	/** Fetch the summary again; while the server cannot be reached the last one stays. */
 	async refresh(): Promise<void> {
-		const request = ++this.#request;
+		const current = this.#begin();
 		try {
 			// With "all users" the counter counts everyone's; the icon still counts the caller's.
 			const [data, mine] = await Promise.all([
 				unwrap(api.GET('/api/v1/inbox/summary', { params: { query: { all_users: scope.query } } })),
 				scope.query ? unwrap(api.GET('/api/v1/inbox/summary')) : null
 			]);
-			if (request === this.#request)
-				[this.summary, this.own, this.failure] = [data, (mine ?? data).open, null];
+			if (current()) [this.summary, this.own, this.failure] = [data, (mine ?? data).open, null];
 		} catch (failure) {
 			// Offline or refused: the counter keeps what it showed until the next refresh.
-			if (request === this.#request) this.failure = failure;
+			if (current()) this.failure = failure;
 		}
 	}
 
@@ -111,7 +111,7 @@ class Inbox {
 	stop(): void {
 		this.#stop?.();
 		this.#stop = null;
-		this.#request++;
+		this.#begin(); // what is under way is dropped
 		[this.summary, this.failure] = [null, null];
 	}
 }

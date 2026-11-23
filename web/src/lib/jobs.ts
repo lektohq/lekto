@@ -11,7 +11,6 @@ export type Job = components['schemas']['JobOut'];
 export type JobState = components['schemas']['JobState'];
 export type KindSummary = components['schemas']['KindSummaryOut'];
 export type JobsSummary = components['schemas']['JobsSummaryOut'];
-export type KindDurations = components['schemas']['KindDurationsOut'];
 
 export const OPEN_STATES = ['running', 'due', 'planned'] as const satisfies readonly JobState[];
 export const STATES = [...OPEN_STATES, 'failed', 'done'] as const satisfies readonly JobState[];

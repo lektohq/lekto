@@ -1,6 +1,7 @@
 /** Field values between the API's form and the text a form field holds. */
 import type { components } from '#lib/api/schema.ts';
 import { m } from '#lib/paraglide/messages.js';
+import { readNumber, shownNumber } from '#lib/i18n.ts';
 
 export type ApiValue = components['schemas']['DocumentDetails']['fields'][string];
 export type FieldType = components['schemas']['FieldType'];
@@ -59,9 +60,10 @@ export function emptyValue(type: FieldType): InputValue {
 
 export function toInput(type: FieldType, value: ApiValue | undefined): InputValue {
 	if (value === undefined || value === null) return emptyValue(type);
-	if (type === 'amount' && isMoney(value)) return { ...value };
+	if (type === 'amount' && isMoney(value)) return { ...value, amount: shownNumber(value.amount) };
 	if (type === 'period' && isPeriod(value)) return { ...value };
 	if (type === 'boolean') return value === true ? 'true' : value === false ? 'false' : '';
+	if (type === 'number') return shownNumber(String(value));
 	return String(value);
 }
 
@@ -69,7 +71,7 @@ export function toInput(type: FieldType, value: ApiValue | undefined): InputValu
 export function toApi(type: FieldType, value: InputValue): ApiValue | null {
 	if (type === 'amount') {
 		const money = isMoney(value) ? value : { amount: '', currency: DEFAULT_CURRENCY };
-		const amount = money.amount.trim().replace(',', '.');
+		const amount = readNumber(money.amount);
 		return amount === '' ? null : { amount, currency: money.currency.trim().toUpperCase() };
 	}
 	if (type === 'period') {
@@ -82,7 +84,7 @@ export function toApi(type: FieldType, value: InputValue): ApiValue | null {
 	const text = typeof value === 'string' ? value.trim() : '';
 	if (text === '') return null;
 	if (type === 'boolean') return text === 'true';
-	if (type === 'number') return text.replace(',', '.');
+	if (type === 'number') return readNumber(text);
 	return text;
 }
 

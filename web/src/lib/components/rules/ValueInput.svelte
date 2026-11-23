@@ -4,6 +4,7 @@
 	import TemplateInput from '#lib/components/templates/TemplateInput.svelte';
 	import { Input } from '#lib/components/ui/input/index.ts';
 	import type { FieldDefinition } from '#lib/masterdata.svelte.ts';
+	import { readNumber, shownNumber } from '#lib/i18n.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import { isMoney, isPeriod } from '#lib/fields.ts';
 	import PeriodInput from '#lib/components/PeriodInput.svelte';
@@ -53,9 +54,11 @@
 	const uid = $props.id();
 
 	const type = $derived(textual ? 'text' : (field?.data_type ?? 'text'));
-	const text = $derived(
+	const raw = $derived(
 		typeof value === 'string' ? value : typeof value === 'number' ? String(value) : ''
 	);
+	// A number in the user's format, as a field's value is (`fields.ts`).
+	const text = $derived(type === 'number' ? shownNumber(raw) : raw);
 	// The date field shows only YYYY-MM-DD; other spellings the API accepts stay visible as text.
 	const dateField = $derived(
 		(type === 'date' || type === 'period') && (text === '' || /^\d{4}-\d{2}-\d{2}$/.test(text))
@@ -143,9 +146,8 @@
 				aria-label={label}
 				aria-invalid={invalid || undefined}
 				inputmode="decimal"
-				value={money.amount}
-				oninput={(event) =>
-					onchange({ ...money, amount: event.currentTarget.value.replace(',', '.') })}
+				value={shownNumber(money.amount)}
+				oninput={(event) => onchange({ ...money, amount: readNumber(event.currentTarget.value) })}
 				class="min-w-0 flex-1"
 			/>
 			<Input
@@ -178,9 +180,7 @@
 			value={text}
 			oninput={(event) =>
 				onchange(
-					type === 'number'
-						? event.currentTarget.value.replace(',', '.')
-						: event.currentTarget.value
+					type === 'number' ? readNumber(event.currentTarget.value) : event.currentTarget.value
 				)}
 		/>
 	{/if}

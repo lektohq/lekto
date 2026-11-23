@@ -287,7 +287,7 @@
 		if (!source) return;
 		const reach = scope.allUsers;
 		try {
-			const now = await placesOfList(source.url, source.words, reach);
+			const now = await placesOfList(source.url, source.words, reach, source.wordsOnly);
 			// Every document the list held keeps its place while one steps through it (a tag of
 			// its filter removed, Tobi 10.11.2026), but one found gone; another reach starts anew.
 			listPlaces = keepPlaces(

@@ -2,7 +2,7 @@ import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { components } from '#lib/api/schema.ts';
-import { showPages } from '#lib/beam.svelte.ts';
+import { forgetParts, showPages } from '#lib/beam.svelte.ts';
 import { quoted } from '#lib/i18n.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { fakeApi, problem } from '#lib/testing/api.ts';
@@ -11,7 +11,8 @@ import PageEditor from './PageEditor.svelte';
 // The Beam is the app's: here only what the editor hands it.
 vi.mock('#lib/beam.svelte.ts', async (original) => ({
 	...(await original<typeof import('#lib/beam.svelte.ts')>()),
-	showPages: vi.fn()
+	showPages: vi.fn(),
+	forgetParts: vi.fn()
 }));
 
 type Document = components['schemas']['DocumentDetails'];
@@ -118,6 +119,13 @@ describe('PageEditor', () => {
 			}
 		]);
 		expect(onedited).toHaveBeenCalled();
+	});
+
+	it('lets the Beam forget its parts when it closes (WG-K11)', async () => {
+		const shown = render(PageEditor, { open: true, document: DOCUMENT, onedited: vi.fn() });
+		vi.mocked(forgetParts).mockClear();
+		await shown.rerender({ open: false, document: DOCUMENT, onedited: vi.fn() });
+		expect(forgetParts).toHaveBeenCalled();
 	});
 
 	it('lets go of the window when it closes in the middle of a press', async () => {

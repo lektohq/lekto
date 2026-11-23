@@ -97,6 +97,30 @@ export function formatNumber(value: number, options?: Intl.NumberFormatOptions):
 	return new Intl.NumberFormat(formatLocale(), options).format(value);
 }
 
+/** The decimal and group separators of the user's format ("," and "." in German). */
+function separators(): { decimal: string; group: string } {
+	const parts = new Intl.NumberFormat(formatLocale()).formatToParts(12345.6);
+	const of = (type: string, otherwise: string) =>
+		parts.find((part) => part.type === type)?.value ?? otherwise;
+	return { decimal: of('decimal', '.'), group: of('group', ',') };
+}
+
+/** A number typed in the user's format as the API writes it: groups and spaces gone, the
+ * decimal separator a point ("1.234,5" in German, "1,234.5" in English: "1234.5"). A dot typed
+ * in German is a group's, as written there (WG-K05). */
+export function readNumber(text: string): string {
+	const { decimal, group } = separators();
+	const bare = text.trim().replace(/\s/g, '').split(group).join('');
+	return decimal === '.' ? bare : bare.split(decimal).join('.');
+}
+
+/** A number of the API ("1234.5") in the user's format for a field, without groups, so that
+ * it reads as typed ("1234,5" in German). */
+export function shownNumber(value: string): string {
+	const { decimal } = separators();
+	return decimal === '.' ? value : value.replace('.', decimal);
+}
+
 /** A share (0 to 1) as whole percent (`87 %`). */
 export function formatPercent(value: number): string {
 	return formatNumber(value, { style: 'percent', maximumFractionDigits: 0 });

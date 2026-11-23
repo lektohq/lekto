@@ -13,14 +13,6 @@ export interface HolderCases {
 	outcome: HolderOutcome;
 }
 
-/** The columns whose numbers open their cases ("Stimmt" stays a number). */
-export const CASE_OUTCOMES: readonly HolderOutcome[] = [
-	'learned_rejected',
-	'refused_confirmed',
-	'unclear',
-	'unread'
-];
-
 /** Where the measure was wrong: its cases' decisions in red. */
 export function wrong(outcome: HolderOutcome): boolean {
 	return outcome === 'learned_rejected' || outcome === 'refused_confirmed';

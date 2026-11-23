@@ -5,6 +5,7 @@ import {
 	beamCount,
 	beamTo,
 	closeBeam,
+	forgetParts,
 	leaveBeam,
 	openBeam,
 	partsOf,
@@ -67,6 +68,11 @@ describe('the state of the Beam', () => {
 		// Another edit's parts take the place of these: the older key names nothing.
 		showPages(parts.slice(0, 1), 0, 'PDF bearbeiten');
 		expect(partsOf(state.beam.parts)).toBeNull();
+		// The editor closed: its parts, an added file's images among them, go (WG-K11).
+		const latest = vi.mocked(goto).mock.lastCall?.[1]?.state as { beam: { parts: string } };
+		expect(partsOf(latest.beam.parts)).not.toBeNull();
+		forgetParts();
+		expect(partsOf(latest.beam.parts)).toBeNull();
 	});
 
 	it('shows parts where the browser offers no random ids (plain http in a network)', () => {

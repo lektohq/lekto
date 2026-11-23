@@ -56,4 +56,24 @@ describe('the documents of the list a document was opened from', () => {
 		const sent = await Promise.all(api.mock.calls.map(([request]) => request.clone().json()));
 		expect(sent).toEqual([{ q: 'Strom' }, { q: 'Strom' }]);
 	});
+
+	it('searches by words alone where the list stayed by words (WG-K08)', async () => {
+		const api = fakeApi({
+			'POST /api/v1/documents/search': () => ({
+				items: [],
+				estimated_total: 0,
+				word_total: 0,
+				next_offset: null,
+				semantic: false,
+				mode: 'words',
+				reason: null,
+				meaning_pending: false
+			})
+		});
+		vi.stubGlobal('fetch', api);
+		await listPlaces('/ui/documents', 'Strom', false, true);
+		expect(calls(api)).toEqual([
+			'POST /api/v1/documents/search?sort=relevance&offset=0&limit=100&semantic_ratio=0'
+		]);
+	});
 });

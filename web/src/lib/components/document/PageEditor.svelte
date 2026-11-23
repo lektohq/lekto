@@ -9,13 +9,14 @@
 	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import Undo2 from '@lucide/svelte/icons/undo-2';
 	import { onDestroy, tick, untrack } from 'svelte';
+	import { onChange } from '#lib/watch.svelte.ts';
 	import { toast } from 'svelte-sonner';
 	import { api } from '#lib/api/client.ts';
 	import { apiError } from '#lib/api/problem.ts';
 	import type { components } from '#lib/api/schema.ts';
 	import DocumentChoice from '#lib/components/document/DocumentChoice.svelte';
 	import SelectionChooser from '#lib/components/SelectionChooser.svelte';
-	import { showPages, type BeamPart } from '#lib/beam.svelte.ts';
+	import { forgetParts, showPages, type BeamPart } from '#lib/beam.svelte.ts';
 	import EditorShell from '#lib/components/EditorShell.svelte';
 	import ChangeDialog from '#lib/components/ChangeDialog.svelte';
 	import DetailList, { type DetailRow } from '#lib/components/DetailList.svelte';
@@ -363,6 +364,12 @@
 
 	// Closed in the middle of a press: the window's listeners and the timer go with the editor.
 	onDestroy(release);
+	// Closed: the parts it showed in the Beam, an added file's images among them, go too.
+	onChange(
+		() => open,
+		(now) => now || forgetParts()
+	);
+	onDestroy(forgetParts);
 
 	/** The click after a move or a long press is no choice. */
 	function swallowClick() {

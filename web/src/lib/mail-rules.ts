@@ -44,21 +44,10 @@ export type DryRunMail = components['schemas']['DryRunMailOut'];
 export type MailRuleDryRun = components['schemas']['MailRuleDryRun'];
 type ApiCondition = components['schemas']['MailConditionBody'];
 
-export const FIELDS: readonly MailField[] = [
-	'sender',
-	'recipient',
-	'to',
-	'cc',
-	'subject',
-	'folder',
-	'attachments',
-	'importance',
-	'keyword',
-	'flag'
-];
-
-/** The comparisons of each field, as the document rules' mail conditions have them. */
-export const OPERATORS = MAIL_FIELD_OPERATORS;
+/** The fields a condition asks, in the order the editor offers them: those of
+ * `MAIL_FIELD_OPERATORS`, the comparisons of each as the document rules' mail conditions have
+ * them. */
+export const FIELDS = Object.keys(MAIL_FIELD_OPERATORS) as readonly MailField[];
 
 export const PARTS: readonly MailParts[] = ['all', 'attachments', 'text', 'nothing'];
 /** The steps on a mail on the server (Tobi, 05.11.2026), in the order "Aktion hinzufügen"
@@ -77,12 +66,6 @@ export const ENDING: readonly MailAction[] = ['move', 'trash'];
 export const MAX_STEPS = 10;
 /** The longest value a condition on a mail compares with (`MailConditionBody.value`). */
 export const MAIL_VALUE_MAX = 1000;
-
-export const FIELD_LABELS = MAIL_FIELD_LABELS;
-
-/** A comparison in the words of the document rules' mail fields ("ist", "endet auf",
- * "Schlagwörter enthalten"); attachments are there or not. */
-export const operatorText = mailOperatorLabel;
 
 /** The value a condition on `field` starts with: the first of a choice, else empty. */
 export function firstValue(field: MailField, folders: readonly string[]): string {
@@ -192,7 +175,13 @@ export interface MailRuleForm {
 }
 
 export function newCondition(field: MailField = 'sender'): MailConditionNode {
-	return { kind: 'condition', key: nextKey(), field, op: OPERATORS[field][0], value: '' };
+	return {
+		kind: 'condition',
+		key: nextKey(),
+		field,
+		op: MAIL_FIELD_OPERATORS[field][0],
+		value: ''
+	};
 }
 
 function conditionFromApi(item: ApiCondition): MailConditionNode {
@@ -392,8 +381,8 @@ export interface Names {
 /** A condition in words ("Absender endet auf @stadtwerke.example"). */
 export function conditionText(item: Pick<MailConditionNode, 'field' | 'op' | 'value'>): string {
 	return [
-		FIELD_LABELS[item.field](),
-		operatorText(item.field, item.op),
+		MAIL_FIELD_LABELS[item.field](),
+		mailOperatorLabel(item.field, item.op),
 		item.value ? valueText(item.field, item.value) : ''
 	]
 		.filter(Boolean)

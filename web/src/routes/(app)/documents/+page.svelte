@@ -155,7 +155,7 @@
 	// A link may ask for a layout (`layout=stream`: the stream of a contact, #145).
 	const asked = $derived(LAYOUTS.find((value) => value === params.get('layout')) ?? null);
 	// "Back" from a document returns to the list as it is now (`returnTo`).
-	$effect(() => returnTo.rememberDocuments(page.url, query));
+	$effect(() => returnTo.rememberDocuments(page.url, query, searchNote.ratio(query) === 0));
 
 	$effect(() => {
 		if (asked) layout = asked;

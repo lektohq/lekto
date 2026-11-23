@@ -24,7 +24,7 @@ import { problemOf } from '#lib/testing/api.ts';
 import { saveErrorsAt } from '#lib/rules/errors.ts';
 import { CONDITION_FIELD_OPERATORS } from '#lib/rules/model.ts';
 import { newGroup } from '#lib/rules/tree.ts';
-import { OPERATORS } from './mail-rules.ts';
+import { MAIL_FIELD_OPERATORS as OPERATORS } from '#lib/mail-traits.ts';
 
 const RULE: MailRule = {
 	id: 'r1',
