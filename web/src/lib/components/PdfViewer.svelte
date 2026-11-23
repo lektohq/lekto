@@ -104,7 +104,8 @@
 				wasmUrl: `${BASE}/pdfjs/wasm/`,
 				standardFontDataUrl: `${BASE}/pdfjs/standard_fonts/`,
 				cMapUrl: `${BASE}/pdfjs/cmaps/`,
-				cMapPacked: true
+				cMapPacked: true,
+				iccUrl: `${BASE}/pdfjs/iccs/`
 			});
 			doc = await loadingTask.promise;
 			if (destroyed) {

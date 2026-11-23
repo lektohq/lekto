@@ -5,9 +5,10 @@ import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { BASE } from './src/lib/base.ts';
 
-// PDF.js loads decoders (JBIG2, JPEG 2000, colour profiles), the standard fonts and the character
-// maps at run time. They are served from the app itself under `pdfjs/`; nothing comes from a CDN.
-const FOLDERS = ['wasm', 'standard_fonts', 'cmaps'];
+// PDF.js loads decoders (JBIG2, JPEG 2000, colour profiles), the standard fonts, the character
+// maps and the CMYK profile (`iccs`: without it, CMYK colours are reckoned roughly and shift) at
+// run time. They are served from the app itself under `pdfjs/`; nothing comes from a CDN.
+const FOLDERS = ['wasm', 'standard_fonts', 'cmaps', 'iccs'];
 
 /** @returns {import('vite').Plugin} */
 export function pdfjsAssets() {
