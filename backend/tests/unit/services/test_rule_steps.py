@@ -100,7 +100,7 @@ async def steps_world(world: World, *, body: BodyFormat = BodyFormat.FULL) -> St
         Actor(owner.id), name="Node-RED", url=URL, event_types=[], signed=False, body=body
     )
     beleg = await world.master_data.create_field(Actor(r.admin.id), "Beleg", FieldType.TEXT)
-    pipeline = builders.skip_classification(r.pipeline())
+    pipeline = r.pipeline()
     return Steps(r, owner, created.webhook, beleg, pipeline)
 
 

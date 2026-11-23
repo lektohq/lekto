@@ -381,9 +381,11 @@ async def _burst(world: World, attempts: int) -> tuple[list[object], GatedHasher
         asyncio.create_task(auth.login("alice", "wrong password!", source=SOURCE))
         for _ in range(attempts)
     ]
-    # Let every attempt either be refused or reach the (blocked) hash.
-    while gate.waiting + sum(task.done() for task in tasks) < attempts:
-        await asyncio.sleep(0)
+    # Let every attempt either be refused or reach the (blocked) hash; one that hangs fails
+    # the test instead of hanging it.
+    async with asyncio.timeout(5):
+        while gate.waiting + sum(task.done() for task in tasks) < attempts:
+            await asyncio.sleep(0)
     gate.release.set()
     return list(await asyncio.gather(*tasks, return_exceptions=True)), gate
 

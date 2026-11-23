@@ -8,7 +8,7 @@ import pytest
 
 from lekto.adapters.outbound.memory import FakePushSender
 from lekto.adapters.outbound.memory.push import FAKE_PUBLIC_KEY
-from lekto.core.domain.documents import Document
+from lekto.core.domain.documents import Document, DocumentChanges
 from lekto.core.domain.events import ReviewRequired
 from lekto.core.domain.identity import ViaToken
 from lekto.core.domain.jobs import Job, JobStatus
@@ -109,7 +109,7 @@ async def test_nobody_is_told_who_switched_it_off_or_has_no_device(world: World)
     assert [j for j in world.database.jobs.values() if j.kind == PUSH_JOB] == []
 
 
-async def test_a_document_confirmed_meanwhile_is_not_told(world: World) -> None:
+async def test_a_document_seen_and_deleted_meanwhile_is_not_told(world: World) -> None:
     sender = FakePushSender()
     service = push(world, sender)
     owner = await world.user()
@@ -117,6 +117,17 @@ async def test_a_document_confirmed_meanwhile_is_not_told(world: World) -> None:
     document = await waiting(world, service, owner)
     await world.inbox.mark_seen(Actor(owner.id), document.id)
     await world.documents.delete(Actor(owner.id), document.id)
+    assert await told(world, service, sender) == []
+
+
+async def test_a_document_confirmed_meanwhile_is_not_told(world: World) -> None:
+    """Confirmed before the quiet ends, it no longer waits in the inbox (TD-K01)."""
+    sender = FakePushSender()
+    service = push(world, sender)
+    owner = await world.user()
+    await with_device(world, service, owner)
+    document = await waiting(world, service, owner)
+    await world.pipeline().confirm(Actor(owner.id), document.id, DocumentChanges())
     assert await told(world, service, sender) == []
 
 

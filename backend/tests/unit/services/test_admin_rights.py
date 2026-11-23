@@ -56,10 +56,11 @@ async def test_admins_list_spaces_of_everyone_and_manage_them(world: World) -> N
     with pytest.raises(ConflictError):
         await world.spaces.delete(Actor(admin.id), personal.id)
 
-    # Nobody else gains anything.
-    for user in (friend, stranger):
-        with pytest.raises((PermissionDeniedError, NotFoundError)):
-            await world.spaces.change(Actor(user.id), office.id, name="Mine")
+    # Nobody else gains anything: a reader is refused, a stranger does not learn of the space.
+    with pytest.raises(PermissionDeniedError):
+        await world.spaces.change(Actor(friend.id), office.id, name="Mine")
+    with pytest.raises(NotFoundError):
+        await world.spaces.change(Actor(stranger.id), office.id, name="Mine")
 
     await world.spaces.delete(Actor(admin.id), office.id)
     with pytest.raises(NotFoundError):

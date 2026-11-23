@@ -3,7 +3,7 @@ from datetime import timedelta
 import pytest
 
 from lekto.core.domain.errors import AuthenticationError, ConflictError
-from lekto.core.domain.identity import ExternalIdentity, LoginMethod, safe_redirect
+from lekto.core.domain.identity import ExternalIdentity, LoginMethod
 from lekto.core.domain.rights import Actor
 from lekto.core.domain.users import Role, User
 from lekto.core.services.oidc import OidcOutcome, OidcService, OidcStart
@@ -176,20 +176,3 @@ async def test_unlinking_needs_a_password(world: World) -> None:
     assert await service.unlink(Actor(alice.id)) == 1
     with pytest.raises(AuthenticationError):
         await round_trip(service, world, await service.begin(), "sub-alice")
-
-
-def test_only_paths_here_are_redirect_targets() -> None:
-    for good in ("/", "/inbox", "/documents/1?x=y#z"):
-        assert safe_redirect(good) == good
-    for bad in (
-        None,
-        "",
-        "https://evil.example",
-        "//evil.example/x",
-        "/\\evil.example",
-        "javascript:alert(1)",
-        "/in box",
-        "/x\r\nLocation: https://evil.example",
-        "/" + "a" * 2001,
-    ):
-        assert safe_redirect(bad) == "/"

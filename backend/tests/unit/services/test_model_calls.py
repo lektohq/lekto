@@ -394,7 +394,7 @@ class Again:
 async def test_the_pipeline_runs_a_node_anew_at_once_when_asked(world: World) -> None:
     owner = await world.user()
     again = Again()
-    pipeline = builders.skip_classification(world.pipeline({Node.SIGNAL_LLM: again}))
+    pipeline = world.pipeline({Node.SIGNAL_LLM: again})
     received = await pipeline.receive(Actor(owner.id), incoming_pdf(), filename="a.pdf")
     while await pipeline.run_next_job():
         pass

@@ -21,6 +21,7 @@ from lekto.core.domain.errors import (
     TooManyAttemptsError,
 )
 from lekto.core.domain.events import (
+    ClassifierTrained,
     DocumentDeleted,
     DocumentFiled,
     DocumentReceived,
@@ -279,9 +280,10 @@ async def test_events_without_a_document_or_for_a_vanished_one_queue_nothing(
 ) -> None:
     user = await world.user()
     await hook(world, user)
-    await world.webhook_delivery().on_event(
-        DocumentReceived(occurred_at=NOW, document_id=DocumentId(new_id()))
-    )
+    service = world.webhook_delivery()
+    await service.on_event(DocumentReceived(occurred_at=NOW, document_id=DocumentId(new_id())))
+    # An event of no document (for the admins' streams) is none for webhooks (TD-K02).
+    await service.on_event(ClassifierTrained(occurred_at=NOW, number=1, examples=3))
     assert deliveries(world) == []
 
 
