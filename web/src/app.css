@@ -57,10 +57,10 @@
 	/* Charts (the page "System"): the lanes as solid marks, a second line, the pale band of a
 	   90th percentile. */
 	--chart-1: #4a9f66;
-	--chart-2: #e0b02e;
+	--chart-2: #b58900;
 	--chart-3: #b83a32;
 	--chart-4: #b4560a;
-	--chart-5: #cfe4e1;
+	--chart-5: #7fb8af;
 }
 
 .dark {
@@ -103,7 +103,7 @@
 	--chart-2: #e3bb4d;
 	--chart-3: #d4554c;
 	--chart-4: #f2a65a;
-	--chart-5: #21403c;
+	--chart-5: #2f5f58;
 }
 
 /*
