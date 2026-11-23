@@ -72,7 +72,8 @@
 	bind:offsetHeight={height}
 >
 	{@render lead?.()}
-	<span class={cn('font-medium', phone.current && 'flex-1')}>{count}</span>
+	<!-- Said as it changes, also by "Alle wählen" (Tobi, 23.11.2026, WZ-K10). -->
+	<span role="status" class={cn('font-medium', phone.current && 'flex-1')}>{count}</span>
 	{#if phone.current}{@render trail?.()}{/if}
 	{#if hint}
 		<span class={cn('text-meta text-muted-foreground', phone.current ? 'basis-full' : 'flex-1')}>

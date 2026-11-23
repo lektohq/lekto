@@ -158,10 +158,11 @@
 			{#if tab === 'profile'}
 				<Card.Root>
 					<Card.Header>
-						<Card.Title class="flex items-center gap-1">
-							{m.profile_title()}
+						<!-- The hint beside the heading, not in it: its name is no part of "Profil". -->
+						<div class="flex items-center gap-1">
+							<Card.Title>{m.profile_title()}</Card.Title>
 							<InfoHint text={m.profile_own_hint()} about={m.profile_title()} />
-						</Card.Title>
+						</div>
 					</Card.Header>
 					<Card.Content>
 						<ProfileForm data={profile} part="person" onsaved={saved} />

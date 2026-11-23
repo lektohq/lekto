@@ -87,7 +87,7 @@
 				accept={ACCEPT}
 				class="sr-only"
 				tabindex="-1"
-				aria-label={m.upload_choose()}
+				aria-hidden="true"
 				onchange={chosen}
 			/>
 		</EmptyNote>

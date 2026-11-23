@@ -352,10 +352,16 @@
 						maxlength={WEBHOOK_LIMITS.headerName}
 						required
 					/>
+					<!-- A header's value is no password of the person: no manager offers to make or keep
+					     one (Tobi, 23.11.2026, WC-K08); masked all the same. -->
 					<Input
 						aria-label={m.webhook_header_value()}
 						type="password"
-						autocomplete="new-password"
+						autocomplete="off"
+						data-1p-ignore
+						data-lpignore="true"
+						data-bwignore
+						data-form-type="other"
 						class="font-mono"
 						placeholder={stillKept(header) ? m.webhook_header_kept() : ''}
 						bind:value={header.value}

@@ -54,6 +54,8 @@ describe('sign-in page', () => {
 	it('signs in and returns to the page the user came from', async () => {
 		fetchMock.mockResolvedValueOnce(json(signedIn));
 		render(Page, { data: { next: '/ui/inbox', oidc: null, error: null } });
+		// The language and the look at the top are the page's banner (WZ-K08).
+		expect(screen.getByRole('banner')).toBeTruthy();
 
 		await enterPassword();
 

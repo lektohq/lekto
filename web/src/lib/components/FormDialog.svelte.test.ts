@@ -114,6 +114,22 @@ describe('FormDialog', () => {
 			expect(props.open).toBe(true);
 		});
 
+		it('focuses an editor without a form itself, not its first button (WZ-K06)', async () => {
+			const body = createRawSnippet(() => ({ render: () => `<p>A token</p>` }));
+			render(
+				EditorShell as never,
+				{
+					open: true,
+					title: 'Token',
+					ondelete: vi.fn(async () => {}),
+					deleteTitle: 'Widerrufen?',
+					children: body
+				} as never
+			);
+			const dialog = await screen.findByRole('dialog');
+			await waitFor(() => expect(document.activeElement).toBe(dialog));
+		});
+
 		it('asks for an editor too, which says itself that it holds something (WT1-K17)', async () => {
 			const user = userEvent.setup();
 			const body = createRawSnippet(() => ({ render: () => `<p>Its fields</p>` }));

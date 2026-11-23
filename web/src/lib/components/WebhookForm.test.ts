@@ -118,6 +118,10 @@ describe('WebhookForm', () => {
 		render(WebhookForm, { webhook: stored, cancelHref: '/ui/webhooks/hook', ondone: () => {} });
 		const value = await screen.findByLabelText(m.webhook_header_value());
 		expect((value as HTMLInputElement).placeholder).toBe(m.webhook_header_kept());
+		// No password manager offers to make or keep a header's value (WC-K08).
+		expect(value.getAttribute('autocomplete')).toBe('off');
+		expect(value.hasAttribute('data-1p-ignore')).toBe(true);
+		expect(value.getAttribute('data-lpignore')).toBe('true');
 		await userEvent.click(screen.getByLabelText(m.webhook_signed()));
 		await userEvent.click(screen.getByRole('button', { name: m.save() }));
 		expect(sent.map((item) => [item.method, item.path])).toEqual([

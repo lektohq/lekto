@@ -90,7 +90,7 @@
 	>
 		<div class="flex items-center gap-2.5">
 			<TriangleAlert
-				class="size-[18px] shrink-0 text-lane-yellow-foreground"
+				class="size-4.5 shrink-0 text-lane-yellow-foreground"
 				aria-hidden="true"
 				strokeWidth={2.2}
 			/>

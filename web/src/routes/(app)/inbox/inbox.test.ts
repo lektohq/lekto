@@ -484,7 +484,10 @@ describe('uploading in the inbox', () => {
 			await user.click(screen.getByRole('button', { name: m.upload_title() }));
 			const dialog = await screen.findByRole('dialog');
 			expect(within(dialog).queryByRole('combobox')).toBeNull();
-			await user.upload(within(dialog).getByLabelText(m.upload_choose()), [pdf('a.pdf')]);
+			// The field itself is hidden: its button stands for it (WZ-K01).
+			const field = dialog.querySelector<HTMLInputElement>('input[type="file"]')!;
+			expect(within(dialog).queryAllByLabelText(m.upload_choose())).toEqual([]);
+			await user.upload(field, [pdf('a.pdf')]);
 			await waitFor(() => expect(calls(api)).toContain('POST /api/v1/documents'));
 			await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
 			await waitFor(() => expect(document.body.style.pointerEvents).not.toBe('none'));

@@ -387,7 +387,7 @@
 								{#each context.series.visibleSeries as line (line.key)}
 									<Spline
 										seriesKey={line.key}
-										strokeWidth={2.5}
+										strokeWidth={2.2}
 										stroke-dasharray={line.key === 'document_type' ? '6 4' : undefined}
 									/>
 								{/each}

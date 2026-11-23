@@ -92,4 +92,25 @@ describe('the settings', () => {
 				.filter((call) => call === 'GET /api/v1/auth/me')
 		).toHaveLength(1);
 	});
+
+	it('names the profile’s heading by its words alone, the hint beside it (WZ-K04)', async () => {
+		vi.stubGlobal(
+			'fetch',
+			fakeApi({
+				...masterData(),
+				'GET /api/v1/auth/me': () => ME,
+				'GET /api/v1/auth/me/profile': () => PROFILE,
+				'GET /api/v1/auth/oidc': () => ({ enabled: false, display_name: null })
+			})
+		);
+		goTo('/ui/settings?tab=profile');
+		render(Page);
+		const heading = await screen.findByRole('heading', { name: m.profile_title() });
+		// The hint's button beside the heading: inside, a screen reader reads its name as part of
+		// the heading ("Profil Hinweis zu Profil").
+		expect(heading.querySelector('button')).toBeNull();
+		expect(
+			screen.getByRole('button', { name: m.hint_about({ name: m.profile_title() }) })
+		).toBeTruthy();
+	});
 });

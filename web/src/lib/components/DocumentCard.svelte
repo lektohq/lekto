@@ -68,6 +68,7 @@
 	});
 	const FITS = 3;
 	const rest = $derived(chips.slice(FITS));
+	const uid = $props.id();
 </script>
 
 <!-- The inbox mark is a link of its own: it stands over the card's link, not inside it. -->
@@ -79,8 +80,10 @@
 			chosen && 'border-primary bg-panel'
 		)}
 	>
+		<!-- Named by its title, then contact, type and date, not by what stands first (WZ-K03). -->
 		<DocumentLink
 			{href}
+			labelledby="{uid}-title {uid}-contact {uid}-type {uid}-date"
 			choosing={onchoose !== undefined}
 			{onview}
 			class="group flex min-w-0 flex-1 flex-col text-sm"
@@ -101,9 +104,9 @@
 				{/if}
 				{#if contact}
 					<ContactAvatar {contact} size="xs" />
-					<span class="min-w-0 truncate">{contact.name}</span>
+					<span id="{uid}-contact" class="min-w-0 truncate">{contact.name}</span>
 				{:else}
-					<span class="min-w-0 truncate">{m.doc_no_contact()}</span>
+					<span id="{uid}-contact" class="min-w-0 truncate">{m.doc_no_contact()}</span>
 				{/if}
 			</div>
 			<div class="relative border-b">
@@ -118,6 +121,7 @@
 			</div>
 			<div class="flex min-w-0 flex-1 flex-col gap-1 p-3">
 				<span
+					id="{uid}-title"
 					class={cn(
 						'line-clamp-2 leading-snug font-semibold break-words hyphens-auto',
 						!onchoose && 'group-hover:underline'
@@ -130,9 +134,9 @@
 				>
 					<span class="flex min-w-0 items-center gap-1.5">
 						<TypeIcon icon={kind?.icon} class="size-3.5 shrink-0" />
-						<span class="truncate">{kind?.name}</span>
+						<span id="{uid}-type" class="truncate">{kind?.name}</span>
 					</span>
-					<span class="shrink-0 tabular-nums">
+					<span id="{uid}-date" class="shrink-0 tabular-nums">
 						{formatDate(document.document_date ?? document.created_at)}
 					</span>
 				</span>

@@ -106,7 +106,10 @@ describe('DocumentFiles', () => {
 		const table = await screen.findByRole('table');
 		expect(table.querySelectorAll('col')).toHaveLength(3);
 		expect(within(table).getByText('Producer')).toBeTruthy();
-		expect(screen.getByText(m.files_size_more({ percent: '11' }))).toBeTruthy();
+		// As the DOM's text is read: the no-break space before "%" as a space.
+		expect(
+			screen.getByText(m.files_size_more({ percent: '11' }).replace(/\s+/g, ' '))
+		).toBeTruthy();
 		await user.click(screen.getByRole('button', { name: m.files_archive() }));
 		expect(within(table).getByText('pdfaid:part')).toBeTruthy();
 		expect(within(table).queryByText('Producer')).toBeNull();

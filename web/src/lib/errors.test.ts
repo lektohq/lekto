@@ -180,7 +180,12 @@ describe('fieldErrors', () => {
 			}),
 			null
 		);
-		expect(fieldErrors(error)).toEqual({ name: 'Höchstens 200 Zeichen.', 'field:abc-1': 'odd' });
+		// The validator's own words are English: a value it refuses without a code of its own says
+		// so in the words of the UI (WY-K03).
+		expect(fieldErrors(error)).toEqual({
+			name: 'Höchstens 200 Zeichen.',
+			'field:abc-1': 'Dieser Wert ist ungültig.'
+		});
 	});
 
 	it('is empty for other errors', () => {

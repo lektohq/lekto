@@ -8,7 +8,7 @@
 	import type { Candidate } from '#lib/candidates.ts';
 	import ContactAvatar from '#lib/components/ContactAvatar.svelte';
 	import CandidateList from '#lib/components/document/CandidateList.svelte';
-	import SourceChip from '#lib/components/document/SourceChip.svelte';
+	import SourceChip, { SOURCE_CHIP } from '#lib/components/document/SourceChip.svelte';
 	import SourcesInfo from '#lib/components/document/SourcesInfo.svelte';
 	import { describeValue, fieldLabel } from '#lib/describe.ts';
 	import { byPage, provenance, type FieldEvidence, type Place } from '#lib/document-view.ts';
@@ -150,7 +150,7 @@
 			aria-label={hiddenPlaces === 1
 				? m.source_more_one()
 				: m.source_more({ count: formatNumber(hiddenPlaces) })}
-			class="shrink-0 rounded-full bg-panel px-2 font-mono text-micro leading-5 text-brand hover:underline"
+			class={SOURCE_CHIP}
 		>
 			+{hiddenPlaces}
 		</button>

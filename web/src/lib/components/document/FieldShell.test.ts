@@ -49,6 +49,10 @@ describe('a field with the pages of its quote', () => {
 		expect(chips()).toHaveLength(6);
 		// Who speaks to the page says what they read: a chip's name begins with it (WA-09).
 		const more = screen.getByRole('button', { name: m.source_more({ count: 2 }) });
+		// A target a finger hits, as the chips beside it (WY-K06).
+		expect(more.className.split(' ')).toEqual(
+			expect.arrayContaining(['relative', 'after:-inset-y-3'])
+		);
 		const shown = chips().map((page) =>
 			screen.getByRole('button', { name: m.source_jump({ page }) })
 		);

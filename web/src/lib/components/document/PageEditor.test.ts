@@ -82,7 +82,11 @@ describe('PageEditor', () => {
 		await user.click(screen.getByRole('button', { name: m.page_cut_after({ page: '1' }) }));
 		expect(
 			screen.getByText(
-				`${m.page_edit_part({ number: '2' })} · ${m.page_edit_part_pages({ first: '2', last: '3' })}`
+				// As the DOM's text is read: the no-break space of "S. 2–3" as a space.
+				`${m.page_edit_part({ number: '2' })} · ${m.page_edit_part_pages({ first: '2', last: '3' })}`.replace(
+					/\s+/g,
+					' '
+				)
 			)
 		).toBeTruthy();
 		await user.click(screen.getByRole('button', { name: m.page_edit_next_parts({ count: 2 }) }));
@@ -159,6 +163,8 @@ describe('PageEditor', () => {
 		};
 		await choose(m.page_edit_select_all());
 		expect(screen.getByRole('region', { name: m.page_edit_chosen({ count: 3 }) })).toBeTruthy();
+		// The count is said as it changes, also by "Alle wählen" (WZ-K10).
+		expect(within(bar()).getByRole('status').textContent).toBe(m.page_edit_chosen({ count: 3 }));
 		expect(tools()).toEqual(before);
 		await choose(m.bulk_select_none());
 		expect(screen.getByRole('region', { name: m.page_edit_none() })).toBeTruthy();

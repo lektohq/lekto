@@ -118,7 +118,7 @@
 			vertical && 'h-11 rounded-xl px-4 text-base'
 		)}
 	>
-		{#if vertical}<section.icon class="size-[18px]" aria-hidden="true" />{/if}
+		{#if vertical}<section.icon class="size-4.5" aria-hidden="true" />{/if}
 		<SteadyText text={section.label()} />
 		{#if section.path === '/inbox' && inbox.summary && tone}
 			<!-- Coloured by the worst lane in it; the label says what stands there. -->
@@ -338,7 +338,9 @@
 						class="gap-2 overflow-y-auto p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] data-[side=right]:w-80 data-[side=right]:pr-[max(1rem,env(safe-area-inset-right))]"
 					>
 						<Sheet.Header class="px-2">
-							<Sheet.Title><Logo class="text-lg" /></Sheet.Title>
+							<!-- Named as what it is, the logo beside its name (WZ-K05). -->
+							<Sheet.Title class="sr-only">{m.nav_main()}</Sheet.Title>
+							<Logo class="text-lg" />
 						</Sheet.Header>
 						{#if phone.current}
 							<div class="flex flex-col gap-0.5 px-4">

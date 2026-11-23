@@ -228,3 +228,18 @@ describe('the words of a hand-over', () => {
 		}
 	});
 });
+
+describe('a number and its unit', () => {
+	it('never break apart: a no-break space joins them (DESIGN.md, "Formats"; WY-K01)', () => {
+		const apart = /\} (?:MB|KB|GB|kB|ms|dpi|px|%|min|Min\.)(?![\w])|\b(?:S|p|pp)\. \{/;
+		const split = (catalog: Record<string, unknown>) =>
+			Object.entries(catalog)
+				.filter(([, text]) => typeof text === 'string' && apart.test(text))
+				.map(([key]) => key);
+		expect(split(de)).toEqual([]);
+		expect(split(en)).toEqual([]);
+		expect(apart.test('{size} MB')).toBe(true);
+		expect(apart.test('S. {page}')).toBe(true);
+		expect(apart.test('{size}\u00a0MB')).toBe(false);
+	});
+});

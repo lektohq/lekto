@@ -13,6 +13,7 @@
 		choosing = false,
 		onview,
 		title,
+		labelledby,
 		class: className,
 		children
 	}: {
@@ -21,6 +22,8 @@
 		onview?: () => void;
 		/** The whole title, where the card cuts it. */
 		title?: string;
+		/** The ids of what names the link, in order: its title first, not what stands first. */
+		labelledby?: string;
 		class?: string;
 		children: Snippet;
 	} = $props();
@@ -33,6 +36,7 @@
 	href={choosing ? undefined : href}
 	{title}
 	aria-haspopup={viewing ? 'dialog' : undefined}
+	aria-labelledby={choosing ? undefined : labelledby}
 	class={cn(
 		className,
 		choosing && 'cursor-pointer',

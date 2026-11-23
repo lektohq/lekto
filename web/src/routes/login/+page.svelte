@@ -105,13 +105,13 @@
 	</aside>
 
 	<div class="flex flex-1 flex-col">
-		<div class="flex items-center justify-between gap-2 px-6 py-6 sm:px-8 lg:justify-end">
+		<header class="flex items-center justify-between gap-2 px-6 py-6 sm:px-8 lg:justify-end">
 			<Logo class="text-xl lg:hidden" />
 			<div class="flex items-center gap-2">
 				<LanguageMenu />
 				<ThemeMenu />
 			</div>
-		</div>
+		</header>
 
 		<main class="flex flex-1 items-center justify-center px-6 pb-20">
 			<div class="flex w-full max-w-[400px] flex-col gap-7">
