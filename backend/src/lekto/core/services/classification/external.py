@@ -26,7 +26,6 @@ from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.fields import FieldDefinition, FieldType
 from lekto.core.domain.ids import FieldId
 from lekto.core.domain.json_value import JsonObject, JsonValue, as_object
-from lekto.core.domain.master_data import one_line
 from lekto.core.domain.pipeline import (
     MODEL,
     TRUNCATED,
@@ -37,6 +36,7 @@ from lekto.core.domain.pipeline import (
 )
 from lekto.core.domain.reasons import ReasonCode, because
 from lekto.core.domain.tasks import DEFAULT_TIMEOUT, Task, TaskKind, TaskStatus
+from lekto.core.domain.validation import one_line
 from lekto.core.domain.webhooks import ModelCallKind, Webhook
 from lekto.core.ports.object_store import ObjectStore
 from lekto.core.ports.unit_of_work import UnitOfWork, UnitOfWorkFactory

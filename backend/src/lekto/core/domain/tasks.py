@@ -17,7 +17,6 @@ The consumer answers with `POST /api/v1/external/tasks/{id}/result`, the token a
 `Authorization: Bearer`, and an envelope (`parse_answer`).
 """
 
-import re
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import StrEnum
@@ -27,7 +26,7 @@ from lekto.core.domain.ids import DocumentId, RuleId, TaskId, UserId, WebhookId,
 from lekto.core.domain.json_value import JsonObject, JsonValue, as_object, as_uuid
 from lekto.core.domain.pipeline import Node
 from lekto.core.domain.reasons import Reason
-from lekto.core.domain.validation import require_utc
+from lekto.core.domain.validation import breaks_lines, one_line, require_utc
 
 TOKEN_PREFIX = "lkt_"
 """The beginning of a task's token, so a leaked one is recognised."""
@@ -282,7 +281,6 @@ class TaskAnswer:
 
 
 _ENVELOPE = frozenset({"status", "producer", "answer", "reason"})
-_CONTROL = re.compile(r"[\x00-\x1f\x7f]+")
 
 
 def parse_answer(data: JsonValue) -> TaskAnswer:
@@ -301,7 +299,7 @@ def parse_answer(data: JsonValue) -> TaskAnswer:
         not isinstance(producer, str)
         or not producer.strip()
         or len(producer) > MAX_PRODUCER
-        or _CONTROL.search(producer) is not None
+        or breaks_lines(producer)
     ):
         raise ValidationError(f"producer: a text of 1 to {MAX_PRODUCER} characters")
     match item.get("status"):
@@ -317,6 +315,6 @@ def parse_answer(data: JsonValue) -> TaskAnswer:
                 raise ValidationError("an answer with status 'error' has a 'reason' text")
             if "answer" in item:
                 raise ValidationError("an answer with status 'error' has no 'answer'")
-            text = _CONTROL.sub(" ", reason).strip()[:MAX_REASON]
+            text = one_line(reason)[:MAX_REASON]
             return TaskAnswer(ok=False, reason=text, producer=producer)
     raise ValidationError("status: 'ok' or 'error'")

@@ -8,14 +8,6 @@ if TYPE_CHECKING:
     from lekto.core.domain.reasons import Reason
 
 
-def _because(code: str, **params: object) -> Reason:
-    """The reason `code` (a `ReasonCode` by its name), for errors defined before the reasons
-    can be imported here."""
-    from lekto.core.domain.reasons import ReasonCode, because
-
-    return because(ReasonCode[code], **params)
-
-
 class DomainError(Exception):
     """Base class for all errors of the core. Raised with a `Reason` (issue #83), its message is
     the reason's English text and `reason` keeps the code; raised with a text, `reason` is that
@@ -40,7 +32,9 @@ class NotFoundError(DomainError):
     """The entity does not exist, or the caller may not know that it exists."""
 
     def __init__(self, kind: str, id: UUID | str, reason: Reason | None = None) -> None:
-        super().__init__(reason or _because("NOT_FOUND", kind=kind, id=str(id)))
+        from lekto.core.domain.reasons import ReasonCode, because  # late: reasons imports this
+
+        super().__init__(reason or because(ReasonCode.NOT_FOUND, kind=kind, id=str(id)))
         self.kind = kind
         self.id = id
 
@@ -54,7 +48,9 @@ class SpaceWriteDeniedError(PermissionDeniedError):
     names the space, so a caller can tell which of its choices was refused."""
 
     def __init__(self, space_id: object, name: str) -> None:
-        super().__init__(_because("NO_WRITE_ACCESS_TO_SPACE", space=name))
+        from lekto.core.domain.reasons import ReasonCode, because  # late: reasons imports this
+
+        super().__init__(because(ReasonCode.NO_WRITE_ACCESS_TO_SPACE, space=name))
         self.space_id = space_id
 
 
@@ -66,7 +62,9 @@ class OpenFieldsError(ValidationError):
     """Confirming a document needs a decision on each of its open fields."""
 
     def __init__(self, fields: tuple[str, ...]) -> None:
-        super().__init__(_because("OPEN_FIELDS", fields=list(fields)))
+        from lekto.core.domain.reasons import ReasonCode, because  # late: reasons imports this
+
+        super().__init__(because(ReasonCode.OPEN_FIELDS, fields=list(fields)))
         self.fields = fields
 
 
@@ -85,12 +83,14 @@ class DuplicateDocumentError(ConflictError):
     one."""
 
     def __init__(self, existing: UUID | None, *, version: int | None = None) -> None:
+        from lekto.core.domain.reasons import ReasonCode, because  # late: reasons imports this
+
         if existing is None:
-            reason = _because("DUPLICATE_UNSEEN")
+            reason = because(ReasonCode.DUPLICATE_UNSEEN)
         elif version is None:
-            reason = _because("DUPLICATE_OF", id=str(existing))
+            reason = because(ReasonCode.DUPLICATE_OF, id=str(existing))
         else:
-            reason = _because("DUPLICATE_OF_VERSION", id=str(existing), version=version)
+            reason = because(ReasonCode.DUPLICATE_OF_VERSION, id=str(existing), version=version)
         super().__init__(reason)
         self.existing = existing
         self.version = version

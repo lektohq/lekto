@@ -22,6 +22,7 @@ from email.message import EmailMessage, Message
 from email.utils import getaddresses, parsedate_to_datetime
 from functools import cached_property, partial
 
+from lekto.core.domain import media_types
 from lekto.core.domain.errors import UnprocessableDocumentError
 from lekto.core.domain.mail_traits import Importance, importance_of
 from lekto.core.domain.pixels import pixels
@@ -30,7 +31,6 @@ from lekto.core.domain.validation import MAX_NAME, clean_filename, without_contr
 
 log = logging.getLogger(__name__)
 
-RFC822 = "message/rfc822"
 MAX_FORWARDS = 5
 """Levels of attached mails read (`mail_intake.letters` unwraps them); a mail attached deeper
 stays an attachment of the last (`.eml`). Each level is written again as the file of its mail
@@ -147,14 +147,14 @@ def _read(message: EmailMessage, source: bytes | Callable[[], bytes], depth: int
     messages: list[MailMessage] = []
     for part in _leaves(message):
         kind = part.get_content_type()
-        if kind == RFC822:
+        if kind == media_types.EML:
             inner = _attached(part)
             if inner is None:
                 continue
             if depth < MAX_FORWARDS:
                 messages.append(_read(inner, partial(_bytes, inner), depth + 1))
             else:
-                attachments.append(MailPart(_filename(part), RFC822, _bytes(inner)))
+                attachments.append(MailPart(_filename(part), media_types.EML, _bytes(inner)))
             continue
         if _is_body(part, html, text):
             continue
@@ -209,7 +209,7 @@ def _leaves(message: Message) -> Iterator[Message]:
     for part in message.get_payload() if message.is_multipart() else ():
         if not isinstance(part, Message):
             continue
-        if part.get_content_type() == RFC822 or not part.is_multipart():
+        if part.get_content_type() == media_types.EML or not part.is_multipart():
             yield part
         else:
             yield from _leaves(part)

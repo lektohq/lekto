@@ -73,7 +73,6 @@ from lekto.core.domain.pipeline import (
 )
 from lekto.core.domain.reasons import Reason, ReasonCode, because, reasons_to_json
 from lekto.core.domain.rule_conditions import (
-    TEXT_TARGET,
     Facts,
     MailOf,
     PatternSubject,
@@ -88,7 +87,7 @@ from lekto.core.domain.rule_planner import (
     SpaceTarget,
     reviewing_rules,
 )
-from lekto.core.domain.rules import Rule, SetSpace, Trigger
+from lekto.core.domain.rules import TEXT_TARGET, Rule, SetSpace, Trigger
 from lekto.core.ports.object_store import ObjectStore
 from lekto.core.ports.patterns import PatternMatcher
 from lekto.core.ports.templates import TemplateRenderer

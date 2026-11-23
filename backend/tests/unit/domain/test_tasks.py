@@ -99,6 +99,9 @@ def test_an_answer_is_an_envelope() -> None:
     error = parse_answer({"status": "error", "reason": "down\nfor\tmaintenance " + "x" * 400})
     assert not error.ok and error.reason is not None
     assert error.reason.startswith("down for maintenance") and len(error.reason) == MAX_REASON
+    # C1 controls and the Unicode line separators break a line too, as in a prompt (DB-K03).
+    broken = parse_answer({"status": "error", "reason": "down\x85for\u2028maintenance"})
+    assert broken.reason == "down for maintenance"
 
 
 @pytest.mark.parametrize(
@@ -113,6 +116,8 @@ def test_an_answer_is_an_envelope() -> None:
         ({"status": "ok", "answer": 1, "extra": 1}, "unknown keys: extra"),
         ({"status": "ok", "answer": 1, "producer": "x" * 101}, "producer"),
         ({"status": "ok", "answer": 1, "producer": "a\nb"}, "producer"),
+        ({"status": "ok", "answer": 1, "producer": "a\x9bb"}, "producer"),
+        ({"status": "ok", "answer": 1, "producer": "a\u2028b"}, "producer"),
     ],
 )
 def test_an_envelope_that_is_not_valid_says_why(data: object, message: str) -> None:

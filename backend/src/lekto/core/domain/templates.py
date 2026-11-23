@@ -134,9 +134,9 @@ _ORIGINS = (FactOrigin.PERSON, FactOrigin.MODEL, FactOrigin.PATTERN, FactOrigin.
 def facts_values(
     kept_facts: Iterable[DocumentFact], codes: Iterable[Code] = ()
 ) -> dict[str, TemplateValue | None]:
-    """What templates see of the document's facts (`fakten.md`, decision 13), none a person
-    rejected and none of a person's, by kind or role (a rule's template writes into what others
-    read):
+    """What templates see of the document's facts (`.knowledge/decisions/2026-10-25-facts.md`,
+    decision 13), none a person rejected and none of a person's, by kind or role (a rule's
+    template writes into what others read):
 
     - `facts.<kind>`: the document's own value of the kind (no reference), the first as the
       text reads, as the text writes it on one line (`DocumentFact.shown`,

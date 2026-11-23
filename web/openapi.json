@@ -31555,7 +31555,7 @@
           "person"
         ],
         "title": "FactRole",
-        "description": "What a fact is to the document that shows it (`fakten.md`, Rollen)."
+        "description": "What a fact is to the document that shows it (`.knowledge/architecture/fact-roles.md`)."
       },
       "FactState": {
         "type": "string",

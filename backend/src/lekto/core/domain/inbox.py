@@ -1,5 +1,5 @@
 """The inbox: what stands in whose inbox, under which tab, and how it left it (Tobi,
-17./18.10.2026; `architektur.md`, Verarbeitung, "Posteingang").
+17./18.10.2026; `.knowledge/architecture/inbox.md`).
 
 A document stands in the inbox of every editor of its space, and in the inbox of every user of
 an admin who includes all users (`all_users`); someone who only reads its space never has it

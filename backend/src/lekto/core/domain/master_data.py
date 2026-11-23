@@ -7,7 +7,6 @@ groups (`group_ids`), which their documents inherit. A contact enables topics (`
 which a document of the contact carries one at most. Tags and document types carry an icon,
 tags a colour, contacts a logo (`appearance`)."""
 
-import re
 from collections.abc import Iterable
 from dataclasses import dataclass, field, replace
 from datetime import datetime
@@ -32,7 +31,7 @@ from lekto.core.domain.identifiers import (
 )
 from lekto.core.domain.ids import ContactId, DocumentTypeId, TagId, UserId, new_id
 from lekto.core.domain.reasons import ReasonCode, because
-from lekto.core.domain.validation import name_key, require_name, require_utc
+from lekto.core.domain.validation import name_key, one_line, require_name, require_utc
 
 MAX_ALIASES = 100
 """Aliases of one contact."""
@@ -514,15 +513,6 @@ class Tag(MasterData):
             raise ValidationError(because(ReasonCode.GROUPS_MANUAL))
 
 
-_CONTROL = re.compile(r"[\x00-\x1f\x7f-\x9f]")
-
-
-def one_line(text: str) -> str:
-    """Control characters and runs of white space as one space: names go into prompts, where a
-    line break could start an instruction."""
-    return " ".join(_CONTROL.sub(" ", text).split())
-
-
 def _aliases(name: str, aliases: Iterable[str]) -> list[str]:
     """On one line, without duplicates (regardless of case); none may be the name."""
     result: list[str] = []
@@ -566,6 +556,7 @@ def _identifiers(identifiers: Iterable[Identifier]) -> list[Identifier]:
 
 
 MAX_TITLE_PATTERN = 500
+"""At most a rule's text (`rules.MAX_TEXT`): `title_rule` writes the pattern into one."""
 
 
 def _title_pattern(pattern: str | None) -> str | None:

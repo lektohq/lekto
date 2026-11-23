@@ -5647,7 +5647,7 @@ export interface components {
 		FactOrigin: 'pattern' | 'code' | 'model' | 'person';
 		/**
 		 * FactRole
-		 * @description What a fact is to the document that shows it (`fakten.md`, Rollen).
+		 * @description What a fact is to the document that shows it (`.knowledge/architecture/fact-roles.md`).
 		 * @enum {string}
 		 */
 		FactRole: 'contact' | 'target' | 'own' | 'thread' | 'refers' | 'person';

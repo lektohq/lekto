@@ -39,7 +39,7 @@ from lekto.core.domain.reasons import Reason, ReasonCode, because
 
 
 class FactRole(StrEnum):
-    """What a fact is to the document that shows it (`fakten.md`, Rollen)."""
+    """What a fact is to the document that shows it (`.knowledge/architecture/fact-roles.md`)."""
 
     CONTACT = "contact"  # points to the contact: customer number, personnel number, VAT ID
     TARGET = "target"  # points to what a series refers to: contract, policy, meter number
@@ -413,8 +413,9 @@ def quote_reason(
 
 def with_read(found: Iterable[DocumentFact], read: Iterable[DocumentFact]) -> list[DocumentFact]:
     """The facts the patterns and codes found, with what a reader gave (checked): a fact of the
-    same kind and value is one fact with both origins, in the role the reader gave (`fakten.md`,
-    decision 3: the language model decides the role); a fact only the reader gave comes in."""
+    same kind and value is one fact with both origins, in the role the reader gave
+    (`.knowledge/decisions/2026-10-25-facts.md`, decision 3: the language model decides the
+    role); a fact only the reader gave comes in."""
     facts = {fact.key: fact for fact in found}
     for fact in read:
         known = facts.get(fact.key)

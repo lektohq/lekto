@@ -156,11 +156,14 @@ def condition_from_json(data: JsonValue, where: str = "condition") -> MailCondit
     value = object_.get("value")
     if value is not None and not isinstance(value, str):
         raise ValidationError(f"{where}.value: expected a text")
+    field, op = str(object_.get("field")), str(object_.get("op"))
+    if field not in MailField:
+        raise ValidationError(f"{where}.field: no field '{field}'")
+    if op not in MailOperator:
+        raise ValidationError(f"{where}.op: no operator '{op}'")
     try:
-        return MailCondition(
-            MailField(str(object_.get("field"))), MailOperator(str(object_.get("op"))), value
-        )
-    except ValueError as error:
+        return MailCondition(MailField(field), MailOperator(op), value)
+    except ValidationError as error:  # the place too, as for the steps (DB-K05)
         raise ValidationError(f"{where}: {error}") from None
 
 

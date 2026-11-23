@@ -62,6 +62,23 @@ def without_control(text: str) -> str:
     return _CONTROL.sub("", text)
 
 
+# Control characters with the C1 ones (U+0080 to U+009F), and the Unicode line and paragraph
+# separators: everything that breaks a line where a text goes into a prompt or a log.
+_LINE_BREAKING = re.compile(r"[\x00-\x1f\x7f-\x9f\u2028\u2029]")
+
+
+def one_line(text: str) -> str:
+    """Control characters (C0, DEL, C1), line separators and runs of white space as one space:
+    names and answers go into prompts and logs, where a line break could start an instruction
+    (DB-K03)."""
+    return " ".join(_LINE_BREAKING.sub(" ", text).split())
+
+
+def breaks_lines(text: str) -> bool:
+    """Whether `text` holds a character `one_line` turns into a space (other than white space)."""
+    return _LINE_BREAKING.search(text) is not None
+
+
 def clean_filename(raw: str) -> str:
     """The last path segment of a file's name as a client or a mail gives it, without control
     characters, at most `MAX_FILENAME` characters; empty if nothing is left (the caller names

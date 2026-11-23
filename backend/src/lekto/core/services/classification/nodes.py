@@ -207,7 +207,8 @@ _NO_WORDS: Mapping[int, tuple[ReadWord, ...]] = MappingProxyType({})
 
 MAX_CONTACTS = 20
 """Contacts a prompt lists, those the text names most: enough for every sender a letter
-names, few enough that the list does not crowd out the document (`architektur.md`)."""
+names, few enough that the list does not crowd out the document
+(`.knowledge/architecture/contacts-and-aliases.md`)."""
 
 
 @dataclass(frozen=True, kw_only=True)

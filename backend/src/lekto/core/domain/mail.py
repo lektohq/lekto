@@ -297,6 +297,8 @@ class Mailbox:
         folders = tuple(dict.fromkeys(folder.strip() for folder in self.folders))
         if not folders or "" in folders or len(folders) > MAX_FOLDERS:
             raise ValidationError(f"folders: 1 to {MAX_FOLDERS}, none empty")
+        if any(len(folder) > MAX_FOLDER for folder in folders):
+            raise ValidationError(f"folders: a name of at most {MAX_FOLDER} characters")
         self.folders = folders
         if not MIN_INTERVAL <= self.interval <= MAX_INTERVAL:
             raise ValidationError("interval: from one minute to one day")

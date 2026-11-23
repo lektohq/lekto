@@ -19,8 +19,8 @@ from dataclasses import dataclass
 from lekto.core.domain.document_facts import FactRole, HolderKind
 from lekto.core.domain.fields import FieldDefinition, FieldType
 from lekto.core.domain.identifiers import IdentifierKind, Key
-from lekto.core.domain.master_data import one_line
 from lekto.core.domain.text import Shortened
+from lekto.core.domain.validation import one_line
 
 EXTRACT_PROMPT = "extract-6"
 PROPOSE_PROMPT = "propose-6"

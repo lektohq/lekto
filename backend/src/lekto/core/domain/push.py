@@ -7,14 +7,13 @@ service sees neither the content nor whom it is for. The address must be one of 
 service's: Lekto sends nothing to an address a caller made up.
 """
 
-import base64
-import binascii
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
 from urllib.parse import urlsplit
 
+from lekto.core.domain.encoding import from_base64url
 from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.ids import DocumentId, PushDeviceId, UserId
 from lekto.core.domain.reasons import ReasonCode, because
@@ -57,8 +56,8 @@ def push_service_of(endpoint: str) -> str | None:
 
 def _key(value: str, length: int) -> bytes | None:
     try:
-        raw = base64.urlsafe_b64decode(value + "=" * (-len(value) % 4))
-    except binascii.Error, ValueError:
+        raw = from_base64url(value)
+    except ValueError:  # binascii.Error is one
         return None
     return raw if len(raw) == length else None
 

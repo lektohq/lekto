@@ -89,6 +89,20 @@ MAX_PATTERN = 200
 MAX_LIST = 100
 
 
+MAIL_PREFIX = "mail_"
+"""A document rule's condition on the mail the document came with: the prefix and the name of
+the mail's trait (`mail_traits.MAIL_OPERATORS`), `mail_subject`."""
+
+
+def mail_trait(field: ConditionField) -> str:
+    """The mail's trait a condition field looks at: `subject` of `mail_subject`."""
+    return field.value.removeprefix(MAIL_PREFIX)
+
+
+TEXT_TARGET = "text"
+"""What a `matches` condition on the document's text runs against (`Condition.target`)."""
+
+
 class RuleScope(StrEnum):
     GLOBAL = "global"
     SPACE = "space"
@@ -184,7 +198,7 @@ _FIELD_OPERATORS: dict[ConditionField, frozenset[Operator]] = {
     ConditionField.RELATION: _REFERENCE_OPERATORS,
     ConditionField.MAIL_MAILBOX: _REFERENCE_OPERATORS,
 } | {
-    ConditionField(f"mail_{name}"): frozenset(Operator(op) for op in ops)
+    ConditionField(f"{MAIL_PREFIX}{name}"): frozenset(Operator(op) for op in ops)
     for name, ops in MAIL_OPERATORS.items()
 }
 TAG_FIELDS: dict[ConditionField, TagScope] = {
@@ -334,7 +348,7 @@ class Condition:
             case ConditionField.FACT:
                 _text(value, MAX_PATTERN if self.op is Operator.MATCHES else MAX_TEXT)
             case field if field in MAIL_FIELDS and field is not ConditionField.MAIL_MAILBOX:
-                check_mail_value(field.value.removeprefix("mail_"), value, label=field.value)
+                check_mail_value(mail_trait(field), value, label=field.value)
 
     @property
     def target(self) -> str:
@@ -344,7 +358,7 @@ class Condition:
             assert self.fact_kind is not None
             role = "" if self.fact_role is None else self.fact_role.value
             return f"fact:{self.fact_kind.value}:{role}"
-        return "text" if self.field_id is None else str(self.field_id)
+        return TEXT_TARGET if self.field_id is None else str(self.field_id)
 
     @property
     def values(self) -> list[JsonValue]:

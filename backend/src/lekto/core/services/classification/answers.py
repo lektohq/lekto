@@ -32,7 +32,7 @@ from lekto.core.domain.json_value import (
     as_uuid,
     loads,
 )
-from lekto.core.domain.master_data import one_line
+from lekto.core.domain.validation import one_line
 
 # Characters of a quoted passage that are kept: more than the prompt asks for
 # (`prompts.EVIDENCE_CHARACTERS`), so a long quote is cut, not lost.

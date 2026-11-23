@@ -193,8 +193,8 @@ class MailHead:
         raise ValueError(f"a mail's head has no texts of {field!r}")
 
     def text_holds(self, field: str, op: str, wanted: str) -> bool:
-        """Whether a text of `field` `is`, `starts_with`, `ends_with` or (any other `op`)
-        contains `wanted`, regardless of case."""
+        """Whether a text of `field` `is`, `starts_with`, `ends_with` or `contains` `wanted`,
+        regardless of case. ValueError for another `op`."""
         wanted = wanted.casefold()
         return any(_compare(op, text.casefold(), wanted) for text in self.texts(field))
 
@@ -207,7 +207,10 @@ def _compare(op: str, text: str, wanted: str) -> bool:
             return text.startswith(wanted)
         case "ends_with":
             return text.endswith(wanted)
-    return wanted in text
+        case "contains":
+            return wanted in text
+    # A text's operators are `_TEXT_OPERATORS`: another is a mistake, not a `contains` (DB-K07).
+    raise ValueError(f"no operator of a text: {op!r}")
 
 
 def importance_holds(importance: Importance | None, wanted: str) -> bool:

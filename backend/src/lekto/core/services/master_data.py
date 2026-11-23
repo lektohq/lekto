@@ -30,7 +30,6 @@ from lekto.core.domain.master_data import (
     MasterData,
     Tag,
     TagScope,
-    one_line,
 )
 from lekto.core.domain.names import match_key, related
 from lekto.core.domain.reasons import Action, Reason, ReasonCode, because
@@ -40,6 +39,7 @@ from lekto.core.domain.rules_json import definition_to_json
 from lekto.core.domain.sorting import sort_key
 from lekto.core.domain.templates import rename_field_key, unknown_values
 from lekto.core.domain.templates import uses_field as field_used
+from lekto.core.domain.validation import one_line
 from lekto.core.domain.webhooks import BodyFormat, Webhook
 from lekto.core.ports.clock import Clock
 from lekto.core.ports.object_store import ObjectStore
