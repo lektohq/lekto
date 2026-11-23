@@ -12,6 +12,7 @@ import { calls, fakeApi, notFound, problem } from '#lib/testing/api.ts';
 import { goTo } from '#lib/testing/page-state.svelte.ts';
 import Page from './+page.svelte';
 import { mailboxOf } from '#lib/testing/system.ts';
+import { settled } from '#lib/testing/time.ts';
 
 vi.mock('$app/navigation', () => import('#lib/testing/navigation.ts'));
 vi.mock('$app/state', () => import('#lib/testing/app-state.ts'));
@@ -92,7 +93,7 @@ describe('the page of a mailbox', () => {
 		vi.stubGlobal('fetch', api);
 		render(Page);
 		await screen.findByText(m.mailbox_log());
-		await new Promise((resolve) => setTimeout(resolve, 20));
+		await settled();
 		expect(calls(api).filter((call) => call === 'GET /api/v1/mailboxes/m1')).toHaveLength(1);
 		events.generation = 0;
 	});

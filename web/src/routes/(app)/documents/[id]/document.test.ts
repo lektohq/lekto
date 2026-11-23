@@ -25,6 +25,7 @@ import { goTo } from '#lib/testing/page-state.svelte.ts';
 import { returnTo } from '#lib/return-to.svelte.ts';
 import Page from './+page.svelte';
 import { streamEvents } from '#lib/testing/events.ts';
+import { elapse, fakeTime } from '#lib/testing/time.ts';
 
 type Document = components['schemas']['DocumentDetails'];
 
@@ -235,16 +236,18 @@ describe('the document view and seen', () => {
 
 	it('loads the document once after a burst of events of a run', async () => {
 		// Issue #75: a run sends two events for each node, some of them side by side.
+		fakeTime(); // the page gathers a burst for a while (`coalesced`): it passes at once
 		const api = serve(() => documentOf({ lane: null }));
 		render(Page);
-		await waitFor(() => expect(seen(api)).toHaveLength(1));
+		await vi.waitFor(() => expect(seen(api)).toHaveLength(1));
 		for (const node of ['signal_llm', 'signal_classifier', 'signal_neighbours', 'signal_facts']) {
 			emit?.('document.node_started', { document_id: 'doc-1', node, run: 1 });
 			emit?.('document.node_completed', { document_id: 'doc-1', node, run: 1, outcome: 'ok' });
 		}
 		const loads = () => calls(api).filter((call) => call === 'GET /api/v1/documents/doc-1');
-		await waitFor(() => expect(loads()).toHaveLength(2));
-		await new Promise((resolve) => setTimeout(resolve, 400));
+		await elapse(1000);
+		expect(loads()).toHaveLength(2);
+		await elapse(10_000);
 		expect(loads()).toHaveLength(2);
 	});
 
@@ -306,6 +309,7 @@ describe('the document view and seen', () => {
 
 describe('the inbox while one document is open', () => {
 	it('drops another document once it left the inbox, read anew', async () => {
+		fakeTime(); // the page gathers events for a while (`coalesced`): it passes at once
 		goTo('/ui/documents/doc-1?from=inbox', { id: 'doc-1' });
 		let items = ['doc-1', 'doc-2', 'doc-3'];
 		const api = serve(() => documentOf({ lane: 'green' }), {
@@ -315,18 +319,21 @@ describe('the inbox while one document is open', () => {
 			})
 		});
 		render(Page);
-		expect(await screen.findByText(m.doc_inbox_position({ position: 1, total: 3 }))).toBeTruthy();
+		const position = (total: number) =>
+			vi.waitFor(() => screen.getByText(m.doc_inbox_position({ position: 1, total })));
+		expect(await position(3)).toBeTruthy();
 		const read = () => calls(api).filter((call) => call.startsWith('GET /api/v1/inbox?')).length;
 		const before = read();
 		// Someone confirmed doc-2 elsewhere: it turned green.
 		items = ['doc-1', 'doc-3'];
 		emit?.('document.lane_changed', { document_id: 'doc-2', old: 'yellow', new: 'green' });
-		expect(await screen.findByText(m.doc_inbox_position({ position: 1, total: 2 }))).toBeTruthy();
+		await elapse(1000);
+		expect(await position(2)).toBeTruthy();
 		expect(read()).toBe(before + 1);
 		// A document outside the inbox changes: nothing to read.
 		emit?.('document.updated', { document_id: 'doc-elsewhere', fields: ['title'] });
 		emit?.('document.node_completed', { document_id: 'doc-3', node: 'ocr' });
-		await new Promise((resolve) => setTimeout(resolve, 50));
+		await elapse(10_000);
 		expect(read()).toBe(before + 1);
 	});
 

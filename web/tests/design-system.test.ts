@@ -1520,6 +1520,24 @@ describe('the design system (web/DESIGN.md)', () => {
 		).toEqual([]);
 	});
 
+	it('waits in tests for a signal or on fake time, never a fixed while (WT1-K16)', () => {
+		// `lib/testing/time.ts`: a wait too short passes a check that proves nothing, one long
+		// enough slows every run. A turn of the event loop (`setTimeout(…, 0)`) is no while.
+		const fixed = /setTimeout\([^,()]+,\s*[1-9]/;
+		expect(fixed.test('await new Promise((resolve) => setTimeout(resolve, 20));')).toBe(true);
+		expect(fixed.test('await new Promise((resolve) => setTimeout(resolve, 0));')).toBe(false);
+		const tests = import.meta.glob<string>('/src/**/*.test.ts', {
+			query: '?raw',
+			import: 'default',
+			eager: true
+		});
+		expect(
+			Object.entries(tests)
+				.filter(([, source]) => fixed.test(source))
+				.map(([path]) => path)
+		).toEqual([]);
+	});
+
 	it('answers a fake API in tests through lib/testing/api.ts, never by a json of its own', () => {
 		const tests = import.meta.glob<string>('/src/**/*.test.ts', {
 			query: '?raw',

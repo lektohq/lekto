@@ -2,6 +2,7 @@ import { render, screen, waitFor } from '@testing-library/svelte';
 import { createRawSnippet } from 'svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import PhoneSheet from './PhoneSheet.svelte';
+import { elapse, fakeTime } from '#lib/testing/time.ts';
 
 const close = createRawSnippet(() => ({
 	render: () => '<button type="button">Schließen</button>'
@@ -66,18 +67,20 @@ describe('PhoneSheet', () => {
 	});
 
 	it('springs back from a short, slow pull', async () => {
+		fakeTime();
 		const { onOpenChange, dialog, head } = sheet();
 		pull(head, 40, 800);
-		await new Promise((resolve) => setTimeout(resolve, 300));
+		await elapse(1000);
 		expect(onOpenChange).not.toHaveBeenCalled();
 		expect(dialog.style.transform).toBe('');
 		expect(screen.getByRole('dialog')).toBe(dialog);
 	});
 
 	it('leaves a tap on its close button to the button', async () => {
+		fakeTime();
 		const { onOpenChange } = sheet();
 		pull(screen.getByRole('button', { name: 'Schließen' }), 160);
-		await new Promise((resolve) => setTimeout(resolve, 300));
+		await elapse(1000);
 		expect(onOpenChange).not.toHaveBeenCalled();
 	});
 });

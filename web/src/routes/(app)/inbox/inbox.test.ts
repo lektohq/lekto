@@ -12,6 +12,7 @@ import { calls, fakeApi, json, masterData, noContent, problem } from '#lib/testi
 import { uploads } from '#lib/upload.svelte.ts';
 import Page from './+page.svelte';
 import { goTo } from '#lib/testing/page-state.svelte.ts';
+import { settled } from '#lib/testing/time.ts';
 
 vi.mock('$app/navigation', () => import('#lib/testing/navigation.ts'));
 vi.mock('$app/state', () => import('#lib/testing/app-state.ts'));
@@ -469,7 +470,7 @@ describe('uploading in the inbox', () => {
 		await fireEvent.dragEnter(window, { dataTransfer: { types: ['Files'] } });
 		expect(screen.queryByText(m.upload_drop_overlay())).toBeNull();
 		await fireEvent.drop(window, { dataTransfer: droppedFolder() });
-		await new Promise((resolve) => setTimeout(resolve, 20));
+		await settled();
 		expect(calls(api)).not.toContain('POST /api/v1/documents');
 		expect(screen.getByRole('button', { name: m.upload_title() })).toBeTruthy();
 	});

@@ -8,6 +8,7 @@ import { m } from '#lib/paraglide/messages.js';
 import { calls, fakeApi } from '#lib/testing/api.ts';
 import StreamView from './StreamView.svelte';
 import { goTo } from '#lib/testing/page-state.svelte.ts';
+import { settled } from '#lib/testing/time.ts';
 
 vi.mock('$app/navigation', () => import('#lib/testing/navigation.ts'));
 vi.mock('$app/state', () => import('#lib/testing/app-state.ts'));
@@ -156,7 +157,7 @@ describe('StreamView', () => {
 
 		await rerender({ query, lookup: null, version: 1 });
 		await vi.waitFor(() => expect(calls(api)).toHaveLength(2));
-		await new Promise((resolve) => setTimeout(resolve, 20));
+		await settled();
 		expect(within(table()).getByRole('link', { name: /Abschlag c/ })).toBeTruthy();
 		expect(within(table()).getByRole('button', { name: m.stream_fewer() })).toBeTruthy();
 		expect(scroller.scrollLeft).toBe(120);

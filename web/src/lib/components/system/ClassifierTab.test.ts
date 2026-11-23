@@ -10,6 +10,7 @@ import { session } from '#lib/session.svelte.ts';
 import Page from './ClassifierTab.svelte';
 import { fakeApi, problem, type Route, type Routes } from '#lib/testing/api.ts';
 import { streamEvents } from '#lib/testing/events.ts';
+import { settled } from '#lib/testing/time.ts';
 
 let fetchMock: ReturnType<typeof fakeApi>;
 
@@ -130,7 +131,7 @@ describe('the classifier tab', () => {
 		emit('classifier.trained', { number: 3 }); // and again: this one comes first
 		await waitFor(() => expect(asked).toBe(3));
 		first!();
-		await new Promise((resolve) => setTimeout(resolve, 20));
+		await settled();
 		expect(
 			screen.getByRole('heading', { name: m.classifier_model_title({ number: 3 }) })
 		).toBeTruthy();

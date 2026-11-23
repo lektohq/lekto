@@ -9,6 +9,7 @@ import { session } from '#lib/session.svelte.ts';
 import { fakeBack, goTo, testPage } from '#lib/testing/page-state.svelte.ts';
 import IdentifiersPanel from './IdentifiersPanel.svelte';
 import { type Routes, fakeApi, problem } from '#lib/testing/api.ts';
+import { settled } from '#lib/testing/time.ts';
 
 vi.mock('$app/navigation', () => import('#lib/testing/app-navigation.ts'));
 vi.mock('$app/state', () => import('#lib/testing/app-state.ts'));
@@ -400,7 +401,7 @@ describe('IdentifiersPanel', () => {
 		await user.click(screen.getByRole('button', { name: new RegExp(`^${m.open_suggested()}`) }));
 		await vi.waitFor(async () => expect(await rows()).toHaveLength(1));
 		late!();
-		await new Promise((resolve) => setTimeout(resolve, 30));
+		await settled();
 		// The late answer's 100 would stand beside the list of the suggestions.
 		expect(learned().textContent).not.toContain('100');
 		expect(learned().textContent).toContain('1');

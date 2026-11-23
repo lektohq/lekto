@@ -5,6 +5,7 @@ import { events } from '#lib/events.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import DocumentText from './DocumentText.svelte';
 import { streamEvents } from '#lib/testing/events.ts';
+import { settled } from '#lib/testing/time.ts';
 
 let answer: object = {};
 let fetchMock = fakeApi();
@@ -61,7 +62,7 @@ describe('DocumentText', () => {
 
 	it('asks for no text before the document has it', async () => {
 		render(DocumentText, { documentId: 'doc-1', hasText: false });
-		await new Promise((resolve) => setTimeout(resolve, 20));
+		await settled();
 		expect(fetchMock).not.toHaveBeenCalled();
 		expect(document.querySelector('[data-page]')).toBeNull();
 		expect(screen.queryByText(m.loading())).toBeNull();

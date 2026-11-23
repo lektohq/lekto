@@ -11,6 +11,7 @@ import { summaryOf } from '#lib/testing/documents.ts';
 import { goTo } from '#lib/testing/page-state.svelte.ts';
 import { signIn } from '#lib/testing/session.ts';
 import Layout from './+layout.svelte';
+import { elapse, fakeTime } from '#lib/testing/time.ts';
 
 vi.mock('$app/navigation', () => import('#lib/testing/navigation.ts'));
 vi.mock('$app/state', () => import('#lib/testing/app-state.ts'));
@@ -31,8 +32,9 @@ describe('the app frame', () => {
 			() => ({})
 		);
 		vi.stubGlobal('fetch', api);
+		fakeTime(); // a refresh the counter puts off would fall due: it passes at once
 		render(Layout, { children: createRawSnippet(() => ({ render: () => '<p>Seite</p>' })) });
-		await new Promise((resolve) => setTimeout(resolve, 50));
+		await elapse(5000);
 		expect(calls(api).filter((call) => call === 'GET /api/v1/inbox/summary')).toHaveLength(1);
 	});
 });

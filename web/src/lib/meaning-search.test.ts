@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { calls, fakeApi, noContent } from '#lib/testing/api.ts';
 import { forgetMeaningSearch, warmSearch } from './meaning-search.ts';
+import { settled } from '#lib/testing/time.ts';
 
 afterEach(() => {
 	forgetMeaningSearch();
@@ -36,7 +37,7 @@ describe('warming the search', () => {
 		const fetch = stub(false);
 		warmSearch(1_000_000);
 		await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
-		await new Promise((resolve) => setTimeout(resolve, 10));
+		await settled();
 		expect(warmed(fetch)).toHaveLength(0);
 	});
 });

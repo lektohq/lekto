@@ -6,6 +6,7 @@ import type { FieldEvidence } from '#lib/document-view.ts';
 import { m } from '#lib/paraglide/messages.js';
 import FieldShell from './FieldShell.svelte';
 import { lookupOf } from '#lib/testing/master-data.ts';
+import { settled } from '#lib/testing/time.ts';
 
 const input = createRawSnippet(() => ({ render: () => '<input id="field-amount" />' }));
 const lookup = lookupOf({
@@ -109,7 +110,7 @@ describe('the mark of a field', () => {
 		onfocus.mockClear();
 		// The popover stands outside the field in the page and takes the focus.
 		outside.focus();
-		await new Promise((resolve) => setTimeout(resolve, 10));
+		await settled();
 		expect(onfocus).not.toHaveBeenCalled();
 		await fireEvent.mouseLeave(screen.getByRole('group'));
 		expect(onfocus).not.toHaveBeenCalled();

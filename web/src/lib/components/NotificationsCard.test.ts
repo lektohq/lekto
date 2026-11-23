@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { m } from '#lib/paraglide/messages.js';
 import { fakeApi } from '#lib/testing/api.ts';
 import NotificationsCard from './NotificationsCard.svelte';
+import { settled } from '#lib/testing/time.ts';
 
 describe('NotificationsCard', () => {
 	it('keeps the latest switch when an earlier answer comes last (WC-K03)', async () => {
@@ -34,7 +35,7 @@ describe('NotificationsCard', () => {
 		await user.click(disabled);
 		await waitFor(() => expect(sent).toHaveLength(2));
 		first!();
-		await new Promise((resolve) => setTimeout(resolve, 20));
+		await settled();
 		expect(disabled.getAttribute('aria-checked')).toBe('true');
 		expect(waiting.getAttribute('aria-checked')).toBe('true');
 	});

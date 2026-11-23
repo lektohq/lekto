@@ -10,6 +10,7 @@ import { goTo, testPage } from '#lib/testing/page-state.svelte.ts';
 import { documentOf } from '#lib/testing/documents.ts';
 import RelationsCard from './RelationsCard.svelte';
 import { streamEvents } from '#lib/testing/events.ts';
+import { settled } from '#lib/testing/time.ts';
 
 vi.mock('$app/navigation', () => import('#lib/testing/app-navigation.ts'));
 vi.mock('$app/state', () => import('#lib/testing/app-state.ts'));
@@ -76,7 +77,7 @@ describe('RelationsCard', () => {
 		// Another document's relations, and another field of this one: nothing to read.
 		emit('document.updated', { document_id: 'other', fields: ['relations'] });
 		emit('document.updated', { document_id: 'reminder', fields: ['title'] });
-		await new Promise((resolve) => setTimeout(resolve, 20));
+		await settled();
 		expect(fetchMock).toHaveBeenCalledTimes(1);
 		emit('document.updated', { document_id: 'reminder', fields: ['relations'] });
 		expect(await screen.findByText(m.relations_refers_to())).toBeTruthy();

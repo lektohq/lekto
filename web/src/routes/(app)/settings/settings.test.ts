@@ -7,6 +7,7 @@ import { session } from '#lib/session.svelte.ts';
 import { calls, fakeApi, masterData, problem } from '#lib/testing/api.ts';
 import { goTo } from '#lib/testing/page-state.svelte.ts';
 import Page from './+page.svelte';
+import { settled } from '#lib/testing/time.ts';
 
 vi.mock('$app/navigation', () => import('#lib/testing/navigation.ts'));
 vi.mock('$app/state', () => import('#lib/testing/app-state.ts'));
@@ -85,7 +86,7 @@ describe('the settings', () => {
 		const before = api.mock.calls.length;
 		await user.click(screen.getByRole('button', { name: m.save() }));
 		await waitFor(() => expect(session.user?.display_name).toBe('Jane Doe'));
-		await new Promise((resolve) => setTimeout(resolve, 20));
+		await settled();
 		expect(
 			calls(api)
 				.slice(before)
