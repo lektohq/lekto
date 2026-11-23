@@ -58,11 +58,8 @@
 		{@const shown = pages[number - 1]}
 		{@const aspect = aspectOf(number)}
 		<!-- Turned sideways, the image is as wide as the box is high, and the other way round. -->
-		<span
-			class="relative block size-full overflow-hidden"
-			role="img"
-			aria-label={m.page_image({ number })}
-		>
+		<!-- The viewer names the page ("Seite 1 von 3"); the image inside says nothing more. -->
+		<span class="relative block size-full overflow-hidden">
 			<span
 				class={[
 					'absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2',

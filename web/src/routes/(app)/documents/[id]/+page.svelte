@@ -1,12 +1,13 @@
 <script lang="ts">
 	import { toast } from 'svelte-sonner';
+	import { TEXT_HINT, type TextHint } from '#lib/viewer/text-hint.ts';
 	import { leaveDocument } from '#lib/way-back.ts';
 	import PageTitle from '#lib/components/page/PageTitle.svelte';
 	import File from '@lucide/svelte/icons/file';
 	import ListChecks from '@lucide/svelte/icons/list-checks';
 	import SquarePen from '@lucide/svelte/icons/square-pen';
 	import TextAlignStart from '@lucide/svelte/icons/text-align-start';
-	import { onMount, tick, untrack, type Snippet } from 'svelte';
+	import { type Snippet, onMount, setContext, tick, untrack } from 'svelte';
 	import { SvelteSet } from 'svelte/reactivity';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
@@ -137,6 +138,8 @@
 	const leftAt = $derived(view.left === 'pages' ? pagesAt : textAt);
 	let panes = $state<HTMLDivElement | null>(null);
 	let viewer = $state<DocumentPages | null>(null);
+	// The pages are images; the pane's "Text" shows what they say (`text-hint.ts`).
+	setContext<TextHint>(TEXT_HINT, () => m.pages_text_hint());
 	let textPane = $state<DocumentText | null>(null);
 	let header = $state<DocumentHeader | null>(null);
 

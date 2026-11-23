@@ -1,8 +1,10 @@
 <script lang="ts">
+	import { setContext } from 'svelte';
 	import ArrowRight from '@lucide/svelte/icons/arrow-right';
 	import X from '@lucide/svelte/icons/x';
 	import { toast } from 'svelte-sonner';
 	import { page } from '$app/state';
+	import { TEXT_HINT, type TextHint } from '#lib/viewer/text-hint.ts';
 	import { api } from '#lib/api/client.ts';
 	import { unwrap } from '#lib/api/call.ts';
 	import { ApiError } from '#lib/api/problem.ts';
@@ -65,6 +67,9 @@
 	const parts = $derived(beam?.parts ? partsOf(beam.parts) : null);
 	const part = $derived(parts && beam ? (parts[beam.index] ?? null) : null);
 	let partPages = $state<PageImages | null>(null);
+	// The Beam only shows (web/DESIGN.md, "Beam"): for the text of a document's pages it points
+	// a screen reader to the document view. The pages of a stack being cut have no such view.
+	setContext<TextHint>(TEXT_HINT, () => (part ? null : m.pages_text_hint_beam()));
 	let document = $state<Document | null>(null);
 	let names = $state<{ contact: string | null; type: string | null }>({
 		contact: null,

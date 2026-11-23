@@ -7,7 +7,7 @@
 	import LayoutGrid from '@lucide/svelte/icons/layout-grid';
 	import Minus from '@lucide/svelte/icons/minus';
 	import Plus from '@lucide/svelte/icons/plus';
-	import { onMount, tick, type Snippet } from 'svelte';
+	import { getContext, onMount, tick, type Snippet } from 'svelte';
 	import Segmented from '#lib/components/Segmented.svelte';
 	import type { Mark, Place } from '#lib/document-view.ts';
 	import { m } from '#lib/paraglide/messages.js';
@@ -26,6 +26,7 @@
 		type Point,
 		type Room
 	} from '#lib/viewer/zoom.ts';
+	import { TEXT_HINT, type TextHint } from '#lib/viewer/text-hint.ts';
 	import { Separator } from '#lib/components/ui/separator/index.ts';
 	import IconButton from '#lib/components/IconButton.svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
@@ -41,6 +42,11 @@
 	// tells when a page comes near the view, `onsettle` when
 	// the zoom has come to rest, with the pages in view (to be drawn anew at their size);
 	// `onpage` the page in the upper third of the view, as the toolbar counts it.
+	// Where the text of these pages stands, said by whoever shows the viewer (`text-hint.ts`).
+	const uid = $props.id();
+	const whereText = getContext<TextHint | undefined>(TEXT_HINT);
+	const textHint = $derived(whereText?.() ?? null);
+
 	let {
 		sizes,
 		label,
@@ -416,12 +422,14 @@
 		</span>
 		{@render end?.()}
 	</div>
+	{#if textHint}<span id="{uid}-text" class="sr-only">{textHint}</span>{/if}
 	<!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
 	<div
 		bind:this={container}
 		role="document"
 		tabindex="0"
 		aria-label={label}
+		aria-describedby={textHint ? `${uid}-text` : undefined}
 		onkeydown={keydown}
 		onscroll={follow}
 		ondblclick={enlarge}
@@ -434,8 +442,14 @@
 			<div class="w-full p-6"><LoadProblem {problem} {onretry} /></div>
 		{:else}
 			{#each sizes as size, index (index)}
+				<!-- A page is an image of the document; its name says which one. -->
 				<div
 					use:watch={index + 1}
+					role="img"
+					aria-label={m.pdf_page({
+						current: formatNumber(index + 1),
+						total: formatNumber(sizes.length)
+					})}
 					class="relative shrink-0 bg-white shadow-sm select-none"
 					style:width={`${size.width * zoom}px`}
 					style:height={`${size.height * zoom}px`}

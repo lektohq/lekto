@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import { userEvent } from '@testing-library/user-event';
 import { toast } from 'svelte-sonner';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -195,6 +195,10 @@ describe('Beam', () => {
 		await waitFor(() => expect(sheet.textContent).toContain('Stadtwerke · Rechnung'));
 		expect(sheet.textContent).toContain(m.beam_position({ current: 1, total: 2 }));
 		expect(await screen.findAllByRole('img', { name: /1|2/ })).toHaveLength(2);
+		// The Beam only shows: for the text it points a screen reader to the document view (WZ-08).
+		const pages = within(sheet).getByRole('document');
+		const hint = document.getElementById(pages.getAttribute('aria-describedby') ?? '');
+		expect(hint?.textContent).toBe(m.pages_text_hint_beam());
 		expect([...sheet.querySelectorAll('img')].map((image) => image.getAttribute('src'))).toEqual([
 			'/api/v1/documents/a/pages/1',
 			'/api/v1/documents/a/pages/2'

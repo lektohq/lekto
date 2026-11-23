@@ -785,6 +785,10 @@ claims something from one, a person sees it with one tap. `Beam.svelte`, mounted
 app shell, on `ui/sheet` with `side="right"`: 640 px on a desktop, the whole screen on a phone,
 modal, over a dialog too.
 
+- **Pages are images with names:** in the document view and in the Beam each page is an image
+  named "Seite 1 von 3", and the region of the pages says where their text stands (unseen, for
+  a screen reader): under "Text" in the document view; the Beam, which only shows, points to
+  the document view (`viewer/text-hint.ts`).
 - **It only shows:** the eyebrow "Beam", the title, a line with contact · type · date; then,
   with more than one document, the `Stepper` "‹ › Dokument 2 von 24" (keys ← →); the pages exactly as the
   document view shows them, only in another window (Tobi, 03.11.2026): one component for both,
