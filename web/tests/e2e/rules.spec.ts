@@ -118,7 +118,7 @@ test('a rule is built, dry-run, applied, changed and deleted', async ({ page }) 
 	// All of: channel is one of web, and a group (any): contact is ours, or text contains NAME.
 	await choose(root.getByRole('combobox', { name: 'Subject' }).first(), 'channel');
 	await choose(root.getByRole('combobox', { name: 'Comparison' }).first(), 'in');
-	await root.getByRole('group', { name: 'Value' }).getByLabel('Web UI').check();
+	await root.getByRole('group', { name: 'Value' }).getByLabel('Web', { exact: true }).check();
 	await root.getByRole('button', { name: 'Add group' }).last().click();
 	const group = root.getByRole('group', { name: 'Group' });
 	await choose(group.getByRole('combobox', { name: 'Subject' }), 'contact');
@@ -151,7 +151,10 @@ test('a rule is built, dry-run, applied, changed and deleted', async ({ page }) 
 	});
 	await expect(page).toHaveURL(/\/apply\?application=[^&]+$/);
 	await page.reload();
-	await expect(page.getByText('1 changed, 0 unchanged, 0 skipped.')).toBeVisible();
+	// The bar says it (and its region for screen readers once more, unseen).
+	await expect(
+		page.getByRole('region', { name: 'Done' }).getByText('1 changed, 0 unchanged, 0 skipped.')
+	).toBeVisible();
 	const document = await (await api.get(`/api/v1/documents/${created.document}`)).json();
 	expect(document.tag_ids).toContain(created.tag);
 
