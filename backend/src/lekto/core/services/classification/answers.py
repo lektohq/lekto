@@ -31,6 +31,7 @@ from lekto.core.domain.json_value import (
     as_texts,
     as_uuid,
     loads,
+    objects_in,
 )
 from lekto.core.domain.validation import one_line
 
@@ -411,10 +412,25 @@ def _load(content: str) -> JsonObject:
     try:
         data = loads(text)
     except ValueError:
-        raise AnswerError("the answer is not JSON") from None
+        data = _last_object(text)
     if not isinstance(data, dict):
         raise AnswerError("the answer is not a JSON object")
     return data
+
+
+def _last_object(text: str) -> JsonObject:
+    """The answer in a text that is no JSON as a whole: its last JSON object. A model that
+    corrects itself writes the correction last (`{…} Wait — … Corrected answer: {…}`) with
+    `json_object`, which no endpoint enforces; with words around one object, it is that one.
+    One cut off or not fitting the schema makes the answer unfit: an earlier one was
+    withdrawn."""
+    try:
+        found = objects_in(text)
+    except ValueError:
+        found = []
+    if not found or found[-1] is None:
+        raise AnswerError("the answer is not JSON")
+    return found[-1]
 
 
 def _require_fields(

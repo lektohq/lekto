@@ -274,8 +274,9 @@ def retry_note(error: str) -> str:
     """After an answer that did not fit the schema: what was wrong, and to answer again. It
     follows the task, so the call shares the beginning of the one before."""
     return (
-        f"Your previous answer was not valid: {error}. Answer the task again with one JSON "
-        "object that follows the schema."
+        f"Your previous answer was not valid: {error}. Answer the task again with exactly one "
+        "JSON object that follows the schema, and nothing before or after it: no explanation, "
+        "no earlier version. If you correct a value, write only the corrected object."
     )
 
 

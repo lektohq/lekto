@@ -138,10 +138,28 @@ def test_fenced_answers_are_read() -> None:
     assert parse_propose(fenced, []).document_type == "Rechnung"
 
 
+def test_an_answer_that_corrects_itself_counts_with_its_last_object() -> None:
+    """With `json_object` no endpoint keeps a model from correcting itself after its answer;
+    the correction comes last and is the answer."""
+    first = json.dumps(ANSWER | {"document_date": {"value": "2026-03-31", "evidence": "3\n1.03"}})
+    corrected = json.dumps(ANSWER | {"document_date": {"value": "2026-03-31", "evidence": "31.03"}})
+    content = (
+        f"{first}\n\nWait — the evidence must be one passage. Corrected answer:\n\n{corrected}"
+    )
+    answer = parse_propose(content, ["a1"])
+    assert answer.document_date is not None and answer.document_date.evidence == "31.03"
+    # Words around one object, as a model writes them all the same.
+    said = parse_propose(f"Here is the answer: {json.dumps(ANSWER)} I hope it helps.", ["a1"])
+    assert said.document_type == "Rechnung"
+
+
 @pytest.mark.parametrize(
     ("content", "error"),
     [
         ("no json", "not JSON"),
+        # A correction cut off does not bring the withdrawn answer back.
+        (json.dumps(ANSWER) + ' Corrected: {"sender": {"value": "x"', "not JSON"),
+        ("{" * 500_000, "not JSON"),
         pytest.param("[" * 500_000, "not JSON", id="nested-deeper-than-the-parser-goes"),
         ("[1]", "not a JSON object"),
         (json.dumps({k: v for k, v in ANSWER.items() if k != "tags"}), "missing tags"),
@@ -400,7 +418,9 @@ def test_the_tasks_list_what_the_call_wants_after_the_document() -> None:
     assert 'The document is of type "Rechnung".' in message
     assert '- a3: "Art" (one of the options): "Strom", "Gas"' in message
     assert "- fields: one entry per listed key" in message
-    assert retry_note("missing tags").startswith("Your previous answer was not valid: missing")
+    note = retry_note("missing tags")
+    assert note.startswith("Your previous answer was not valid: missing")
+    assert "exactly one JSON object" in note and "nothing before or after it" in note
 
 
 def test_every_call_shares_the_system_prompt_and_no_list_is_in_it() -> None:
