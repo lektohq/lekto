@@ -52,14 +52,33 @@ def flatten_on_white(image: Image.Image) -> Image.Image:
 
 def in_plain_mode(image: Image.Image, *, palette: bool = False) -> Image.Image:
     """`image` as one bit, grey or RGB, and with `palette` also as a palette: itself if it is in
-    one of them, an image of integers or floats as grey, any other (CMYK, YCbCr, LAB, HSV, and a
-    palette without `palette`) as RGB. A PDF page holds the first three; OCRmyPDF takes a
-    palette too."""
+    one of them, an image of integers or floats as grey (`in_eight_bits`), any other (CMYK,
+    YCbCr, LAB, HSV, and a palette without `palette`) as RGB. A PDF page holds the first three;
+    OCRmyPDF takes a palette too."""
     if image.mode in ("1", "L", "RGB") or (palette and image.mode == "P"):
         return image
     if image.mode.startswith(("I", "F")):
-        return image.convert("L")
+        return in_eight_bits(image)
     return image.convert("RGB")
+
+
+def in_eight_bits(image: Image.Image) -> Image.Image:
+    """An image of integers or floats as grey of eight bits, scaled from the range its values
+    are in: 16 bits for `I;16` (a scanner's grey), else the least of 0 to 1 (floats only), 0 to
+    255 and 0 to 65535 that holds them, or up to the largest. Pillow's own conversion cuts every
+    value above 255 off: a scan of 16 bits became a white page."""
+    wide = image if image.mode in ("I", "F") else image.convert("I")
+    if image.mode.startswith("I;16"):
+        top = 65535.0
+    else:
+        highest = wide.getextrema()[1]  # one band: its least and its largest value
+        assert isinstance(highest, int | float)
+        ranges = (1.0, 255.0, 65535.0) if image.mode == "F" else (255.0, 65535.0)
+        top = next((limit for limit in ranges if highest <= limit), highest)
+    if top != 255.0:
+        factor = 255.0 / top
+        wide = wide.point(lambda value: value * factor)
+    return wide.convert("L")
 
 
 def image_dpi(size: tuple[int, int], stated: object) -> int:
