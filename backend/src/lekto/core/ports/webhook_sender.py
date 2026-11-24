@@ -11,9 +11,10 @@ from typing import Protocol
 
 from lekto.core.domain.reasons import Reason
 
-REFUSED = "the target has an address in the own network, which this webhook may not reach"
+REFUSED = "the target has no public address, and this webhook may reach no other"
 """The error of a request refused before it was sent (`WebhookResponse.refused`); every adapter
-says it alike."""
+says it alike. One text for a target in the own network and a name that does not exist, so that
+it tells nobody which names the own network has (XB-K02)."""
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -34,8 +35,8 @@ class WebhookResponse:
     """What came back: the status code, or None and a short `error` if there was no answer
     (unreachable, certificate refused, timeout). `duration_ms` is the time until then. The
     receiver's response body is not part of it: it is not read, kept or logged. `refused`: not
-    sent, because the target has an address that is not public and the request did not allow
-    one (`error` says so); trying again would not change that."""
+    sent, because the target has an address that is not public, or its name none at all, and
+    the request did not allow one (`error` says so); trying again would not change that."""
 
     status_code: int | None
     duration_ms: int
@@ -50,7 +51,7 @@ class WebhookSender(Protocol):
         """Send it once. Redirects are not followed (a 3xx is the answer). A failure on the way
         is the answer, with `status_code` None and an `error` that does not contain the URL
         (it may carry a secret in its path). Without `private`, a host that resolves to an address
-        that is not public is refused (`refused`), and the request goes to the address that was
-        checked, so that a second answer of the name server cannot lead elsewhere. Never
-        raises."""
+        that is not public, or to none, is refused (`refused`); one whose name server does not
+        answer for now is not (it may later). The request goes to the address that was checked,
+        so that a second answer of the name server cannot lead elsewhere. Never raises."""
         ...

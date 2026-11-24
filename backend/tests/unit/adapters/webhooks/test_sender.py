@@ -1,6 +1,7 @@
 """The httpx2 sender against a receiver on the loopback interface: the contracts, and what the
 contract cannot say (the headers it adds, certificate errors)."""
 
+import socket
 from collections.abc import AsyncIterator
 from datetime import timedelta
 
@@ -9,6 +10,7 @@ import pytest
 
 from lekto import __version__
 from lekto.adapters.outbound.webhooks import HttpWebhookSender
+from lekto.adapters.outbound.webhooks.sender import UNRESOLVED
 from lekto.composition.container import USER_AGENT
 from lekto.core.ports.webhook_sender import WebhookRequest, WebhookSender
 from tests.contracts.webhook_sender import Receiver, WebhookSenderContract, request
@@ -69,13 +71,14 @@ class TestHttpWebhookSender(WebhookSenderContract):
 class _Network:
     """A name server and a network that record what the sender asks and where it connects."""
 
-    def __init__(self, names: dict[str, list[str]]) -> None:
+    def __init__(self, names: dict[str, list[str]], *, failure: OSError | None = None) -> None:
         self.names = names
+        self.failure = failure
         self.sent: list[httpx2.Request] = []
 
     async def resolve(self, host: str) -> list[str]:
         if host not in self.names:
-            raise OSError(f"{host} resolves to no address")
+            raise self.failure or OSError(f"{host} resolves to no address")
         return self.names[host]
 
     def transport(self) -> httpx2.MockTransport:
@@ -126,10 +129,19 @@ async def test_a_target_with_an_address_that_is_not_public_is_refused(
     assert network.sent == []
 
 
-async def test_a_name_that_does_not_resolve_is_refused_like_one_in_the_own_network() -> None:
+@pytest.mark.parametrize(
+    "failure",
+    [
+        None,  # the resolver found no address
+        socket.gaierror(socket.EAI_NONAME, "Name or service not known"),
+    ],
+)
+async def test_a_name_that_does_not_resolve_is_refused_like_one_in_the_own_network(
+    failure: OSError | None,
+) -> None:
     """Else the log tells someone who may not reach the own network which names exist there
     (`postgres`, `meilisearch`) and which do not (XB-K02)."""
-    network = _Network({})
+    network = _Network({}, failure=failure)
     response = await _sender(network).send(request("https://hooks.example.org/in", private=False))
     refused = await _sender(_Network({"ollama": ["127.128.129.23"]})).send(
         request("http://ollama:11434/api/pull", private=False)
@@ -139,6 +151,17 @@ async def test_a_name_that_does_not_resolve_is_refused_like_one_in_the_own_netwo
         True,
         refused.error,
     )
+    assert network.sent == []
+
+
+async def test_a_name_server_that_does_not_answer_for_now_is_a_failure_tried_again() -> None:
+    """Not a refusal: the name may resolve on the next attempt (a name server not up yet), and
+    nobody can make it fail for a name of the own network only."""
+    network = _Network(
+        {}, failure=socket.gaierror(socket.EAI_AGAIN, "Temporary failure in name resolution")
+    )
+    response = await _sender(network).send(request("https://hooks.example.org/in", private=False))
+    assert (response.status_code, response.refused, response.error) == (None, False, UNRESOLVED)
     assert network.sent == []
 
 

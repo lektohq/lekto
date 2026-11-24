@@ -50,7 +50,7 @@ from lekto.core.domain.webhooks import (
     Webhook,
     WebhookDelivery,
 )
-from lekto.core.ports.webhook_sender import WebhookRequest
+from lekto.core.ports.webhook_sender import REFUSED, WebhookRequest
 from lekto.core.services import _jobs
 from lekto.core.services._push_queue import PUSH_JOB
 from lekto.core.services.objects import codes_key
@@ -952,7 +952,7 @@ async def test_a_target_in_the_own_network_is_dropped_once_its_owner_is_no_admin
         None,
         None,
     )
-    assert row.error and "own network" in row.error
+    assert row.error == REFUSED
     assert world.sender.requests == []
     assert all(job.status is JobStatus.DONE for job in deliveries(world))
     # Not a failure of the receiver: it does not count towards switching the webhook off.
