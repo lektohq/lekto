@@ -85,8 +85,9 @@ class Unfit(NamedTuple):
 def unfit(api_version: str | None) -> Unfit | None:
     """Why this client may not work with a Lekto that speaks the API `api_version`; None if it
     fits (`pylekto.api_fit`). Only an older Lekto, or one that names no version, stops it: a
-    newer one comes before a pylekto that speaks its API (pylekto follows a release), and its
-    own tests and its migration image run this client against it."""
+    newer one meets the client of an earlier release, and Lekto's own tests run this client
+    against it between a change of its API and the pylekto release that speaks it (released
+    before Lekto's, .knowledge/decisions/2026-11-24-pylekto-before-lekto.md)."""
     ours = f"this client speaks the API {API_VERSION} of Lekto {LEKTO_VERSION}"
     match api_fit(api_version):
         case "fits":

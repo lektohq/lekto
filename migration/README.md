@@ -10,8 +10,9 @@ part of the Lekto image.
 Lekto must speak at least the version of its API that pylekto speaks (`api_version` of
 `GET /auth/me`): with an older Lekto, or one that names no version, every command stops before it
 reads or writes anything and says to update Lekto. A newer Lekto gets a warning and the command
-goes on (pylekto follows a Lekto release); what that Lekto refuses is reported as usual, and the
-client of its release is the safer choice.
+goes on; what that Lekto refuses is reported as usual, and the client of its release is the safer
+choice. Each Lekto release brings the client of its own API: the pylekto that speaks it is
+released first.
 
 A migration is an ingest: Lekto reads every original itself (OCR as always: a page's own text
 layer stays, another program's invisible one is replaced, images are read), the migration plan
