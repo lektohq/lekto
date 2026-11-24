@@ -559,8 +559,8 @@ async def test_an_older_lekto_stops_every_command(
 
 @pytest.mark.parametrize("api_version", ["0.99", "1.0"])
 async def test_a_newer_lekto_is_warned_about_and_migrated(setup: Setup, api_version: str) -> None:
-    """pylekto follows a Lekto release: until then the newer Lekto's own tests and its migration
-    image run this client against it."""
+    """The client of an earlier release, or Lekto's own tests between a change of its API and the
+    pylekto release that speaks it (released before Lekto's), run this client against it."""
     setup.lekto.api_version = api_version
     for command in ("plan", "prepare", "run", "check"):
         assert await setup.run(command) == 0
