@@ -43,9 +43,9 @@ _SQLITE_PRAGMAS = (
 COMMAND_TIMEOUT = timedelta(minutes=5)
 """Postgres: how long one statement of the API, the worker and the commands may take (SQ-K07).
 Without it a connection the network lost without a word waits on the TCP keepalive (hours);
-nothing of theirs runs that long, and a write waiting this long for the write lock (the
-outbox's advisory lock) waits behind something stuck. Not for `lekto migrate`: a migration of
-a large database may take longer."""
+nothing of theirs runs that long (a purge deletes in batches, `purging`), and a write waiting
+this long for the write lock (the outbox's advisory lock) waits behind something stuck. Not for
+`lekto migrate`: a migration of a large database may take longer."""
 
 # A read-only connection leaves the journal mode alone: switching a fresh file to WAL is a write.
 _SQLITE_READER_PRAGMAS = (_SQLITE_BUSY,)

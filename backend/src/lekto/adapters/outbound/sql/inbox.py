@@ -22,6 +22,7 @@ from sqlalchemy import (
 
 from lekto.adapters.outbound.sql import tables as t
 from lekto.adapters.outbound.sql.documents import SqlDocumentRepository
+from lekto.adapters.outbound.sql.purging import delete_in_batches
 from lekto.adapters.outbound.sql.repositories import KEYS_PER_QUERY, via_columns
 from lekto.adapters.outbound.sql.spaces import member_space_ids
 from lekto.adapters.outbound.sql.transaction import Transaction
@@ -171,8 +172,8 @@ class SqlInboxRepository:
         )
 
     async def purge(self, *, before: datetime) -> int:
-        confirmations = await self._tx.write(
-            delete(_confirmations).where(_confirmations.c.confirmed_at < before)
+        confirmations = await delete_in_batches(
+            self._tx.write, _confirmations, _confirmations.c.confirmed_at < before
         )
         # A mark tells nothing once its document became new again after it, or is new for no
         # one: a later `new_at` is later still.
@@ -184,8 +185,10 @@ class SqlInboxRepository:
             )
             .exists()
         )
-        marks = await self._tx.write(delete(_seen).where(_seen.c.seen_at < before, telling_nothing))
-        return int(confirmations.rowcount) + int(marks.rowcount)
+        marks = await delete_in_batches(
+            self._tx.write, _seen, _seen.c.seen_at < before, telling_nothing
+        )
+        return confirmations + marks
 
     async def remove_for_user(self, user: UserId) -> int:
         result = await self._tx.write(delete(_seen).where(_seen.c.user_id == user))

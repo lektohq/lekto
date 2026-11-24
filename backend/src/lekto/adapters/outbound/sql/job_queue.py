@@ -26,7 +26,6 @@ from sqlalchemy import (
     Row,
     and_,
     case,
-    delete,
     func,
     insert,
     literal,
@@ -37,6 +36,7 @@ from sqlalchemy import (
 )
 
 from lekto.adapters.outbound.sql import tables as t
+from lekto.adapters.outbound.sql.purging import delete_in_batches
 from lekto.adapters.outbound.sql.transaction import Transaction
 from lekto.core.domain.errors import ConcurrencyError, ConflictError, NotFoundError
 from lekto.core.domain.ids import JobId, new_id
@@ -296,13 +296,12 @@ class SqlJobQueue:
         ]
 
     async def purge(self, *, before: datetime) -> int:
-        result = await self._tx.write(
-            delete(_jobs).where(
-                _jobs.c.status.in_([JobStatus.DONE.value, JobStatus.FAILED.value]),
-                _jobs.c.run_at < require_utc(before, "before"),
-            )
+        return await delete_in_batches(
+            self._tx.write,
+            _jobs,
+            _jobs.c.status.in_([JobStatus.DONE.value, JobStatus.FAILED.value]),
+            _jobs.c.run_at < require_utc(before, "before"),
         )
-        return int(result.rowcount)
 
     async def _finish(self, job: Job, *, status: JobStatus, **values: Any) -> None:
         await self._held(job, status=status.value, locked_until=None, **values)
