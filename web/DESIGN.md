@@ -62,10 +62,10 @@ A new token needs a value for both modes and that contrast.
 | `tpl-*`                                                                   | Liquid template highlighting only                                                                                                    |
 | `mark-edge`, `mark-light`                                                 | The edge of a mark on a page image (`.mark-glass`)                                                                                   |
 
-**Charts** (`chart-*`): a mark stands at least 3:1 on the card, the yellow `chart-2` too; the
-band of a 90th percentile (`chart-5`) about 2:1 on its track and apart from the median. Green and
-yellow are about as light, so stacked parts are kept apart by a gap or a line of the card. Every
-value a chart shows also stands as text.
+**Charts** (`chart-*`): a mark stands at least 3:1 on the card, except the yellow `chart-2`, which
+keeps the lane's light tone (Tobi, 24.11.2026); the band of a 90th percentile (`chart-5`) about
+2:1 on its track and apart from the median. Stacked parts are kept apart by a gap or a line of the
+card. Every value a chart shows also stands as text.
 
 **Lane tones:** a mark of a lane (badge, chip, step of the processing band, counter) has the lane's
 ground, its text in the lane's foreground, and a border in the foreground at low opacity. In light
