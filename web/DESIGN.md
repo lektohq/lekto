@@ -1002,6 +1002,11 @@ Every view that loads has these four states. Each looks the same everywhere:
 
 Two empty notes carry the owl ([Logo and owl](#logo-and-owl)).
 
+**Rejected or discarded** stays in view, struck through: `text-muted-foreground line-through`, with
+its word for a screen reader. So stand an identifier or a fact a person rejected, and, in the
+prompt dialog, the part of a model's answer Lekto did not read (the text around the last JSON
+object of an answer that corrected itself), with a line above that says so (Tobi, 24.11.2026).
+
 ## Patterns
 
 ### Footers

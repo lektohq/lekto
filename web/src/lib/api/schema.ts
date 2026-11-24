@@ -3327,6 +3327,22 @@ export interface components {
 			 */
 			not: boolean;
 		};
+		/**
+		 * AnswerPartOut
+		 * @description A part of a model's answer, in characters (Unicode code points) from 0.
+		 */
+		AnswerPartOut: {
+			/**
+			 * Start
+			 * @description First character, from 0.
+			 */
+			start: number;
+			/**
+			 * End
+			 * @description After the last character.
+			 */
+			end: number;
+		};
 		/** AnyGroup[ConditionSchema] */
 		'AnyGroup_ConditionSchema_-Input': {
 			any: components['schemas']['GroupItems_ConditionSchema_-Input'];
@@ -8527,6 +8543,8 @@ export interface components {
 			 * @description The model's text as it came.
 			 */
 			answer: string;
+			/** @description The part of `answer` Lekto read where it read a part: the last JSON object of an answer that is no JSON as a whole (a model that corrected itself); the rest was discarded. Null where it read the whole answer, and for a call without a document. */
+			read: components['schemas']['AnswerPartOut'] | null;
 			/**
 			 * Model
 			 * @example qwen3:8b

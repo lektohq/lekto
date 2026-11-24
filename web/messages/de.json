@@ -1998,6 +1998,8 @@
 	"prompt_characters": "{characters} Zeichen",
 	"prompt_input": "{characters} Zeichen · ≈ {tokens} Eingabe-Tokens",
 	"prompt_output": "{characters} Zeichen · {tokens} Ausgabe-Tokens",
+	"prompt_discarded": "verworfen",
+	"prompt_discarded_note": "Durchgestrichen: von Lekto verworfen. Gelesen hat Lekto das letzte JSON-Objekt der Antwort.",
 	"prompt_document_note": "Der Dokumenttext ist Teil der Nachricht.",
 	"prompt_parts_note": "Reihenfolge: Systemprompt (bei jedem Aufruf gleich), Dokument, Aufgabe; mit json_object danach das Schema der Antwort. Aufrufe zu einem Dokument beginnen gleich; ein Endpunkt kann das cachen.",
 	"log_editors_only": "Was der Schritt getan hat, sehen die Bearbeiter des Space und Admins.",
