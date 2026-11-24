@@ -119,7 +119,6 @@
 							highlighted={step.node === highlighted}
 							onhighlight={(on) => onhighlight(on ? step.node : null)}
 							controls={panelId(step.node)}
-							compact={grid}
 							onclick={() => ontoggle(step.node)}
 						/>
 						{#if !grid && step.node === selected}{@render panel(step)}{/if}

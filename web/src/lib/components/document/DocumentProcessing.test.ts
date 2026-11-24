@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { goto } from '$app/navigation';
 import { NODE_LABELS } from '#lib/node-labels.ts';
 import type { components } from '#lib/api/schema.ts';
-import { desktop } from '#lib/desktop.svelte.ts';
+import { desktop, wideDesktop } from '#lib/desktop.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import type { GraphNode } from '#lib/pipeline.ts';
 import { goTo } from '#lib/testing/page-state.svelte.ts';
@@ -195,10 +195,12 @@ beforeEach(() => {
 	serve([proposed, judged], { signal_llm: [exchange] });
 	goTo('/ui/documents/doc-1?tab=processing', { id: 'doc-1' });
 	desktop.override(true);
+	wideDesktop.override(true);
 });
 
 afterEach(() => {
 	desktop.override(null);
+	wideDesktop.override(null);
 });
 
 describe('DocumentProcessing', () => {
@@ -333,6 +335,16 @@ describe('DocumentProcessing', () => {
 			})
 		).toBeTruthy();
 		expect(within(matrix).queryByText(m.matrix_chip_question())).toBeNull();
+	});
+
+	it('sets the runs above the steps on a laptop, so that the four columns keep the width', async () => {
+		wideDesktop.override(false);
+		const { container } = show();
+		const runs = container.querySelector('#runs-heading') as HTMLElement;
+		const steps = container.querySelector('#steps-heading') as HTMLElement;
+		expect(runs.compareDocumentPosition(steps) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+		// The steps in their columns all the same: the details open in the panel below them.
+		expect(card(container, 'judge').getAttribute('aria-controls')).toBe('step-details');
 	});
 
 	it('runs the steps down a line on a narrower screen, opening a step below its card', async () => {

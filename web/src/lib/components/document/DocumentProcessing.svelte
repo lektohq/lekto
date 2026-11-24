@@ -16,7 +16,7 @@
 	import SignalMatrix from '#lib/components/document/SignalMatrix.svelte';
 	import type { DetailContext } from '#lib/components/document/StepDetails.svelte';
 	import StepEntries from '#lib/components/document/StepEntries.svelte';
-	import { desktop } from '#lib/desktop.svelte.ts';
+	import { desktop, wideDesktop } from '#lib/desktop.svelte.ts';
 	import { pageHref, stepHref, stepOf, viewHref, viewOf } from '#lib/document-view.ts';
 	import { formatDuration } from '#lib/duration.ts';
 	import { describeError } from '#lib/errors.ts';
@@ -470,34 +470,45 @@
 	/>
 {/snippet}
 
+{#snippet graphOf()}
+	<ProcessingGraph
+		{groups}
+		run={shownRun}
+		{selected}
+		{summaryOf}
+		{durationOf}
+		{phaseDuration}
+		{highlighted}
+		onhighlight={highlight}
+		ontoggle={toggle}
+		{details}
+	/>
+	{#if matrix.length > 0}<SignalMatrix rows={matrix} chips={false} />{/if}
+{/snippet}
+
 <!-- On a desktop the view fills the window: the left column and the box of the runs scroll
      each on their own, the page does not. Both are positioned, so what lies absolutely in them
      (text for screen readers) scrolls with them instead of stretching the page. -->
 <div class="lg:flex lg:h-full lg:min-h-0 lg:flex-col">
 	{#if problem}<div class="mb-4 shrink-0"><LoadProblem {problem} onretry={load} /></div>{/if}
-	{#if wide}
+	{#if wide && wideDesktop.current}
 		<div
 			class="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_20rem] grid-rows-[minmax(0,1fr)] items-start gap-6"
 		>
 			<div class="relative flex max-h-full min-h-0 min-w-0 flex-col gap-4 overflow-y-auto pr-1">
 				{@render summary()}
-				<ProcessingGraph
-					{groups}
-					run={shownRun}
-					{selected}
-					{summaryOf}
-					{durationOf}
-					{phaseDuration}
-					{highlighted}
-					onhighlight={highlight}
-					ontoggle={toggle}
-					{details}
-				/>
-				{#if matrix.length > 0}<SignalMatrix rows={matrix} chips={false} />{/if}
+				{@render graphOf()}
 			</div>
 			<div class="relative max-h-full min-w-0 overflow-y-auto">
 				{@render runBox()}
 			</div>
+		</div>
+	{:else if wide}
+		<!-- A laptop: the runs above the steps, so that their four columns keep the width. -->
+		<div class="relative flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto pr-1">
+			{@render summary()}
+			{@render runBox()}
+			{@render graphOf()}
 		</div>
 	{:else}
 		<div class="flex flex-col gap-4">
