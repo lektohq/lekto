@@ -22,8 +22,25 @@ describe('field values', () => {
 		expect(toApi('number', '1.234,5')).toBe('1234.5');
 		expect(toApi('number', '12,5')).toBe('12.5');
 		expect(toInput('number', '1234.5')).toBe('1234,5');
+		// A dot groups only three digits: one typed out of habit is the decimal point, as the
+		// server reads it, not a value a hundred times larger.
+		expect(toApi('number', '12.50')).toBe('12.50');
+		expect(toApi('amount', { amount: '12.50', currency: 'EUR' })).toEqual({
+			amount: '12.50',
+			currency: 'EUR'
+		});
+		expect(toApi('number', '1.234')).toBe('1234');
+		expect(toApi('number', '1.234.567,89')).toBe('1234567.89');
+		expect(toApi('number', '1 234,5')).toBe('1234.5');
+		expect(toApi('number', '-12,5')).toBe('-12.5');
+		expect(toApi('number', ',5')).toBe('0.5');
+		// What fits no notation goes to the API as typed, which refuses it.
+		expect(toApi('number', '1.2.3')).toBe('1.2.3');
+		expect(toApi('number', '1.234,5.6')).toBe('1.234,5.6');
 		setLocale('en', { reload: false });
 		expect(toApi('number', '1,234.5')).toBe('1234.5');
+		expect(toApi('number', '1,234')).toBe('1234');
+		expect(toApi('number', '12,50')).toBe('12.50');
 		expect(toInput('number', '1234.5')).toBe('1234.5');
 	});
 
