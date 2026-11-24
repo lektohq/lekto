@@ -238,7 +238,8 @@ class OpenIdentifierService:
         """Confirm every open identifier whose documents recommend it (admins, Tobi
         28.10.2026), each as `decide` confirms one: at its contact by hand, a suggested one at
         the contact or the person its documents name. One that cannot be done says why. Never
-        rejects: a rejected one is never learned again and leaves the list unseen."""
+        rejects: a rejected one is never learned again and leaves the list unseen. All of them,
+        however many: `MAX_DECISIONS` bounds what a request names, and this one names none."""
         async with self._uow() as uow:
             await require_admin(uow, actor, Action.CHANGE_MASTER_DATA)
             found, _, _, learned = await _open(uow)
@@ -249,8 +250,6 @@ class OpenIdentifierService:
         ]
         if not decisions:
             return []
-        if len(decisions) > MAX_DECISIONS:  # as `decide` takes them
-            raise ValidationError(because(ReasonCode.INPUT_TOO_MANY, max=MAX_DECISIONS))
         # What was read once, not again through `decide` (SA-K03).
         return await self._decide_all(actor, decisions, found, learned, session)
 
