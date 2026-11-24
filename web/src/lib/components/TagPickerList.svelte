@@ -59,14 +59,11 @@
 	const listed = $derived(searching && matches.length === 0 ? own : matches);
 	const isGroup = $derived(scope === 'contact' || scope === 'document_type');
 
-	// The tag a click chose already: the change of its radio that follows tells nothing new.
-	let clicked: string | null = null;
-
 	function toggle(id: string, on: boolean) {
-		if (single && on && clicked === id) {
-			clicked = null;
-			return;
-		}
+		// The topic chosen already tells nothing new: a click chose it before the change of its
+		// radio followed (WC-K13), whichever ran first in between (a browser runs the
+		// microtasks after the click, a test after both).
+		if (single && on && selected.includes(id)) return;
 		onchange(single ? (on ? [id] : []) : toggled(selected, id, on));
 	}
 
@@ -74,9 +71,6 @@
 	// to a radio they move to. It chooses before it closes: the change comes after the click.
 	function picked(event: MouseEvent, id: string) {
 		if (!single || event.detail === 0) return;
-		clicked = id;
-		// The change follows the click at once, or not at all (the tag was chosen already).
-		queueMicrotask(() => (clicked = null));
 		onchange([id]);
 		onpicked?.();
 	}
