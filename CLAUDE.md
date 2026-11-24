@@ -76,6 +76,14 @@ tells the homelab its version (`workflow_dispatch` of its `lekto-release.yml`, s
 `HOMELAB_DISPATCH_REPO` and `HOMELAB_DISPATCH_TOKEN`; see `deploy/README.md`).
 `.github/workflows/site.yml` asks lekto.dev to rebuild (`repository_dispatch` `lekto-release`,
 organization secret `LEKTO_DEV_DISPATCH_TOKEN`), which then shows the new version. The repository carries the version `0.0.0.dev0`.
+
+A release whose API changed since the previous one (`API_VERSION`) needs the pylekto of that API
+first, so `lekto-migration` brings the client of its own API: release pylekto from the
+`openapi.json` of `main` with the version of the release draft (see pylekto's `CLAUDE.md`), raise
+`pylekto==` in `migration/` and in the backend's dev group in a pull request (label
+`dependencies`, no other merge before the release), then publish Lekto. `release.yml` warns when
+the pylekto of `migration/uv.lock` speaks another API (`.github/scripts/pylekto_api.py`).
+
 Every action in a workflow is pinned to its commit with the version in a comment
 (`uses: actions/checkout@<sha> # v6.1.0`, which Renovate updates); a test in `.github/scripts`
 fails on a tag.
