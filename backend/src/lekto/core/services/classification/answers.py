@@ -12,7 +12,6 @@ to the prompts before did, and so does one whose label is no text.
 """
 
 import json
-import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Self
@@ -20,6 +19,7 @@ from uuid import UUID
 
 from lekto.core.domain.document_facts import MODEL_HOLDER_KINDS, HolderKind, ReadFact
 from lekto.core.domain.documents import MAX_TITLE
+from lekto.core.domain.exchanges import answer_json
 from lekto.core.domain.fields import FieldDefinition, FieldType
 from lekto.core.domain.holders import ReadHolder
 from lekto.core.domain.ids import FieldId
@@ -31,14 +31,12 @@ from lekto.core.domain.json_value import (
     as_texts,
     as_uuid,
     loads,
-    objects_in,
 )
 from lekto.core.domain.validation import one_line
 
 # Characters of a quoted passage that are kept: more than the prompt asks for
 # (`prompts.EVIDENCE_CHARACTERS`), so a long quote is cut, not lost.
 _EVIDENCE_LENGTH = 500
-_FENCE = re.compile(r"^\s*```(?:json)?\s*(.*?)\s*```\s*$", re.DOTALL)
 
 _TEXT_OR_NULL: JsonObject = {"type": ["string", "null"]}
 
@@ -407,30 +405,15 @@ def _proposal(value: JsonObject, *, labelled: bool = False) -> JsonObject:
 
 
 def _load(content: str) -> JsonObject:
-    fenced = _FENCE.match(content)
-    text = fenced.group(1) if fenced else content
-    try:
-        data = loads(text)
-    except ValueError:
-        data = _last_object(text)
+    """The JSON object of the answer (`exchanges.answer_json`): the whole, or the last of
+    several. One cut off or not fitting the schema makes the answer unfit."""
+    found = answer_json(content)
+    if found is None:
+        raise AnswerError("the answer is not JSON")
+    data = loads(content[found.start : found.end])
     if not isinstance(data, dict):
         raise AnswerError("the answer is not a JSON object")
     return data
-
-
-def _last_object(text: str) -> JsonObject:
-    """The answer in a text that is no JSON as a whole: its last JSON object. A model that
-    corrects itself writes the correction last (`{…} Wait — … Corrected answer: {…}`) with
-    `json_object`, which no endpoint enforces; with words around one object, it is that one.
-    One cut off or not fitting the schema makes the answer unfit: an earlier one was
-    withdrawn."""
-    try:
-        found = objects_in(text)
-    except ValueError:
-        found = []
-    if not found or found[-1] is None:
-        raise AnswerError("the answer is not JSON")
-    return found[-1]
 
 
 def _require_fields(

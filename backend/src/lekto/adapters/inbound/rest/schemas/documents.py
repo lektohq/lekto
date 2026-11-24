@@ -610,6 +610,13 @@ class LogEntry(BaseModel):
         )
 
 
+class AnswerPartOut(BaseModel):
+    """A part of a model's answer, in characters (Unicode code points) from 0."""
+
+    start: int = Field(description="First character, from 0.")
+    end: int = Field(description="After the last character.")
+
+
 class ModelCallOut(BaseModel):
     """One request to the language model and its answer. A call of the signal or the fields node
     (since `propose-6`, `extract-6`) sent `system`, `document`, `task` and, after an unfit
@@ -630,6 +637,11 @@ class ModelCallOut(BaseModel):
         "role); empty for the node's first request and its attempts."
     )
     answer: str = Field(description="The model's text as it came.")
+    read: AnswerPartOut | None = Field(
+        description="The part of `answer` Lekto read where it read a part: the last JSON object "
+        "of an answer that is no JSON as a whole (a model that corrected itself); the rest was "
+        "discarded. Null where it read the whole answer, and for a call without a document."
+    )
     model: str = Field(examples=["qwen3:8b"])
     usage: dict[str, Any] = Field(
         description=(
@@ -649,6 +661,9 @@ class ModelCallOut(BaseModel):
             retry=call.retry,
             request=FACTS_SCHEMA if call.request == FACTS_SCHEMA else "",
             answer=call.answer,
+            read=None
+            if (part := call.read_part()) is None
+            else AnswerPartOut(start=part[0], end=part[1]),
             model=call.model,
             usage=dict(call.usage),
         )

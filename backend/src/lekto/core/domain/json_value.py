@@ -4,6 +4,7 @@ input that must fit: a ValidationError that names the place otherwise."""
 
 import json
 import math
+from dataclasses import dataclass
 from datetime import date
 from typing import Any
 from uuid import UUID
@@ -31,14 +32,24 @@ MAX_OBJECTS = 100
 """Beginnings of JSON objects `objects_in` tries at most."""
 
 
-def objects_in(text: str) -> list[dict[str, Any] | None]:
+@dataclass(frozen=True)
+class Found:
+    """A JSON object in a text, from `start` to `end` (characters); `value` None where a "{"
+    begins none (one cut off), `end` then right after it."""
+
+    start: int
+    end: int
+    value: dict[str, Any] | None
+
+
+def objects_in(text: str) -> list[Found]:
     """The JSON objects `text` holds one after the other, with words before, between or after
     them: what a model writes that corrects itself (`{…} Wait — corrected answer: {…}`). A "{"
-    that begins none (one cut off) is None, followed by the objects within it. ValueError as
-    `loads` for one nested too deeply, and for more than `MAX_OBJECTS` beginnings (each that
-    fails costs a pass over the text before it); numbers as `loads` reads them."""
+    that begins none (one cut off) is found without a value, followed by the objects within it.
+    ValueError as `loads` for one nested too deeply, and for more than `MAX_OBJECTS` beginnings
+    (each that fails costs a pass over the text before it); numbers as `loads` reads them."""
     decoder = json.JSONDecoder(parse_constant=_not_finite, parse_float=_finite)
-    found: list[dict[str, Any] | None] = []
+    found: list[Found] = []
     at = text.find("{")
     while at >= 0:
         if len(found) == MAX_OBJECTS:
@@ -48,10 +59,10 @@ def objects_in(text: str) -> list[dict[str, Any] | None]:
         except RecursionError:
             raise ValueError("the JSON is nested too deeply") from None
         except ValueError:
-            found.append(None)
+            found.append(Found(at, at + 1, None))
             at = text.find("{", at + 1)
             continue
-        found.append(value)  # an object: it begins with "{"
+        found.append(Found(at, end, value))  # an object: it begins with "{"
         at = text.find("{", end)
     return found
 
