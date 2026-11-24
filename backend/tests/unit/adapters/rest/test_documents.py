@@ -403,12 +403,25 @@ async def test_the_model_exchanges_are_listed_per_run(api: Api) -> None:
                     "retry": None,
                     "request": "",
                     "answer": "{}",
+                    "read": None,
                     "model": "m",
                     "usage": {"total_tokens": 9},
                 }
             ],
         }
     ]
+    # An answer that corrected itself: the part read, the last object; the rest discarded.
+    answer = '{"a": 1}\n\nWait — corrected: {"a": 2}'
+    corrected = ModelCall(system="s", document="d", task="t", answer=answer, model="m", usage={})
+    await api.container.object_store.put(
+        exchanges_key(id, Node.SIGNAL_LLM),
+        json.dumps(exchanges_to_json([RunExchange(run=1, calls=(corrected,))])).encode(),
+        content_type="application/json",
+    )
+    listed = await api.client.get(f"{url}/exchanges/signal_llm", headers=auth(owner))
+    (sent,) = listed.json()[0]["calls"]
+    assert (sent["answer"], sent["read"]) == (answer, {"start": 28, "end": 36})
+    assert answer[28:36] == '{"a": 2}'
     wrong = await api.client.get(f"{url}/exchanges/parse", headers=auth(owner))
     assert wrong.status_code == 422
 

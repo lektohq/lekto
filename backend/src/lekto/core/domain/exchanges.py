@@ -6,11 +6,56 @@ document instead, one file per node with every run. A person checking a document
 there; nothing in the pipeline reads them back.
 """
 
+import re
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 
 from lekto.core.domain.errors import ValidationError
-from lekto.core.domain.json_value import JsonObject, JsonValue, as_int, as_object
+from lekto.core.domain.json_value import (
+    JsonObject,
+    JsonValue,
+    as_int,
+    as_object,
+    loads,
+    objects_in,
+)
+
+_FENCE = re.compile(r"^\s*```(?:json)?\s*(.*?)\s*```\s*$", re.DOTALL)
+
+
+@dataclass(frozen=True)
+class AnswerJson:
+    """Where the JSON of a model's answer stands in it, from `start` to `end` (characters):
+    the whole answer or the inside of a Markdown fence around it, or (`last`) the last JSON
+    object of an answer that is no JSON as a whole."""
+
+    start: int
+    end: int
+    last: bool = False
+
+
+def answer_json(content: str) -> AnswerJson | None:
+    """The JSON a model's answer holds. The whole answer, without a Markdown fence around it;
+    if that is no JSON, its last JSON object, with words around or between: a model that
+    corrects itself (`{…} Wait — … Corrected answer: {…}`) writes the correction last, and
+    `json_object` lets it. None if it holds none, or the last one is cut off: an earlier one
+    was withdrawn."""
+    fenced = _FENCE.match(content)
+    start, end = fenced.span(1) if fenced else (0, len(content))
+    text = content[start:end]
+    try:
+        loads(text)
+    except ValueError:
+        pass
+    else:
+        return AnswerJson(start, end)
+    try:
+        found = objects_in(text)
+    except ValueError:
+        return None
+    if not found or found[-1].value is None:
+        return None
+    return AnswerJson(start + found[-1].start, start + found[-1].end, last=True)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -32,6 +77,15 @@ class ModelCall:
     task: str = ""
     retry: str | None = None
     request: str = ""
+
+    def read_part(self) -> tuple[int, int] | None:
+        """Where the part of the answer Lekto read stands, if it read a part (`answer_json`,
+        `last`): the last JSON object of a call that sent a document, which the classification
+        reads so; None for the whole answer and for another call (a page the VLM read)."""
+        if not self.document:
+            return None
+        found = answer_json(self.answer)
+        return (found.start, found.end) if found is not None and found.last else None
 
     def to_json(self) -> JsonObject:
         sent: JsonObject = {

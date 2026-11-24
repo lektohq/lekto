@@ -73,6 +73,18 @@
 		shown.some((entry) => entry.part === chosenPart) ? chosenPart : shown[0].part
 	);
 	const body = $derived(call ? text(call, part) : '');
+	// An answer Lekto read only a part of (the last JSON object of one that corrected itself):
+	// the rest before and after it, struck through. In code points, as the API counts.
+	const pieces = $derived.by(() => {
+		const read = part === 'answer' ? call?.read : null;
+		if (!read) return null;
+		const chars = Array.from(body);
+		return {
+			before: chars.slice(0, read.start).join(''),
+			read: chars.slice(read.start, read.end).join(''),
+			after: chars.slice(read.end).join('')
+		};
+	});
 	const counted = (value: unknown) => (typeof value === 'number' ? value : null);
 	const size = $derived.by(() => {
 		if (!call) return '';
@@ -95,6 +107,10 @@
 
 	const copy = () => copyText(body);
 </script>
+
+{#snippet discarded(part: string)}{#if part}<del class="text-muted-foreground line-through"
+			><span class="sr-only">{`${m.prompt_discarded()}: `}</span>{part}</del
+		>{/if}{/snippet}
 
 <Dialog.Root bind:open>
 	<Dialog.Content size="xl">
@@ -133,13 +149,18 @@
 			{/if}
 			<span class="text-sm text-muted-foreground">{size}</span>
 		</div>
+		{#if pieces}
+			<p class="text-sm text-muted-foreground">{m.prompt_discarded_note()}</p>
+		{/if}
 		<!-- It scrolls: a region the keyboard reaches, named after the part it shows. -->
 		<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 		<pre
 			role="region"
 			tabindex="0"
 			aria-label={shown.find((entry) => entry.part === part)?.label()}
-			class="h-[min(28rem,55vh)] overflow-auto rounded-xl border bg-surface px-4 py-3.5 font-mono text-meta leading-relaxed whitespace-pre-wrap">{body}</pre>
+			class="h-[min(28rem,55vh)] overflow-auto rounded-xl border bg-surface px-4 py-3.5 font-mono text-meta leading-relaxed whitespace-pre-wrap">{#if pieces}{@render discarded(
+					pieces.before
+				)}{pieces.read}{@render discarded(pieces.after)}{:else}{body}{/if}</pre>
 		<Dialog.Footer class="items-center sm:justify-between">
 			<p class="text-sm text-muted-foreground">
 				{call?.document ? m.prompt_parts_note() : m.prompt_document_note()}

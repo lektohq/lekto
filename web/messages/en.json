@@ -1998,6 +1998,8 @@
 	"prompt_characters": "{characters} characters",
 	"prompt_input": "{characters} characters · ≈ {tokens} input tokens",
 	"prompt_output": "{characters} characters · {tokens} output tokens",
+	"prompt_discarded": "discarded",
+	"prompt_discarded_note": "Struck through: discarded by Lekto. It read the answer's last JSON object.",
 	"prompt_document_note": "The document's text is part of the message.",
 	"prompt_parts_note": "Order: the system prompt (the same for every call), the document, the task; with json_object then the answer’s schema. Calls about a document begin alike, so an endpoint can cache that.",
 	"log_editors_only": "The space's editors and admins see what the step did.",

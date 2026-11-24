@@ -1,11 +1,15 @@
 """The stored exchanges with the language model: JSON both ways, one entry per run."""
 
+from dataclasses import replace
+
 import pytest
 
 from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.exchanges import (
+    AnswerJson,
     ModelCall,
     RunExchange,
+    answer_json,
     exchanges_from_json,
     exchanges_to_json,
     tokens_of,
@@ -89,3 +93,25 @@ def test_the_tokens_an_endpoint_took_from_its_cache() -> None:
     assert (first["cached"], second["cached"]) == (2048, 1900)  # type: ignore[index, call-overload]
     zero: JsonObject = {"prompt_tokens_details": {"cached_tokens": 0}}
     assert tokens_of([zero])[0]["cached"] == 0  # type: ignore[index, call-overload]
+
+
+def test_the_json_of_an_answer_is_the_whole_or_its_last_object() -> None:
+    whole = '{"a": 1}'
+    assert answer_json(whole) == AnswerJson(0, 8)
+    fenced = '```json\n{"a": 1}\n```'
+    assert answer_json(fenced) == AnswerJson(8, 16)
+    corrected = '{"a": 1}\n\nWait — corrected: {"a": 2}'
+    at = corrected.index('{"a": 2}')
+    assert answer_json(corrected) == AnswerJson(at, at + 8, last=True)
+    assert answer_json('{"a": 1} Corrected: {"a": ') is None  # cut off: nothing withdrawn
+    assert answer_json("no json") is None
+
+
+def test_a_call_with_a_document_tells_the_part_of_its_answer_read() -> None:
+    """For the processing tab, which strikes through what Lekto discarded."""
+    answer = '{"a": 1} Wait — corrected: {"a": 2}'
+    call = ModelCall(system="s", document="<doc>", task="t", answer=answer, model="m", usage={})
+    at = answer.index('{"a": 2}')
+    assert call.read_part() == (at, at + 8)
+    assert replace(call, answer='{"a": 2}').read_part() is None  # read whole
+    assert replace(call, document="", user="a page").read_part() is None  # the VLM's

@@ -17,6 +17,29 @@ const call = (system: string): Call =>
 	}) as unknown as Call;
 
 describe('PromptDialog', () => {
+	it('strikes through what Lekto discarded of an answer that corrected itself', async () => {
+		const user = userEvent.setup();
+		// Counted in code points: the emoji is one, as the API counts.
+		const answer = '{"a": 1} 🙂 Wait — corrected: {"a": 2}';
+		const start = Array.from(answer).length - 8;
+		const corrected = {
+			...call('the system'),
+			answer,
+			read: { start, end: start + 8 }
+		} as unknown as Call;
+		render(PromptDialog, { open: true, title: 'Prompt', meta: 'm', calls: [corrected] });
+		await user.click(await screen.findByRole('button', { name: m.prompt_answer() }));
+		const struck = [...document.querySelectorAll('del')].map((del) => del.textContent);
+		expect(struck).toEqual([`${m.prompt_discarded()}: {"a": 1} 🙂 Wait — corrected: `]);
+		const region = screen.getByRole('region', { name: m.prompt_answer() });
+		expect(region.textContent).toContain('{"a": 2}');
+		expect(region.querySelector('del')?.textContent).not.toContain('{"a": 2}');
+		expect(screen.getByText(m.prompt_discarded_note())).toBeTruthy();
+		// An answer read whole has nothing struck through.
+		await user.click(screen.getByRole('button', { name: m.prompt_system() }));
+		expect(document.querySelector('del')).toBeNull();
+	});
+
 	it('starts another prompt at its first attempt', async () => {
 		const user = userEvent.setup();
 		const props = { open: true, title: 'Prompt · Judge', meta: 'qwen3:8b' };

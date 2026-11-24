@@ -7,6 +7,7 @@ import pytest
 from lekto.core.domain.codes import Code
 from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.json_value import (
+    MAX_OBJECTS,
     JsonObject,
     JsonValue,
     as_bool,
@@ -19,6 +20,7 @@ from lekto.core.domain.json_value import (
     as_texts,
     as_uuid,
     loads,
+    objects_in,
     require_date,
     require_object,
     require_uuid,
@@ -99,3 +101,18 @@ def test_a_number_that_is_not_finite_is_no_json() -> None:
     for text in ('{"paid": NaN}', "[Infinity]", "[-Infinity]", '{"big": 1e999}'):
         with pytest.raises(ValueError):
             loads(text)
+
+
+def test_the_objects_of_a_text_with_words_between_them() -> None:
+    def values(text: str) -> list[object]:
+        return [found.value for found in objects_in(text)]
+
+    text = '{"a": 1} Wait, corrected: {"a": 2, "b": {"c": 3}} done'
+    assert values(text) == [{"a": 1}, {"a": 2, "b": {"c": 3}}]
+    assert [(found.start, found.end) for found in objects_in(text)] == [(0, 8), (26, 49)]
+    # One cut off has no value, then what stands within it.
+    assert values('{"a": 1} {"b": {"c": 3}, "d":') == [{"a": 1}, None, {"c": 3}]
+    assert values("no object [1, 2]") == []
+    assert values('{"a": NaN} {"a": 1}') == [None, {"a": 1}]  # no JSON number: none
+    with pytest.raises(ValueError, match=f"more than {MAX_OBJECTS}"):
+        objects_in("{" * 500_000)
