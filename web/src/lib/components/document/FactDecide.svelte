@@ -1,16 +1,10 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
-	import Select from '#lib/components/Select.svelte';
+	import ConfirmDialog from '#lib/components/ConfirmDialog.svelte';
+	import FactFields from '#lib/components/document/FactFields.svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
-	import { Input } from '#lib/components/ui/input/index.ts';
-	import {
-		FACT_ROLES,
-		onlyByPerson,
-		roleLabel,
-		type FactDecision,
-		type FactRole,
-		type KeptFact
-	} from '#lib/facts.ts';
+	import * as Card from '#lib/components/ui/card/index.ts';
+	import { onlyByPerson, type FactDecision, type FactRole, type KeptFact } from '#lib/facts.ts';
 	import { kindLabel } from '#lib/identifiers.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import { Choice } from '#lib/components/ui/choice/index.ts';
@@ -56,6 +50,10 @@
 	const changed = $derived(changedValue || role !== fact.role);
 	const base = $derived({ kind: fact.kind, value: fact.value });
 
+	// A fact only a person added is gone once withdrawn: asked first.
+	let removing = $state(false);
+	const withdraw = () => ondecide({ ...base, action: 'withdraw' });
+
 	function correct() {
 		if (!changed) return;
 		ondecide({
@@ -68,8 +66,10 @@
 	}
 </script>
 
-<form
-	class="mx-2.5 mb-2.5 flex flex-col gap-2.5 rounded-xl border bg-card p-3"
+<Card.Root
+	as="form"
+	size="sm"
+	class="mx-2.5 mb-2.5 flex flex-col gap-2.5"
 	onsubmit={(event) => {
 		event.preventDefault();
 		correct();
@@ -79,18 +79,7 @@
 	{#if rejected}
 		<span class="text-xs text-muted-foreground">{m.facts_decide_rejected_hint()}</span>
 	{:else}
-		<label class="flex flex-col gap-1 text-sm">
-			<span class="text-xs text-muted-foreground">{m.facts_decide_value()}</span>
-			<Input class="font-mono" bind:value autocomplete="off" spellcheck="false" />
-		</label>
-		<label class="flex flex-col gap-1 text-sm">
-			<span class="text-xs text-muted-foreground">{m.facts_decide_role()}</span>
-			<Select
-				bind:value={role}
-				aria-label={m.facts_decide_role()}
-				options={FACT_ROLES.map((item) => ({ value: item, label: roleLabel(item) }))}
-			/>
-		</label>
+		<FactFields bind:value bind:role />
 		{#if contact && changedValue}
 			<Choice bind:checked={atContact}>
 				<span>{m.facts_decide_at_contact({ contact })}</span>
@@ -100,12 +89,7 @@
 	<div class="flex flex-wrap justify-end gap-2">
 		<Button type="button" variant="ghost" size="sm" onclick={oncancel}>{m.cancel()}</Button>
 		{#if rejected}
-			<Button
-				type="button"
-				size="sm"
-				{busy}
-				onclick={() => ondecide({ ...base, action: 'withdraw' })}
-			>
+			<Button type="button" size="sm" {busy} onclick={withdraw}>
 				{m.facts_decide_restore()}
 			</Button>
 		{:else}
@@ -115,7 +99,7 @@
 					variant="outline"
 					size="sm"
 					{busy}
-					onclick={() => ondecide({ ...base, action: 'withdraw' })}
+					onclick={() => (onlyByPerson(fact) ? (removing = true) : withdraw())}
 				>
 					{onlyByPerson(fact) ? m.facts_decide_remove() : m.facts_decide_undo()}
 				</Button>
@@ -136,4 +120,12 @@
 			</Button>
 		{/if}
 	</div>
-</form>
+</Card.Root>
+
+<ConfirmDialog
+	bind:open={removing}
+	title={m.facts_remove_title({ kind: kindLabel(fact.kind), value: shownValue(fact) })}
+	description={m.facts_remove_confirm()}
+	confirmLabel={m.facts_decide_remove()}
+	onconfirm={async () => withdraw()}
+/>

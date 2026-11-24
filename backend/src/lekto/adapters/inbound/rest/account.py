@@ -45,6 +45,7 @@ from lekto.adapters.inbound.rest.schemas.account import (
     TokenCreate,
     TokenCreated,
     TokenOut,
+    TotpBegin,
     TotpSetupOut,
     UserOut,
 )
@@ -268,13 +269,18 @@ async def end_other_sessions(principal: SessionPrincipal, context: Context) -> S
     summary="Start setting up TOTP",
     description=(
         "A new secret for the authenticator app, shown only now. TOTP is on once a code "
-        "confirms it (`POST /auth/totp/confirm`)." + SESSION_ONLY_NOTE
+        "confirms it (`POST /auth/totp/confirm`). Needs the caller's password (403 "
+        "`wrong_password`, counted as a failed sign-in); 409 `totp_needs_password` for an "
+        "account without one, whose sign-in through the provider asks for no code of Lekto's."
+        + SESSION_ONLY_NOTE
     ),
     response_model=TotpSetupOut,
-    responses=problem_responses(401, 403, 409),
+    responses=problem_responses(401, 403, 409, 422, 429),
 )
-async def begin_totp(principal: SessionPrincipal, context: Context) -> TotpSetupOut:
-    setup = await context.auth.begin_totp(principal.actor)
+async def begin_totp(
+    body: TotpBegin, principal: SessionPrincipal, context: Context
+) -> TotpSetupOut:
+    setup = await context.auth.begin_totp(principal.actor, body.password.get_secret_value())
     return TotpSetupOut(secret=setup.secret, otpauth_uri=setup.uri)
 
 
@@ -358,8 +364,7 @@ async def create_token(
         body.chosen(),
         expires_at=None if body.expires_at is None else to_utc(body.expires_at, "expires_at"),
     )
-    out = TokenOut.of(token, admin=principal.user.is_active_admin)
-    return TokenCreated(**out.model_dump(), token=value)
+    return TokenCreated.of(token, admin=principal.user.is_active_admin, token=value)
 
 
 @router.delete(

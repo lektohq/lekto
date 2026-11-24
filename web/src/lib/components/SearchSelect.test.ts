@@ -5,6 +5,7 @@ import { m } from '#lib/paraglide/messages.js';
 import { phone } from '#lib/phone.svelte.ts';
 import { choose, selectedValue } from '#lib/testing/select.ts';
 import SearchSelect from './SearchSelect.svelte';
+import { elapse, fakeTime } from '#lib/testing/time.ts';
 
 const OPTIONS = [
 	{ value: 'c1', label: 'Stadtwerke', keywords: 'SWM Energie' },
@@ -94,11 +95,12 @@ describe('SearchSelect', () => {
 	});
 
 	it('opens without scrolling the page to the list before it is placed', async () => {
+		fakeTime(); // the list is placed a frame or more later: a second passes at once
 		const scroll = vi.spyOn(Element.prototype, 'scrollIntoView');
 		const { trigger } = field();
 		await fireEvent.click(trigger);
-		await screen.findByLabelText(m.assignment_search());
-		await new Promise((resolve) => setTimeout(resolve, 50));
+		await vi.waitFor(() => screen.getByLabelText(m.assignment_search()));
+		await elapse(1000);
 		expect(scroll).not.toHaveBeenCalled();
 		scroll.mockRestore();
 	});

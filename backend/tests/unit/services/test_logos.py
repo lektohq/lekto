@@ -30,6 +30,7 @@ from lekto.core.domain.master_data import Contact
 from lekto.core.domain.rights import Actor
 from lekto.core.domain.users import Role
 from lekto.core.ports.logos import FetchedLogo
+from lekto.core.services._push_queue import PUSH_JOB
 from lekto.core.services.logos import FETCHING_OFF, LOGO_JOB, LOGO_MAX_SIZE, LogoService
 from lekto.core.services.master_data import replace_learned_identifiers
 from lekto.core.services.objects import logo_key
@@ -201,13 +202,29 @@ async def test_a_fetch_queued_before_fetching_was_switched_off_ends_at_once(
     (job,) = [job for job in world.database.jobs.values() if job.kind == LOGO_JOB]
     assert await world.logos.run_next_job() is True  # without fetching now
     ended = world.database.jobs[job.id]
-    assert (ended.status, ended.last_error, ended.attempts) == (
-        JobStatus.FAILED,
-        FETCHING_OFF,
+    # Switched off on purpose: done, not failed, and no notice to the admins (SB-K06).
+    assert (ended.status, ended.result, ended.attempts) == (
+        JobStatus.DONE,
+        {"skipped": FETCHING_OFF},
         1,
     )
+    assert [job for job in world.database.jobs.values() if job.kind == PUSH_JOB] == []
     assert await world.logos.run_next_job() is False
     assert (await stored(world, contact.id)).logo is None
+
+
+async def test_a_job_whose_payload_cannot_be_read_fails_at_once(world: World) -> None:
+    _, logos = world.fetching(FakeLogoFetcher({"nord.example": PNG}))
+    async with world.uow() as uow:
+        queued = await uow.jobs.enqueue(
+            LOGO_JOB, {"contact_id": "not an id"}, run_at=world.clock.now()
+        )
+        await uow.commit()
+    assert queued is not None
+    assert await logos.run_next_job() is True
+    ended = world.database.jobs[queued]
+    assert (ended.status, ended.attempts) == (JobStatus.FAILED, 1)
+    assert ended.last_error is not None and ended.last_error.startswith("invalid payload")
 
 
 async def test_without_fetching_nothing_is_queued(world: World) -> None:

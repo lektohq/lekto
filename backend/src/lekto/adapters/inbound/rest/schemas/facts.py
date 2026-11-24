@@ -17,6 +17,7 @@ from lekto.core.domain.document_facts import (
     HolderSource,
 )
 from lekto.core.domain.facts import Span, Strength
+from lekto.core.domain.fields import decimal_text
 from lekto.core.domain.identifiers import MAX_IDENTIFIER_VALUE, IdentifierKind, Key
 from lekto.core.domain.ids import ContactId
 from lekto.core.services.documents import (
@@ -250,7 +251,7 @@ class CodeOut(BaseModel):
                 bic=item.giro.bic,
                 amount=None
                 if amount is None
-                else MoneyValue(amount=str(amount.amount), currency=amount.currency),
+                else MoneyValue(amount=decimal_text(amount.amount), currency=amount.currency),
                 purpose=item.giro.purpose,
             )
         return cls(

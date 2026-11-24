@@ -3,6 +3,7 @@
  * person may ask for it, and why it is advised (`GET /documents/{id}/reading`). Only a person
  * asks; the page images leave for the endpoint `GET /pipeline` names.
  */
+import { formatList, formatNumber } from '#lib/i18n.ts';
 import type { components } from '#lib/api/schema.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { reprocessable, type GraphNode, type Processing } from '#lib/pipeline.ts';
@@ -30,6 +31,6 @@ export function visionAvailable(
 export function adviceText(reading: Reading | null): string | null {
 	if (!reading?.advice) return null;
 	if (reading.advice === 'no_text') return m.vision_advice_no_text();
-	const pages = reading.pages.filter((page) => page.poor).map((page) => page.page);
-	return m.vision_advice_poor_page({ pages: pages.join(', ') });
+	const pages = reading.pages.filter((page) => page.poor).map((page) => formatNumber(page.page));
+	return m.vision_advice_poor_page({ pages: formatList(pages) });
 }

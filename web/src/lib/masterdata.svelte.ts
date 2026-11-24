@@ -91,12 +91,6 @@ export function byId<T extends { id: string }>(list: readonly T[]): ReadonlyMap<
 	return index;
 }
 
-/** Name by id for a list of master data. */
-export function names(list: readonly { id: string; name: string }[]): Map<string, string> {
-	// eslint-disable-next-line svelte/prefer-svelte-reactivity
-	return new Map(list.map((entry) => [entry.id, entry.name]));
-}
-
 /** The fields that apply to a document type: global ones and those listed for it. */
 export function fieldsFor(
 	fields: readonly FieldDefinition[],
@@ -208,7 +202,7 @@ export function spaceOptions(
 	users: readonly UserName[],
 	user: { id: string; role?: UserName['role'] } | null
 ): { value: string; label: string }[] {
-	const editable = editableSpaces(spaces, user);
+	const editable = editableSpaces(spaces);
 	const offered = editable.map((space) => space.id);
 	return [
 		...editable.map((space) => ({

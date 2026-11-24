@@ -1000,7 +1000,7 @@ def _default_title(document: Document) -> str:
     return document.file_title
 
 
-def changed_fields(changes: DocumentChanges) -> frozenset[str]:
+def given_fields(changes: DocumentChanges) -> frozenset[str]:
     """The fields a change sets (given, not left unset), named as in field checks."""
     given: set[str] = {
         field_name

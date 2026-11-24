@@ -207,7 +207,7 @@ class OidcService:
         return base64url(sealed)
 
     def _open(self, sealed: str | None) -> _Flow:
-        expired = AuthenticationError("the sign-in has expired or was not started here")
+        expired = AuthenticationError(because(ReasonCode.OIDC_MISMATCH))
         if not sealed:
             raise expired
         try:

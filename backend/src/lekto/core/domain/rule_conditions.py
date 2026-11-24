@@ -29,16 +29,16 @@ from lekto.core.domain.mail_message import address_texts
 from lekto.core.domain.mail_traits import MailHead, flag_holds, importance_holds, keyword_holds
 from lekto.core.domain.periods import Period
 from lekto.core.domain.rules import (
+    TEXT_TARGET,
     Condition,
     ConditionField,
     Group,
     Operator,
     Rule,
     condition_value,
+    mail_trait,
 )
 from lekto.core.domain.tag_tree import TagTree
-
-TEXT_TARGET = "text"
 
 type Truth = bool | None
 """Three-valued: None is unknown."""
@@ -300,7 +300,7 @@ def _condition(
             | ConditionField.MAIL_SUBJECT
         ):
             return facts.mail is not None and facts.mail.text_holds(
-                condition.field.value.removeprefix("mail_"), op.value, str(condition.value)
+                mail_trait(condition.field), op.value, str(condition.value)
             )
         case ConditionField.FACT:
             # Read from the text (or decided by a person): never unknown.

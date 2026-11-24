@@ -34,7 +34,7 @@ from lekto.core.domain.condition_tree import Group, check_limits, group_from_jso
 from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.ids import DocumentTypeId, MailboxId, MailRuleId, SpaceId, UserId, new_id
 from lekto.core.domain.json_value import JsonObject, JsonValue, require_object
-from lekto.core.domain.mail import MAX_FOLDER, MailAction, MailStep, check_steps
+from lekto.core.domain.mail import MAX_FOLDER, MailAction, MailStep, check_steps, step_to_json
 from lekto.core.domain.mail_intake import MailDecision, MailParts, MailRecord, letters
 from lekto.core.domain.mail_message import MailMessage, address_texts
 from lekto.core.domain.mail_traits import (
@@ -156,11 +156,14 @@ def condition_from_json(data: JsonValue, where: str = "condition") -> MailCondit
     value = object_.get("value")
     if value is not None and not isinstance(value, str):
         raise ValidationError(f"{where}.value: expected a text")
+    field, op = str(object_.get("field")), str(object_.get("op"))
+    if field not in MailField:
+        raise ValidationError(f"{where}.field: no field '{field}'")
+    if op not in MailOperator:
+        raise ValidationError(f"{where}.op: no operator '{op}'")
     try:
-        return MailCondition(
-            MailField(str(object_.get("field"))), MailOperator(str(object_.get("op"))), value
-        )
-    except ValueError as error:
+        return MailCondition(MailField(field), MailOperator(op), value)
+    except ValidationError as error:  # the place too, as for the steps (DB-K05)
         raise ValidationError(f"{where}: {error}") from None
 
 
@@ -175,13 +178,7 @@ def conditions_from_json(data: JsonValue) -> MailConditions | None:
 
 def steps_to_json(steps: tuple[MailStep, ...]) -> list[JsonValue]:
     """The steps in the JSON form a rule's are stored in."""
-    found: list[JsonValue] = []
-    for step in steps:
-        data: JsonObject = {"action": step.action.value}
-        if step.value is not None:
-            data["value"] = step.value
-        found.append(data)
-    return found
+    return [step_to_json(step) for step in steps]
 
 
 def steps_from_json(data: JsonValue) -> tuple[MailStep, ...]:

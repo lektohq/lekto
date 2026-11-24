@@ -20,6 +20,7 @@ from lekto.adapters.inbound.mcp.names import (
 )
 from lekto.adapters.inbound.mcp.output import compact
 from lekto.adapters.inbound.mcp.registry import Tools, principal_of
+from lekto.adapters.inbound.schemas import MAX_POSITION
 from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.identifiers import MAX_IDENTIFIER_VALUE, normalise_identifier
 from lekto.core.domain.ids import short_id
@@ -170,7 +171,7 @@ def add_reference_tools(tools: Tools, context: ApiContext) -> None:
         ctx: Context,
         source: Literal["learned", "suggested"] | None = None,
         query: Annotated[str | None, Field(max_length=100)] = None,
-        offset: Annotated[int, Field(ge=0)] = 0,
+        offset: Annotated[int, Field(ge=0, le=MAX_POSITION)] = 0,
     ) -> str:
         user = principal_of(ctx).actor
         page = await context.open_identifiers.page(

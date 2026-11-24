@@ -36,8 +36,9 @@
 	// of a session that ended, and the browser reconnects as whoever holds the cookie now.
 	$effect(() => {
 		const reconnected = events.generation > 0;
-		if (!userId) return;
-		if (reconnected) void recheckSession();
+		// At the start `inbox.start()` reads the counter itself.
+		if (!userId || !reconnected) return;
+		void recheckSession();
 		void inbox.refresh();
 	});
 

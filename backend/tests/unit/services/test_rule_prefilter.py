@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 
 from lekto.core.domain.ids import ContactId, DocumentTypeId, FieldId, new_id
 from lekto.core.domain.master_data import Tag, TagScope
-from lekto.core.domain.rules import Condition, ConditionField, Group, Operator
+from lekto.core.domain.rules import TAG_FIELDS, Condition, ConditionField, Group, Operator
 from lekto.core.domain.tag_tree import TagTree
 from lekto.core.ports.repository import DocumentFilter
 from lekto.core.services.rules.prefilter import prefilter
@@ -94,3 +94,10 @@ def test_it_keeps_what_the_base_asks_and_finds_when_nothing_can_hold() -> None:
         contacts=frozenset({ACME})
     )
     assert prefilter(all_of(contact(ACME), contact(BANK)), TREE, BASE) is None
+
+
+def test_every_condition_on_tags_narrows() -> None:
+    """A new condition on tags (`TAG_FIELDS`) narrows too, or this fails (SC-K02)."""
+    for field in TAG_FIELDS:
+        op = Operator.IS if field is ConditionField.TOPIC else Operator.CONTAINS
+        assert prefilter(all_of(ask(field, op, str(BILLS.id))), TREE, BASE) != BASE, field

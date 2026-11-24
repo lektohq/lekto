@@ -5,7 +5,7 @@ the SQL adapter's inserts are: the first write wins, no version is checked."""
 from collections import Counter
 from collections.abc import Collection, Iterator, Sequence
 from dataclasses import replace
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import TYPE_CHECKING
 
 from lekto.adapters.outbound.memory.database import DOCUMENTS
@@ -13,14 +13,12 @@ from lekto.core.domain.documents import Document
 from lekto.core.domain.first_runs import FieldVerdict, FirstRun, Verdict
 from lekto.core.domain.ids import DocumentId
 from lekto.core.domain.pipeline import Lane, Node
-from lekto.core.ports.repository import FactsScope, LaneCount, RunTimes, SignalCount
+from lekto.core.ports.repository import MICROSECOND, FactsScope, LaneCount, RunTimes, SignalCount
 
 if TYPE_CHECKING:
     from lekto.adapters.outbound.memory.unit_of_work import MemoryUnitOfWork
 
 type VerdictKey = tuple[DocumentId, str]
-
-MICROSECOND = timedelta(microseconds=1)
 
 
 class MemoryProcessingFacts:

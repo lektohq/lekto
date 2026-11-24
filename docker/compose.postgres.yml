@@ -46,8 +46,9 @@ x-environment: &environment
   LEKTO_EMBEDDING_BASE_URL: ${LEKTO_EMBEDDING_BASE_URL:-}
   LEKTO_EMBEDDING_MODEL: ${LEKTO_EMBEDDING_MODEL:-}
   LEKTO_EMBEDDING_API_KEY: ${LEKTO_EMBEDDING_API_KEY:-}
-  LEKTO_EMBEDDING_QUERY_PREFIX: "query:"
-  LEKTO_EMBEDDING_DIMENSIONS: 1024
+  # As snowflake-arctic-embed2 wants them; another model sets both in .env.
+  LEKTO_EMBEDDING_QUERY_PREFIX: ${LEKTO_EMBEDDING_QUERY_PREFIX-query:}
+  LEKTO_EMBEDDING_DIMENSIONS: ${LEKTO_EMBEDDING_DIMENSIONS:-1024}
 
 services:
   # The API (and the web UI): migrates the database at the start.

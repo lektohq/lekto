@@ -63,12 +63,18 @@
 	const filterTag = $derived(byId.get(group ?? topic ?? '') ?? null);
 	const listed = $derived.by(() => {
 		let list = items ?? [];
-		const within = (wanted: string, ids: readonly string[] | undefined) => {
-			const tree = below(tags, wanted).add(wanted);
-			return (ids ?? []).some((id) => tree.has(id));
-		};
-		if (group) list = list.filter((item) => within(group, item.group_ids));
-		if (topic) list = list.filter((item) => within(topic, item.topic_ids));
+		// A tag and those below it, once per filter, not per entry.
+		const tree = (wanted: string) => below(tags, wanted).add(wanted);
+		const within = (wanted: Set<string>, ids: readonly string[] | undefined) =>
+			(ids ?? []).some((id) => wanted.has(id));
+		if (group) {
+			const groups = tree(group);
+			list = list.filter((item) => within(groups, item.group_ids));
+		}
+		if (topic) {
+			const topics = tree(topic);
+			list = list.filter((item) => within(topics, item.topic_ids));
+		}
 		if (query.trim()) {
 			list = list.filter((item) =>
 				kind === 'contacts' ? contactMatches(item, query) : typeMatches(item, query)
@@ -310,7 +316,7 @@
 
 <!-- Facts in a line, a dot between them (a comma to a screen reader). -->
 {#snippet line(facts: Fact[])}
-	{#each facts as fact, index (fact.text)}
+	{#each facts as fact, index (index)}
 		{#if index > 0}<span class="sr-only">, </span><span class="px-1.5" aria-hidden="true">·</span
 			>{/if}<span title={fact.title}>{fact.text}</span>
 	{/each}

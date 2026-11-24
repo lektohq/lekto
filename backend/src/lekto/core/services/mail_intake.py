@@ -35,6 +35,7 @@ from lekto.core.domain.errors import (
 from lekto.core.domain.events import MailboxFetched
 from lekto.core.domain.ids import DocumentId, MailboxId, new_id
 from lekto.core.domain.jobs import Job
+from lekto.core.domain.json_value import JsonObject
 from lekto.core.domain.mail import (
     Fallback,
     FetchStart,
@@ -55,6 +56,7 @@ from lekto.core.domain.mail_intake import (
     MailParts,
     MailRecord,
     OriginRole,
+    attachments_left,
     letters,
     mail_limit,
     record_id,
@@ -91,10 +93,20 @@ from lekto.core.services.pipeline import IncomingFile, PipelineService
 log = logging.getLogger(__name__)
 
 FETCH_JOB = "mail.fetch"
-"""Job kind of a mailbox's fetch; payload: `{"mailbox_id": ...}`."""
+"""Job kind of a mailbox's fetch; payload: `fetch_payload`."""
 LEASE = timedelta(minutes=30)
 MAX_PER_RUN = 50
 STORE_ATTEMPTS = 5
+
+
+def fetch_payload(id: MailboxId) -> JsonObject:
+    """The payload of a `FETCH_JOB`."""
+    return {"mailbox_id": str(id)}
+
+
+def payload_fetch(payload: JsonObject) -> MailboxId:
+    """The mailbox of a `fetch_payload`; KeyError or ValueError for a payload that is none."""
+    return MailboxId(UUID(str(payload["mailbox_id"])))
 
 
 def fetch_key(id: MailboxId) -> str:
@@ -107,7 +119,7 @@ async def schedule_fetch(uow: UnitOfWork, mailbox: Mailbox, run_at: datetime) ->
     if not await uow.jobs.hasten(fetch_key(mailbox.id), run_at=run_at):
         await uow.jobs.enqueue(
             FETCH_JOB,
-            {"mailbox_id": str(mailbox.id)},
+            fetch_payload(mailbox.id),
             run_at=run_at,
             dedup_key=fetch_key(mailbox.id),
         )
@@ -183,7 +195,7 @@ class MailIntakeService:
 
     async def _run(self, job: Job) -> None:
         try:
-            id = MailboxId(UUID(str(job.payload["mailbox_id"])))
+            id = payload_fetch(job.payload)
         except (KeyError, ValueError) as invalid:
             await self._jobs.invalid(job, invalid)
             return
@@ -292,7 +304,7 @@ class MailIntakeService:
                     )
                 await uow.commit()
 
-        await retrying(store, attempts=STORE_ATTEMPTS, backoff=True)
+        await self._jobs.storing(job, store)
 
     async def _folder(
         self, session: MailSession, mailbox: Mailbox, folder: str, count: _Count
@@ -392,6 +404,7 @@ class MailIntakeService:
         taken = replace(
             decided,
             outcome=MailOutcome.TAKEN if documents else MailOutcome.NOTHING,
+            reason=_left(message, decision),
             documents=documents,
             steps_due=decision.after,
         )
@@ -524,6 +537,7 @@ class MailIntakeService:
         record = replace(
             record,
             outcome=MailOutcome.TAKEN if documents else MailOutcome.NOTHING,
+            reason=_left(message, decision),
             rule=decision.rule,
             rule_id=decision.rule_id,
             documents=documents,
@@ -849,3 +863,11 @@ def _stem(subject: str) -> str:
     """A file name of a subject: no separators, at most 100 characters."""
     cleaned = "".join("_" if char in '/\\:*?"<>|' else char for char in subject).strip(" .")
     return cleaned[:100] or "Mail"
+
+
+def _left(message: MailMessage, decision: MailDecision) -> Reason | None:
+    """The note on a taken mail's record that attachments beyond the limit were left (SB-K10);
+    none where the decision takes no attachments."""
+    if decision.parts not in (MailParts.ALL, MailParts.ATTACHMENTS):
+        return None
+    return attachments_left(message)

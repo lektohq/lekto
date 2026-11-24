@@ -177,11 +177,6 @@ class Walk:
             [step for step in self.rule.definition.actions if _is_action(step)]
         )
 
-    @property
-    def pending(self) -> bool:
-        """The rule waits for an answer."""
-        return self.ask is not None or self.waiting
-
     @classmethod
     def plain(cls, match: Match) -> Walk:
         """A rule without steps between its actions: all of them count."""

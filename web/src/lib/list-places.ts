@@ -21,8 +21,14 @@ export const SEARCH_PAGE_MAX = 100;
  * so fewer than in a list; a hit further back is opened from the list. */
 export const SEARCH_PLACES_MAX = 200;
 
-/** The ids of the list at `url` (its path and query), searched for `words`, in its order. */
-export async function listPlaces(url: string, words: string, allUsers: boolean): Promise<string[]> {
+/** The ids of the list at `url` (its path and query), searched for `words`, in its order;
+ * `wordsOnly`: by the words alone, as the list searched while the meaning was being made. */
+export async function listPlaces(
+	url: string,
+	words: string,
+	allUsers: boolean,
+	wordsOnly = false
+): Promise<string[]> {
 	const params = new URL(url, 'http://lekto').searchParams;
 	const searching = words.trim() !== '';
 	const base = apiQuery(parseFilters(params), allUsers);
@@ -38,7 +44,8 @@ export async function listPlaces(url: string, words: string, allUsers: boolean):
 							// A search never sorts by a field (`sortOf`).
 							sort: sort as Exclude<Sort, FieldSort>,
 							offset,
-							limit: SEARCH_PAGE_MAX
+							limit: SEARCH_PAGE_MAX,
+							semantic_ratio: wordsOnly ? 0 : undefined
 						}
 					},
 					body: { q: words }

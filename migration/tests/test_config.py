@@ -1,8 +1,11 @@
 from pathlib import Path
 
 import pytest
+from ruamel.yaml.comments import CommentedMap
 
-from lekto_migration.config import Config, ConfigError, secret
+from lekto_migration.config import Config, ConfigError, forms, public, secret
+from lekto_migration.session import MigrationError, bound
+from lekto_migration.state import State, StateError
 
 
 def load(env: dict[str, str], **changes: object) -> Config:
@@ -65,6 +68,17 @@ def test_a_key_may_come_from_a_file(tmp_path: Path) -> None:
             {"LEKTO_MIGRATION_PAPERLESS_URL": "http://p", "LEKTO_MIGRATION_PAPERLESS_TOKEN": "k"},
             {"concurrency": 0},
             "concurrency",
+        ),
+        # Not the last two cut off, nor a pipeline that is never waited for (MI-K07).
+        (
+            {"LEKTO_MIGRATION_PAPERLESS_URL": "http://p", "LEKTO_MIGRATION_PAPERLESS_TOKEN": "k"},
+            {"limit": -2},
+            "limit",
+        ),
+        (
+            {"LEKTO_MIGRATION_PAPERLESS_URL": "http://p", "LEKTO_MIGRATION_PAPERLESS_TOKEN": "k"},
+            {"pipeline_timeout": 0.0},
+            "pipeline timeout",
         ),
     ],
 )
@@ -129,3 +143,28 @@ def test_the_env_file_goes_before_or_after_the_command(
     assert main(["--env-file", missing, "check"]) == 2
     assert main(["check", "--env-file", missing]) == 2
     assert capsys.readouterr().err.count("--env-file") == 2
+
+
+def test_an_ipv6_address_keeps_its_brackets() -> None:
+    """Without them the port runs into the address (MI-K05)."""
+    assert public("http://[::1]:8000/x") == "http://[::1]:8000/x"
+    assert public("https://user:secret@[2001:db8::1]/") == "https://[2001:db8::1]/"
+
+
+def test_a_state_or_plan_of_the_form_before_the_brackets_goes_on(tmp_path: Path) -> None:
+    """A migration begun with an IPv6 address before MI-K05 wrote it without brackets; the
+    same address goes on with its state file and plan, the state then holds the new form."""
+    url = "http://[::1]:8000"
+    assert forms(url) == ("http://[::1]:8000", "http://::1:8000")
+    assert forms("https://user:secret@host:8000/base") == ("https://host:8000/base",)
+    state = State(tmp_path / "state.sqlite")
+    state.bind(paperless=("http://::1:8000",))  # as the earlier version wrote it
+    state.bind(paperless=forms(url))
+    state.bind(paperless=(public(url) or "",))  # now held in the form of now
+    with pytest.raises(StateError, match="another paperless"):
+        state.bind(paperless=forms("http://[::2]:8000"))
+    state.close()
+    config = load({"LEKTO_MIGRATION_PAPERLESS_URL": url, "LEKTO_MIGRATION_PAPERLESS_TOKEN": "key"})
+    bound(CommentedMap({"source": "http://::1:8000"}), config)
+    with pytest.raises(MigrationError, match="another source"):
+        bound(CommentedMap({"source": "http://::2:8000"}), config)

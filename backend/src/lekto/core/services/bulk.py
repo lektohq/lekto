@@ -38,15 +38,17 @@ from lekto.core.domain.errors import (
 from lekto.core.domain.identity import ViaToken
 from lekto.core.domain.ids import BulkOperationId, DocumentId
 from lekto.core.domain.jobs import Job
-from lekto.core.domain.json_value import JsonValue
+from lekto.core.domain.json_value import JsonObject
 from lekto.core.domain.pipeline import Lane
 from lekto.core.domain.reasons import Action, Reason, ReasonCode, because
 from lekto.core.domain.rights import Actor, TokenRight
+from lekto.core.domain.users import User
 from lekto.core.ports.clock import Clock
 from lekto.core.ports.repository import PAGE_LIMIT, DocumentFilter
 from lekto.core.ports.unit_of_work import UnitOfWork, UnitOfWorkFactory
 from lekto.core.services._access import load_actor, load_lister
-from lekto.core.services._jobs import LEASE, JobRunner, lost, reason_of
+from lekto.core.services._jobs import CONFLICT_ATTEMPTS, LEASE, JobRunner, reason_of
+from lekto.core.services._moves import move_target
 from lekto.core.services.documents import DocumentService
 from lekto.core.services.pipeline import PipelineService
 from lekto.core.services.search import SearchService
@@ -54,7 +56,8 @@ from lekto.core.services.search import SearchService
 log = logging.getLogger(__name__)
 
 BULK_JOB = "documents.bulk"
-"""Job kind of a bulk operation; payload: operation id."""
+"""Job kind of a bulk operation; payload: operation id (`_enqueue`, `_operation_id`)."""
+_OPERATION = "operation_id"
 BATCH = 25
 """Documents per job; the next job continues."""
 
@@ -111,7 +114,7 @@ class BulkService:
         documents = await self._resolve(actor, selection)
         async with self._uow() as uow:
             user = await load_actor(uow, actor)
-            await _check_action(uow, action)
+            await _check_action(uow, user, action)
             now = self._clock.now()
             operation = BulkOperation.create(
                 user_id=user.id,
@@ -183,9 +186,13 @@ class BulkService:
     async def _attempt(self, job: Job) -> None:
         try:
             await self._run(job)
-        except ConcurrencyError:
-            lost(job)
         except Exception as error:
+            if await self._jobs.claim_lost(job, error):
+                return
+            if isinstance(error, ConcurrencyError) and job.tries < CONFLICT_ATTEMPTS:
+                # Only this worker changes the operation: a deadlock, gone the next time.
+                await self._jobs.again(job, reason_of(error), self._clock.now())
+                return
             log.exception("bulk operation failed", extra={"job_id": str(job.id)})
             await self._abort(job, error)
 
@@ -319,8 +326,10 @@ def _changes(action: BulkAction, document: Document) -> DocumentChanges:
             raise AssertionError(f"no metadata change: {action.kind}")
 
 
-async def _check_action(uow: UnitOfWork, action: BulkAction) -> None:
-    """NotFoundError for what the action names that does not exist."""
+async def _check_action(uow: UnitOfWork, user: User, action: BulkAction) -> None:
+    """NotFoundError for what the action names that does not exist; for a space, as moving one
+    document checks it (`move_target`): NotFoundError for one the person neither sees nor hands
+    over to, SpaceWriteDeniedError for one they only read (XA-K01, SB-K04)."""
     for tag in sorted(action.add | action.remove):
         await uow.tags.get(tag)
     if action.topic is not None:
@@ -330,13 +339,15 @@ async def _check_action(uow: UnitOfWork, action: BulkAction) -> None:
     if action.document_type is not None:
         await uow.document_types.get(action.document_type)
     if action.space is not None:
-        await uow.spaces.get(action.space)
+        await move_target(uow, user, action.space)
 
 
 def _operation_id(job: Job) -> BulkOperationId:
-    return BulkOperationId(UUID(str(job.payload["operation_id"])))
+    """The operation of a `BULK_JOB`'s payload (`_enqueue`); KeyError or ValueError for a
+    payload that is none."""
+    return BulkOperationId(UUID(str(job.payload[_OPERATION])))
 
 
 async def _enqueue(uow: UnitOfWork, id: BulkOperationId, now: datetime) -> None:
-    payload: dict[str, JsonValue] = {"operation_id": str(id)}
+    payload: JsonObject = {_OPERATION: str(id)}
     await uow.jobs.enqueue(BULK_JOB, payload, run_at=now, dedup_key=f"{BULK_JOB}:{id}")

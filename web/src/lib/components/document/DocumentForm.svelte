@@ -935,6 +935,7 @@
 				required={required(field)}
 				byHand={field.assignment === 'manual'}
 				hint={field.description}
+				{field}
 				onfocus={focus}
 				onjump={jump}
 			>

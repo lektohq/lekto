@@ -117,6 +117,13 @@ describe('Pager', () => {
 		return { paged, asked };
 	}
 
+	it('goes to a whole page, as an address may say 1.5 (WH-K06)', async () => {
+		const { paged, asked } = pager();
+		await paged.go(2.5);
+		expect(paged.page).toBe(2);
+		expect(asked.at(-1)).toEqual([50, 50]);
+	});
+
 	it('keeps the first item in view when the page size changes', async () => {
 		const { paged, asked } = pager();
 		await paged.go(2); // items 50 to 99

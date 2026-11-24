@@ -24,6 +24,7 @@ import { calls, fakeApi, masterData } from '#lib/testing/api.ts';
 import Page from './+page.svelte';
 import { FakeEventSource } from '#lib/testing/events.ts';
 import { testPage } from '#lib/testing/page-state.svelte.ts';
+import { elapse, fakeTime } from '#lib/testing/time.ts';
 
 /** No document in any facet. */
 const NO_FACETS = {
@@ -91,6 +92,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+	events.stop();
 	localStorage.clear();
 	session.clear();
 	vi.useRealTimers();
@@ -108,12 +110,19 @@ describe('the archive page', () => {
 			})
 		});
 		vi.stubGlobal('fetch', api);
+		fakeTime(); // the page gathers events for a while (`coalesced`): it passes at once
 		events.useFactory((url) => new FakeEventSource(url) as unknown as EventSource);
 		events.start(() => {});
 		render(Page);
-		await screen.findByText('Eins');
+		await vi.waitFor(() => screen.getByText('Eins'));
 		const send = (type: string, id: string) => FakeEventSource.last.send(type, { document_id: id });
-		const settled = () => new Promise((resolve) => setTimeout(resolve, 550));
+		// The burst gathered and what it reads answered.
+		const settled = async () => {
+			await elapse(1000);
+			await vi.waitFor(() =>
+				expect(api.mock.settledResults.some((result) => result.type === 'incomplete')).toBe(false)
+			);
+		};
 		const since = (from: number) =>
 			calls(api)
 				.slice(from)
@@ -144,7 +153,6 @@ describe('the archive page', () => {
 		expect(all).toContain('GET /api/v1/documents/facets');
 		// The list's own count and that of "all documents" beside the lenses.
 		expect(all.filter((call) => call === 'GET /api/v1/documents/count').length).toBeGreaterThan(1);
-		events.stop();
 	});
 
 	describe('comes back to the place it was left at (WF-03)', () => {
@@ -172,14 +180,16 @@ describe('the archive page', () => {
 		}
 
 		it('by the way back of a document: the place in its history entry', async () => {
+			fakeTime(); // a while passes at once before the list comes
 			const { scrolled, answer } = serve();
 			testPage.state = { place: { y: 1500 } };
 			render(Page);
-			await new Promise((resolve) => setTimeout(resolve, 20));
+			await elapse(1000);
 			expect(scrolled).toEqual([]); // not while the list is empty
 			answer();
-			await screen.findByText('Eins');
-			await waitFor(() => expect(scrolled).toEqual([{ y: 1500, rows: 2 }]));
+			await vi.waitFor(() => screen.getByText('Eins'));
+			await elapse(1000);
+			expect(scrolled).toEqual([{ y: 1500, rows: 2 }]);
 		});
 
 		it('by the back button: the place in the snapshot', async () => {
@@ -196,11 +206,12 @@ describe('the archive page', () => {
 		});
 
 		it('stays at the top when opened otherwise', async () => {
+			fakeTime(); // a while passes at once after the list came
 			const { scrolled, answer } = serve();
 			render(Page);
 			answer();
-			await screen.findByText('Eins');
-			await new Promise((resolve) => setTimeout(resolve, 20));
+			await vi.waitFor(() => screen.getByText('Eins'));
+			await elapse(1000);
 			expect(scrolled).toEqual([]);
 		});
 	});
@@ -371,7 +382,6 @@ describe('the archive page', () => {
 		await vi.waitFor(() => expect(listed()).toHaveLength(2));
 		expect(listed().at(-1)).toContain('offset=50');
 		expect(goto).not.toHaveBeenCalled();
-		events.stop();
 	});
 
 	// Opens two menus and a dialog and follows a poll: the longest test of the page, longer
@@ -820,7 +830,6 @@ describe('the archive page', () => {
 		const searches = calls(api).filter((call) => call.startsWith('POST /api/v1/documents/search'));
 		expect(searches[0]).not.toContain('semantic_ratio');
 		expect(searches.at(-1)).not.toContain('semantic_ratio');
-		events.stop();
 	});
 
 	it('shows nothing of the meaning where the installation has no search by it', async () => {
@@ -843,12 +852,13 @@ describe('the archive page', () => {
 			})
 		});
 		vi.stubGlobal('fetch', api);
-		const user = userEvent.setup();
+		fakeTime(); // the pause after typing passes at once
+		const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
 		render(Page);
-		expect(await screen.findByText(m.search_none())).toBeTruthy();
+		expect(await vi.waitFor(() => screen.getByText(m.search_none()))).toBeTruthy();
 		const [field] = screen.getAllByRole('searchbox', { name: m.documents_search_label() });
 		await user.type(field, 'x');
-		await new Promise((resolve) => setTimeout(resolve, 20));
+		await elapse(1000);
 		expect(screen.queryByText(m.reason_search_no_embeddings(), { exact: false })).toBeNull();
 		expect(calls(api).some((call) => call.includes('/search/warm'))).toBe(false);
 	});

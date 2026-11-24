@@ -7,12 +7,15 @@ import pytest
 from lekto.core.domain.bulk import MAX_IDS, BulkAction, BulkKind
 from lekto.core.domain.documents import DocumentChanges
 from lekto.core.domain.errors import (
+    ConcurrencyError,
     NotFoundError,
     PermissionDeniedError,
     SearchUnavailableError,
+    SpaceWriteDeniedError,
     ValidationError,
 )
 from lekto.core.domain.ids import (
+    BulkOperationId,
     ContactId,
     DocumentId,
     DocumentTypeId,
@@ -21,6 +24,7 @@ from lekto.core.domain.ids import (
     UserId,
     new_id,
 )
+from lekto.core.domain.jobs import JobStatus
 from lekto.core.domain.pipeline import Lane, Node
 from lekto.core.domain.progress import ProgressStatus
 from lekto.core.domain.push import PushKind
@@ -31,6 +35,7 @@ from lekto.core.domain.spaces import SpaceRole
 from lekto.core.domain.users import Role
 from lekto.core.ports.repository import DocumentFilter
 from lekto.core.services import bulk
+from lekto.core.services._jobs import CONFLICT_ATTEMPTS
 from lekto.core.services._push_queue import PUSH_JOB
 from lekto.core.services.bulk import BulkService, Selection
 from lekto.core.services.search import SearchItem, SearchMode, SearchPage, SearchService
@@ -179,6 +184,20 @@ async def test_what_an_action_names_is_checked_once_when_it_starts(world: World)
     ):
         with pytest.raises(NotFoundError):
             await bulk_service.start(Actor(owner.id), ids(document), action)
+    # A space the person neither sees nor hands over to is none, one they only read is refused,
+    # as when moving one document: at the start, not skipped with every document (XA-K01).
+    stranger = await world.user()
+    theirs = await world.spaces.create(Actor(stranger.id), "Theirs")
+    with pytest.raises(NotFoundError):
+        await bulk_service.start(
+            Actor(owner.id), ids(document), BulkAction(BulkKind.MOVE, space=theirs.id)
+        )
+    read_only = await world.spaces.create(Actor(stranger.id), "Shared")
+    await world.spaces.set_member(Actor(stranger.id), read_only.id, owner.id, SpaceRole.READ)
+    with pytest.raises(SpaceWriteDeniedError):
+        await bulk_service.start(
+            Actor(owner.id), ids(document), BulkAction(BulkKind.MOVE, space=read_only.id)
+        )
     with pytest.raises(ValidationError, match="move takes no add"):
         BulkAction(BulkKind.MOVE, space=SpaceId(new_id()), add=frozenset({TagId(new_id())}))
     with pytest.raises(ValidationError, match="confirm takes no contact, node"):
@@ -257,6 +276,45 @@ async def test_an_unexpected_error_ends_the_operation_and_tells_the_admins(
         if job.kind == PUSH_JOB and job.payload.get("kind") == PushKind.JOB_FAILED.value
     ]
     assert told == [{"kind": bulk.BULK_JOB}]
+
+
+async def test_a_concurrent_change_while_the_job_is_held_runs_it_again_at_once(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A deadlock is gone the next time: the operation goes on, not stopped and not left
+    waiting for its lease to run out (SC-K10); the fifth in a row stops it."""
+    r = await rule_world(world)
+    owner = await world.user()
+    document = await r.arrive(owner)
+    bulk_service = service(r)
+    operation = await bulk_service.start(
+        Actor(owner.id), ids(document), BulkAction(BulkKind.CONFIRM)
+    )
+    next_document = bulk_service._next_document
+    conflicts = [ConcurrencyError("deadlock")]
+
+    async def once(id: BulkOperationId) -> bool:
+        if conflicts:
+            raise conflicts.pop()
+        return await next_document(id)
+
+    monkeypatch.setattr(bulk_service, "_next_document", once)
+    assert await bulk_service.run_next_job()
+    (job,) = [job for job in world.database.jobs.values() if job.kind == bulk.BULK_JOB]
+    assert (job.status, job.run_at) == (JobStatus.QUEUED, world.clock.now())
+    assert await bulk_service.run_next_job()
+    done = await bulk_service.get(Actor(owner.id), operation.id)
+    assert (done.status, done.position, done.error) == (ProgressStatus.DONE, 1, None)
+
+    again = await bulk_service.start(Actor(owner.id), ids(document), BulkAction(BulkKind.CONFIRM))
+    conflicts.extend(ConcurrencyError("deadlock") for _ in range(CONFLICT_ATTEMPTS))
+    while await bulk_service.run_next_job():
+        pass
+    stopped = await bulk_service.get(Actor(owner.id), again.id)
+    assert (stopped.status, stopped.error) == (
+        ProgressStatus.FAILED,
+        "stopped by an internal error",
+    )
 
 
 async def test_a_selection_is_bounded(world: World, monkeypatch: pytest.MonkeyPatch) -> None:

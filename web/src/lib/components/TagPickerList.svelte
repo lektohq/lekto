@@ -60,6 +60,10 @@
 	const isGroup = $derived(scope === 'contact' || scope === 'document_type');
 
 	function toggle(id: string, on: boolean) {
+		// The topic chosen already tells nothing new: a click chose it before the change of its
+		// radio followed (WC-K13), whichever ran first in between (a browser runs the
+		// microtasks after the click, a test after both).
+		if (single && on && selected.includes(id)) return;
 		onchange(single ? (on ? [id] : []) : toggled(selected, id, on));
 	}
 

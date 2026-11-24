@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount, tick, untrack } from 'svelte';
+	import { tick, untrack } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { scrollBehavior } from '#lib/motion.ts';
@@ -26,7 +26,13 @@
 	import type { Lookup } from '#lib/masterdata.svelte.ts';
 	import { NODE_LABELS } from '#lib/node-labels.ts';
 	import { m } from '#lib/paraglide/messages.js';
-	import { durationSeconds, reprocessable, type GraphNode, type Node } from '#lib/pipeline.ts';
+	import {
+		durationSeconds,
+		isAtWork,
+		reprocessable,
+		type GraphNode,
+		type Node
+	} from '#lib/pipeline.ts';
 	import { changesOf, headlineOf } from '#lib/run-summary.ts';
 	import { glance, runNumbers, runTokens, startedAgain } from '#lib/runs.ts';
 	import { session } from '#lib/session.svelte.ts';
@@ -57,6 +63,7 @@
 		graph,
 		manageable,
 		lookup = null,
+		reading = null,
 		onreprocess
 	}: {
 		document: Document;
@@ -64,6 +71,9 @@
 		manageable: boolean;
 		/** Names of contacts, types, spaces and users in what the steps said. */
 		lookup?: Lookup | null;
+		/** How the text was read, as the page loads it with the document; without it the
+		 * details of the text recognition leave the poor pages out. */
+		reading?: Reading | null;
 		onreprocess: () => void;
 	} = $props();
 
@@ -73,10 +83,9 @@
 
 	let entries = $state<LogEntry[] | null>(null);
 	let exchanges = $state<Partial<Record<Node, Exchange[]>>>({});
-	// The document's files and how its text was read, for the details of the text recognition;
-	// without them the details leave that out.
+	// The document's files, for the details of the text recognition; without them the details
+	// leave that out.
 	let files = $state<Files | null>(null);
-	let reading = $state<Reading | null>(null);
 	let problem = $state<string | null>(null);
 	let prompt = $state<{ title: string; meta: string; calls: Exchange['calls'] } | null>(null);
 	let promptOpen = $state(false);
@@ -109,19 +118,14 @@
 		}
 	}
 
-	/** The files and the reading, beside the log; a failure leaves them out, not the log. */
+	/** The files, beside the log; a failure leaves them out, not the log. The reading comes with
+	 * the page, which loads it with the document anew at every event. */
 	async function loadExtras(wanted: string, request: number) {
-		const [found, read] = await Promise.all([
-			unwrap(api.GET('/api/v1/documents/{id}/files', { params: { path: { id: wanted } } })).catch(
-				() => null
-			),
-			unwrap(api.GET('/api/v1/documents/{id}/reading', { params: { path: { id: wanted } } })).catch(
-				() => null
-			)
-		]);
+		const found = await unwrap(
+			api.GET('/api/v1/documents/{id}/files', { params: { path: { id: wanted } } })
+		).catch(() => null);
 		if (wanted !== document.id || request !== latest) return;
 		files = found && typeof found === 'object' && 'original' in found ? found : null;
-		reading = read && typeof read === 'object' && Array.isArray(read.pages) ? read : null;
 	}
 
 	// Loaded once per document and after completed nodes; a new state of the document (every
@@ -135,7 +139,6 @@
 			if (loadedFor !== id) {
 				entries = null;
 				files = null;
-				reading = null;
 				problem = null;
 				loadedFor = id;
 			}
@@ -152,9 +155,12 @@
 		};
 	});
 
-	// The clock for the duration of a running node.
+	// The clock for the duration of a running node: it ticks only while one is at work.
 	let now = $state(new Date());
-	onMount(() => {
+	const atWork = $derived(document.processing.nodes.some(isAtWork));
+	$effect(() => {
+		if (!atWork) return;
+		now = new Date();
 		const timer = setInterval(() => (now = new Date()), 1000);
 		return () => clearInterval(timer);
 	});

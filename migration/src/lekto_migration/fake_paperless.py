@@ -1,5 +1,10 @@
 """A stand-in for the Paperless-ngx REST API, for tests: serves a prepared archive through
-`httpx2.MockTransport`. Only the endpoints the migration reads exist, and only GET."""
+`httpx2.MockTransport`. Only the endpoints the migration reads exist, and only GET.
+
+It lives in the package, not among the tests, on purpose (Tobi, 23.11.2026, MI-K09): the
+backend's tests (`test_migration_flow`) run the migration against the real REST API and
+import it as `lekto_migration.fake_paperless`, which a test module of this project would not
+offer them. In the image it is a few kilobytes no command uses."""
 
 import json
 from dataclasses import dataclass, field

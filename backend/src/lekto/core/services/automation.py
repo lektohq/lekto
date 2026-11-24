@@ -27,20 +27,19 @@ from lekto.core.domain.reasons import Action
 from lekto.core.domain.rights import Actor
 from lekto.core.domain.statistics import percentiles
 from lekto.core.ports.clock import Clock
-from lekto.core.ports.repository import FactsScope, LaneCount
+from lekto.core.ports.repository import MICROSECOND, FactsScope, LaneCount
 from lekto.core.ports.unit_of_work import UnitOfWorkFactory
 from lekto.core.services._access import load_actor, require_admin
 from lekto.core.services._kept import Kept
 
 DEFAULT_CHANNELS = frozenset({Channel.WEB, Channel.API, Channel.MAIL})
 HISTORY_MONTHS = 12
+"""The months of the history, for the periods that end now; all time goes back to the first."""
 MAX_CASES = 100
 """Cases behind one number of the holders' evaluation at most."""
-"""The months of the history, for the periods that end now; all time goes back to the first."""
 ALL_MONTHS = 60
 """How far the history of all time looks back, at most: five years of months is what a chart
 still tells apart; the counts of all time are not bounded."""
-_MICROSECOND = timedelta(microseconds=1)
 
 
 class Period(StrEnum):
@@ -361,4 +360,4 @@ def _field_order(field: str) -> int:
 
 
 def _time(micros: int | None) -> timedelta | None:
-    return None if micros is None else micros * _MICROSECOND
+    return None if micros is None else micros * MICROSECOND

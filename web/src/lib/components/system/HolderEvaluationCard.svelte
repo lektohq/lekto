@@ -129,26 +129,24 @@
 	{:else if !holders}
 		<Loading />
 	{:else}
-		<div class="overflow-x-auto">
-			<Table.Root label={m.holders_title()}>
-				<Table.Header>
-					<Table.Row>
-						<Table.Head>{m.holders_kind()}</Table.Head>
-						<Table.Head class="text-right">{m.holders_right()}</Table.Head>
-						<Table.Head class="text-right">{m.holders_learned_rejected()}</Table.Head>
-						<Table.Head class="text-right">{m.holders_refused_confirmed()}</Table.Head>
-						<Table.Head class="text-right">{m.holders_unclear()}</Table.Head>
-						<Table.Head class="text-right">{m.holders_unread()}</Table.Head>
-					</Table.Row>
-				</Table.Header>
-				<Table.Body>
-					{#each rows as item (item.kind)}
-						{@render row(labelOfKind(item.kind), item.kind, item, false)}
-					{/each}
-					{@render row(m.holders_recommendation(), 'recommendation', holders.recommendation, true)}
-				</Table.Body>
-			</Table.Root>
-		</div>
+		<Table.Root label={m.holders_title()}>
+			<Table.Header>
+				<Table.Row>
+					<Table.Head>{m.holders_kind()}</Table.Head>
+					<Table.Head class="text-right">{m.holders_right()}</Table.Head>
+					<Table.Head class="text-right">{m.holders_learned_rejected()}</Table.Head>
+					<Table.Head class="text-right">{m.holders_refused_confirmed()}</Table.Head>
+					<Table.Head class="text-right">{m.holders_unclear()}</Table.Head>
+					<Table.Head class="text-right">{m.holders_unread()}</Table.Head>
+				</Table.Row>
+			</Table.Header>
+			<Table.Body>
+				{#each rows as item (item.kind)}
+					{@render row(labelOfKind(item.kind), item.kind, item, false)}
+				{/each}
+				{@render row(m.holders_recommendation(), 'recommendation', holders.recommendation, true)}
+			</Table.Body>
+		</Table.Root>
 		<p class="text-meta text-muted-foreground">{m.holders_footnote()}</p>
 	{/if}
 </Card.Root>

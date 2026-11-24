@@ -47,6 +47,12 @@ describe('what the bar of a dry run tells a screen reader (WD-12)', () => {
 		);
 	});
 
+	it('offers no "all" to choose where every document has a conflict (WD-K02)', () => {
+		render(RuleApplyBar, props({ loaded: 3, conflicts: 3 }));
+		const all = screen.getByRole('checkbox', { name: m.rule_preview_select_all() });
+		expect((all as HTMLInputElement).disabled).toBe(true);
+	});
+
 	it('says that the dry run stopped, with how far it came', async () => {
 		render(RuleApplyBar, props({ complete: false, lookedAt: 20, loaded: 7, conflicts: 0 }));
 		expect(said().textContent).toBe(

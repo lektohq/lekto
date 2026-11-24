@@ -80,7 +80,7 @@
 	async function saved(changed: Profile) {
 		if (profile) profile.profile = changed;
 		try {
-			[me] = await Promise.all([unwrap(api.GET('/api/v1/auth/me')), session.load()]);
+			me = (await session.load()) ?? me; // one request: the session's answer is the account
 		} catch (error) {
 			reportError(error);
 		}
@@ -158,10 +158,11 @@
 			{#if tab === 'profile'}
 				<Card.Root>
 					<Card.Header>
-						<Card.Title class="flex items-center gap-1">
-							{m.profile_title()}
+						<!-- The hint beside the heading, not in it: its name is no part of "Profil". -->
+						<div class="flex items-center gap-1">
+							<Card.Title>{m.profile_title()}</Card.Title>
 							<InfoHint text={m.profile_own_hint()} about={m.profile_title()} />
-						</Card.Title>
+						</div>
 					</Card.Header>
 					<Card.Content>
 						<ProfileForm data={profile} part="person" onsaved={saved} />
@@ -169,7 +170,7 @@
 				</Card.Root>
 			{:else if tab === 'sign-in'}
 				{#if me.has_password}<PasswordCard />{/if}
-				<TotpCard enabled={me.totp_enabled} onchanged={load} />
+				<TotpCard enabled={me.totp_enabled} hasPassword={me.has_password} onchanged={load} />
 
 				{#if oidc?.enabled || me.linked_accounts.length > 0}
 					<Card.Root>

@@ -79,6 +79,8 @@ describe('DateInput', () => {
 		expect(calendar?.getAttribute('aria-label') ?? '').not.toMatch(/Event/);
 		expect(document.body.innerHTML).not.toMatch(/aria-label="Event\b/);
 		expect(document.body.innerHTML).toMatch(/Geburtsdatum,? [^"<]*\d{4}/);
+		// The calendar's head is no second banner of the page (WZ-K02).
+		expect(screen.queryByRole('banner')).toBeNull();
 	});
 
 	it('writes a typed part as its number, not as empty', () => {

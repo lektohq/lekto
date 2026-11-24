@@ -152,6 +152,11 @@ class Credential:
                 return True
         return False
 
+    def turn_off_totp(self) -> None:
+        """No second factor any more: neither the authenticator nor the recovery codes."""
+        self.totp = None
+        self.recovery_codes = set()
+
     def accept_totp_step(self, step: int) -> bool:
         """Record the step of a valid code; False if it, or a later one, was used already."""
         assert self.totp is not None

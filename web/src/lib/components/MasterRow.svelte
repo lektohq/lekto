@@ -50,7 +50,7 @@
 		<button
 			type="button"
 			class={cn(
-				'flex min-w-0 flex-1 items-center gap-3 py-2.5 pr-3 text-left transition-colors hover:bg-panel focus-visible:bg-panel focus-visible:outline-none',
+				'flex min-w-0 flex-1 items-center gap-3 py-2.5 pr-3 text-left transition-colors hover:bg-panel focus-visible:bg-panel focus-visible:-outline-offset-2',
 				columns ? 'min-h-18' : 'min-h-14',
 				before ? 'pl-1' : 'pl-4'
 			)}

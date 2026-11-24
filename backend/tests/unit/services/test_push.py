@@ -8,12 +8,13 @@ import pytest
 
 from lekto.adapters.outbound.memory import FakePushSender
 from lekto.adapters.outbound.memory.push import FAKE_PUBLIC_KEY
-from lekto.core.domain.documents import Document
+from lekto.core.domain.documents import Document, DocumentChanges
 from lekto.core.domain.events import ReviewRequired
+from lekto.core.domain.identity import ViaToken
 from lekto.core.domain.jobs import Job, JobStatus
 from lekto.core.domain.pipeline import Node
-from lekto.core.domain.push import PushKind, PushMessage
-from lekto.core.domain.rights import Actor
+from lekto.core.domain.push import PushDevice, PushKind, PushMessage
+from lekto.core.domain.rights import Actor, TokenRight
 from lekto.core.domain.users import Role, User
 from lekto.core.ports.push import PushOutcome
 from lekto.core.services import _jobs
@@ -108,7 +109,7 @@ async def test_nobody_is_told_who_switched_it_off_or_has_no_device(world: World)
     assert [j for j in world.database.jobs.values() if j.kind == PUSH_JOB] == []
 
 
-async def test_a_document_confirmed_meanwhile_is_not_told(world: World) -> None:
+async def test_a_document_seen_and_deleted_meanwhile_is_not_told(world: World) -> None:
     sender = FakePushSender()
     service = push(world, sender)
     owner = await world.user()
@@ -116,6 +117,17 @@ async def test_a_document_confirmed_meanwhile_is_not_told(world: World) -> None:
     document = await waiting(world, service, owner)
     await world.inbox.mark_seen(Actor(owner.id), document.id)
     await world.documents.delete(Actor(owner.id), document.id)
+    assert await told(world, service, sender) == []
+
+
+async def test_a_document_confirmed_meanwhile_is_not_told(world: World) -> None:
+    """Confirmed before the quiet ends, it no longer waits in the inbox (TD-K01)."""
+    sender = FakePushSender()
+    service = push(world, sender)
+    owner = await world.user()
+    await with_device(world, service, owner)
+    document = await waiting(world, service, owner)
+    await world.pipeline().confirm(Actor(owner.id), document.id, DocumentChanges())
     assert await told(world, service, sender) == []
 
 
@@ -224,3 +236,30 @@ async def test_a_notice_names_what_it_is_about(world: World) -> None:
         {"mailbox_id": "m-1", "name": "Rechnungen"},
         "/ui/system/mailboxes/m-1",
     )
+
+
+async def test_a_device_registered_through_a_token_goes_with_the_token(world: World) -> None:
+    """Revoking the token deletes it, as its webhooks; the others stay (XA-K04)."""
+    owner = await world.user()
+    service = push(world, FakePushSender())
+    token, _ = await world.auth.create_api_token(
+        Actor(owner.id), "Home Assistant", frozenset({TokenRight.DOCUMENTS_READ})
+    )
+
+    async def register(endpoint: str, via: ViaToken | None = None) -> PushDevice:
+        return await service.register(
+            Actor(owner.id),
+            endpoint=endpoint,
+            p256dh=FAKE_PUBLIC_KEY,
+            auth=AUTH,
+            name="iPhone",
+            locale="de",
+            via=via,
+        )
+
+    script = await register("https://web.push.apple.com/script", ViaToken.of(token))
+    phone = await register("https://web.push.apple.com/phone")
+    await world.auth.revoke_api_token(Actor(owner.id), token.id)
+    async with world.uow() as uow:
+        assert [device.id for device in await uow.push_devices.list_for(owner.id)] == [phone.id]
+    assert script.api_token_id == token.id

@@ -43,7 +43,8 @@
 		try {
 			[hooks, users] = await Promise.all([
 				unwrap(api.GET('/api/v1/webhooks')),
-				unwrap(api.GET('/api/v1/users'))
+				// Only an admin sees whose a webhook is.
+				session.isAdmin ? unwrap(api.GET('/api/v1/users')) : []
 			]);
 			problem = null;
 		} catch (error) {

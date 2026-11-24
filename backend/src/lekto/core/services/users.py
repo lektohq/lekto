@@ -52,7 +52,7 @@ from lekto.core.services.rules.references import (
 )
 from lekto.core.services.rules.running import Prepared
 from lekto.core.services.tasks.settling import drop_queued
-from lekto.core.services.webhooks.management import disable_sending_rules
+from lekto.core.services.webhooks.management import disable_sending_rules, remove_made_through
 
 log = logging.getLogger(__name__)
 
@@ -241,6 +241,8 @@ class UserService:
             await uow.sessions.remove_for_user(id)
             await uow.known_devices.remove_for_user(id)
             if revoke_tokens:
+                tokens = await uow.api_tokens.list_for(id)
+                await remove_made_through(uow, [token.id for token in tokens], now)
                 await uow.api_tokens.remove_for_user(id)
             await uow.commit()
         log.info("password reset", extra={"user_id": str(id), "tokens_revoked": revoke_tokens})
@@ -254,8 +256,7 @@ class UserService:
             await uow.users.get(id)
             credential = await uow.credentials.find(id)
             if credential is not None and credential.totp is not None:
-                credential.totp = None
-                credential.recovery_codes = set()
+                credential.turn_off_totp()
                 await uow.credentials.update(credential)
                 await uow.commit()
                 log.info("TOTP turned off by an admin", extra={"user_id": str(id)})
@@ -466,7 +467,7 @@ async def _blocking(uow: UnitOfWork, id: UserId) -> list[tuple[BlockingSpace, Sp
         personal = space.personal_of == id
         if not personal and space.editors != {id}:
             continue
-        documents = len(await _documents_in(uow, space.id))
+        documents = await uow.documents.count(DocumentFilter(spaces=frozenset({space.id})), None)
         if personal and not documents:
             continue  # goes with the user
         if personal:

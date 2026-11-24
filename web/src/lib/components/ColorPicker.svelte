@@ -127,7 +127,7 @@
 		{/each}
 	</div>
 	{#if shownMore}
-		<div class="flex flex-wrap items-center gap-2 rounded-xl border border-dashed p-2">
+		<div class="flex flex-wrap items-center gap-2 rounded-xl border p-2">
 			<input
 				type="color"
 				value={own && value ? value : FALLBACK}

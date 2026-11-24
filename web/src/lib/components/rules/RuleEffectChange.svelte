@@ -53,8 +53,7 @@
 		{/each}
 		{#each removed as id (id)}
 			<span class="sr-only">{m.rule_change_removed()}</span>
-			<span class="text-muted-foreground" aria-hidden="true">−</span>
-			<s class="text-muted-foreground">{describeValue(id, lookup)}</s>
+			<span class="text-muted-foreground" aria-hidden="true">−</span>{@render chip(id)}
 		{/each}
 	{:else}
 		{#if old !== undefined}

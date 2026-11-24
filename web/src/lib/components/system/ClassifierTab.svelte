@@ -2,6 +2,7 @@
 	import RefreshCw from '@lucide/svelte/icons/refresh-cw';
 	import { LineChart, Spline } from 'layerchart';
 	import { onMount, untrack } from 'svelte';
+	import { latest } from '#lib/latest.ts';
 	import { toast } from 'svelte-sonner';
 	import { api } from '#lib/api/client.ts';
 	import { unwrap } from '#lib/api/call.ts';
@@ -51,15 +52,21 @@
 	let problem = $state<string | null>(null);
 	let busy = $state(false);
 
+	// Loaded again after a break of the stream and after a training: the newest answer wins.
+	const begin = latest();
 	async function load() {
+		const current = begin();
 		try {
-			[status, models, signals] = await Promise.all([
+			const found = await Promise.all([
 				unwrap(api.GET('/api/v1/classifier')),
 				unwrap(api.GET('/api/v1/classifier/models')),
 				unwrap(api.GET('/api/v1/automation/signals', { params: { query: { tz: zone } } }))
 			]);
+			if (!current()) return;
+			[status, models, signals] = found;
 			problem = null;
 		} catch (failure) {
+			if (!current()) return;
 			if (failure instanceof ApiError && failure.status === 503) unavailable = true;
 			else problem = describeError(failure);
 		}
@@ -380,7 +387,7 @@
 								{#each context.series.visibleSeries as line (line.key)}
 									<Spline
 										seriesKey={line.key}
-										strokeWidth={2.5}
+										strokeWidth={2.2}
 										stroke-dasharray={line.key === 'document_type' ? '6 4' : undefined}
 									/>
 								{/each}
@@ -403,7 +410,7 @@
 			{#if !anySignal}
 				<EmptyNote size="line">{m.classifier_signals_none()}</EmptyNote>
 			{:else}
-				<div class="mt-4 overflow-x-auto">
+				<div class="mt-4">
 					<Table.Root
 						label={m.classifier_signals_title()}
 						class="w-full min-w-[720px] border-collapse tabular-nums"
@@ -461,9 +468,8 @@
 													</span>
 												</div>
 											{:else}
-												<span class="text-muted-foreground" aria-label={m.classifier_signal_none()}
-													>–</span
-												>
+												<span class="text-muted-foreground" aria-hidden="true">–</span>
+												<span class="sr-only">{m.classifier_signal_none()}</span>
 											{/if}
 										</Table.Cell>
 									{/each}

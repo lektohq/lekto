@@ -36,8 +36,9 @@ router = APIRouter(route_class=SYSTEM_AREA, prefix="/users", tags=["users"], dep
 
 
 def _account(account: Account, personal_space: SpaceId | None) -> AccountOut:
-    return AccountOut(
-        **UserOut.of(account.user, personal_space=personal_space).model_dump(),
+    return AccountOut.of(
+        account.user,
+        personal_space=personal_space,
         has_password=account.has_password,
         totp_enabled=account.totp_enabled,
         linked_accounts=[LinkOut.of(link) for link in account.external_identities],

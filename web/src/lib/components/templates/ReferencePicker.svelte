@@ -23,10 +23,10 @@
 	// search index: the titles of the newest).
 	let {
 		value = $bindable(null),
-		documentType = undefined,
+		documentType,
 		preselect = true,
-		label = undefined,
-		exclude = undefined
+		label,
+		exclude
 	}: {
 		value?: Reference | null;
 		documentType?: string | null;

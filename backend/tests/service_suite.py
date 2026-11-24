@@ -19,14 +19,12 @@ from lekto.core.services.master_data import MasterDataService
 from lekto.core.services.profiles import ContactNumber, ProfileChanges, ProfileService
 from tests import builders
 from tests.builders import NOW, PlaceholderNode, incoming
-from tests.contracts.unit_of_work import owner_with_space
+from tests.contracts.unit_of_work import owner_with_space, seed
 
 
 async def _admin(uow_factory: UnitOfWorkFactory) -> User:
     admin = builders.admin()
-    async with uow_factory() as uow:
-        await uow.users.add(admin)
-        await uow.commit()
+    await seed(uow_factory, admin)
     return admin
 
 

@@ -13,7 +13,7 @@ from fastapi.exceptions import RequestValidationError
 from lekto.adapters.inbound.lanes import LANES, LaneFilter
 from lekto.adapters.inbound.limits import MAX_SELECTED
 from lekto.adapters.inbound.rest.context import Context
-from lekto.adapters.inbound.rest.schemas.refs import opened
+from lekto.adapters.inbound.rest.schemas.refs import fact_criterion
 from lekto.core.domain.document_facts import FactCriterion, FactRole
 from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.identifiers import IdentifierKind
@@ -97,12 +97,11 @@ def _fact(written: str, refs: RefCipher) -> FactCriterion:
     if kind and kind not in IdentifierKind:
         raise ValidationError(because(ReasonCode.FACT_KIND_UNKNOWN, kind=kind))
     if role and role not in FactRole:
-        raise ValidationError(because(ReasonCode.FACT_KIND_UNKNOWN, kind=role))
-    if ref and not kind:
-        raise ValidationError(because(ReasonCode.FACT_CRITERION_EMPTY))
-    return FactCriterion.written(
+        raise ValidationError(because(ReasonCode.FACT_ROLE_UNKNOWN, role=role))
+    return fact_criterion(
+        refs,
         IdentifierKind(kind) if kind else None,
-        opened(refs, IdentifierKind(kind), ref) if ref else None,
+        ref or None,
         FactRole(role) if role else None,
     )
 

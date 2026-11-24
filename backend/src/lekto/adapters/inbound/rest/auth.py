@@ -7,7 +7,8 @@
   they stay out of addresses) is open to a `read` token; with a session it needs the header all
   the same. A token of the scope `upload` reaches only the upload (`UPLOADS`), nothing else.
 - Every protected router depends on `authenticate`, so a route cannot be added without it. It
-  runs before the parameters are checked: without credentials the answer is always 401.
+  runs before the parameters are checked: without credentials the answer is 401, unless the
+  body is no JSON at all, which FastAPI refuses before (422).
 - Managing one's own sign-in (password, TOTP, tokens, sessions, links) needs a session; an API
   token cannot be used to take over an account.
 """

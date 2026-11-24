@@ -19,7 +19,7 @@ Common rules for every adapter:
 
 from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from enum import StrEnum
 from typing import Protocol
@@ -53,6 +53,7 @@ from lekto.core.domain.ids import (
     UserId,
     WebhookId,
     ends_with,
+    id_reference,
 )
 from lekto.core.domain.inbox import Confirmation, InboxTab
 from lekto.core.domain.lenses import Lens
@@ -267,6 +268,8 @@ class DocumentFilter:
         ):
             if chosen is not None and not chosen:
                 raise ValueError(f"a set of {name} in a filter is never empty")
+        if self.ids is not None and any(id_reference(item) != item for item in self.ids):
+            raise ValueError("an id in a filter is a short id or the whole one (`id_reference`)")
 
     def matches(self, view: FilterView) -> bool:
         """Whether a document (as `view` shows it) matches; for the core and the in-memory
@@ -789,6 +792,10 @@ class LaneCount:
     count: int
 
 
+MICROSECOND = timedelta(microseconds=1)
+"""The unit of the processing times the adapters store and `RunTimes` gives (PM-K07)."""
+
+
 @dataclass(frozen=True)
 class RunTimes:
     """The times of the first runs in microseconds, one value per document, in no particular
@@ -1004,10 +1011,6 @@ class MailRecordRepository(Protocol):
     async def has_message(self, message_id: str) -> bool:
         """Whether a mail with that Message-ID was taken (`TAKEN_OUTCOMES`), from any folder or
         mailbox: one no rule took, or that failed, does not count."""
-        ...
-
-    async def recent(self, mailbox: MailboxId, *, limit: int) -> list[MailRecord]:
-        """The mailbox's latest records, the latest first."""
         ...
 
     async def page(

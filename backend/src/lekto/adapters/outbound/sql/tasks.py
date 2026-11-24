@@ -3,9 +3,10 @@
 from datetime import datetime, timedelta
 from typing import Any
 
-from sqlalchemy import Row, delete, func, select
+from sqlalchemy import Row, func, select
 
 from lekto.adapters.outbound.sql import tables as t
+from lekto.adapters.outbound.sql.purging import delete_in_batches
 from lekto.adapters.outbound.sql.repositories import SqlRepository, Values
 from lekto.core.domain.ids import DocumentId, TaskId, UserId, WebhookId
 from lekto.core.domain.pipeline import Node
@@ -56,8 +57,7 @@ class SqlTaskRepository(SqlRepository[TaskId, Task]):
 
     async def purge(self, *, before: datetime) -> int:
         table = self.table
-        result = await self._tx.write(delete(table).where(table.c.settled_at < before))
-        return int(result.rowcount)
+        return await delete_in_batches(self._tx.write, table, table.c.settled_at < before)
 
     def _entity(self, row: Row[Any]) -> Task:
         return Task(

@@ -18,6 +18,7 @@ from enum import StrEnum
 from lekto.core.domain.changes import UNSET, Unset, apply_changes
 from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.ids import DocumentTypeId, MailboxId, UserId, new_id
+from lekto.core.domain.json_value import JsonObject
 from lekto.core.domain.mail_traits import (
     COLOR_BITS,
     FLAGGED,
@@ -128,6 +129,20 @@ class MailStep:
                 if value is not None:
                     raise ValidationError(f"{self.action} takes no value")
         object.__setattr__(self, "value", value)
+
+
+def step_to_json(step: MailStep) -> JsonObject:
+    """A step in the JSON form it is stored in: at a rule (`steps_to_json`) and a record."""
+    data: JsonObject = {"action": step.action.value}
+    if step.value is not None:
+        data["value"] = step.value
+    return data
+
+
+def step_from_json(data: JsonObject) -> MailStep:
+    """The step of a `step_to_json`, as stored; a rule's are checked by `steps_from_json`."""
+    value = data.get("value")
+    return MailStep(MailAction(str(data["action"])), None if value is None else str(value))
 
 
 @dataclass(frozen=True)
@@ -297,6 +312,8 @@ class Mailbox:
         folders = tuple(dict.fromkeys(folder.strip() for folder in self.folders))
         if not folders or "" in folders or len(folders) > MAX_FOLDERS:
             raise ValidationError(f"folders: 1 to {MAX_FOLDERS}, none empty")
+        if any(len(folder) > MAX_FOLDER for folder in folders):
+            raise ValidationError(f"folders: a name of at most {MAX_FOLDER} characters")
         self.folders = folders
         if not MIN_INTERVAL <= self.interval <= MAX_INTERVAL:
             raise ValidationError("interval: from one minute to one day")

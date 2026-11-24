@@ -465,6 +465,8 @@
 										: 'bg-primary/20 ring-2 ring-primary',
 									mark.pinned && 'shadow-pinned'
 								)}
+								data-mark={mark.derived ? 'derived' : 'found'}
+								data-pinned={mark.pinned || undefined}
 								style:left={`${box.x * 100}%`}
 								style:top={`${box.y * 100}%`}
 								style:width={`${box.width * 100}%`}

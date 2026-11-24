@@ -128,6 +128,16 @@ async def test_the_structure_has_pages_lines_and_words_with_boxes(tmp_path: Path
     assert x1 == pytest.approx(72 / 595, abs=0.01) and 0 < y1 < y2 < 0.15 and x1 < x2 <= 1
 
 
+async def test_a_page_without_area_keeps_its_text_without_boxes(tmp_path: Path) -> None:
+    """A box is a fraction of the page: a page of no width has none (AD-K03)."""
+    data = pdf(at(60, 700, "Rechnung 4711")).replace(
+        b"/MediaBox [0 0 595 842]", b"/MediaBox [0 0 0 842]"
+    )
+    text, structure = await parse(tmp_path, data)
+    assert text == "Rechnung 4711"
+    assert structure["pages"][0]["lines"] == []
+
+
 async def test_pages_are_apart_and_one_without_text_is_empty(tmp_path: Path) -> None:
     source = tmp_path / "source.pdf"
     with (

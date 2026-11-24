@@ -7,6 +7,7 @@ from collections.abc import Sequence
 import pytest
 
 from lekto.adapters.outbound.imap.session import ImapMailSession
+from lekto.core.ports.mail_server import MailSearch
 
 Sent = tuple[str, ...]
 
@@ -119,3 +120,22 @@ async def test_a_folder_is_addressed_as_the_server_lists_it() -> None:
         ("UID", "FETCH", "9", "(BODY.PEEK[HEADER])"),
     ]
     assert ("SELECT", '"R&D"') in imap.sent
+
+
+class AnsweringImap(FakeImap):
+    """As `imaplib` keeps them: the SELECT's untagged answers, taken by the first `response`."""
+
+    def select(self, name: str) -> tuple[str, list[bytes]]:
+        self._answers = {"UIDVALIDITY": [b"42"]}
+        return super().select(name)
+
+    def response(self, key: str) -> tuple[str, list[bytes | None]]:
+        return key, list(self._answers.pop(key, [None]))
+
+
+async def test_every_search_of_a_folder_knows_its_uidvalidity() -> None:
+    """The folder stays selected; a second search reads no SELECT answer of its own (AD-K02)."""
+    session = _session(AnsweringImap())
+    first = await session.search("INBOX", MailSearch())
+    again = await session.search("INBOX", MailSearch())
+    assert (first.uidvalidity, again.uidvalidity) == (42, 42)

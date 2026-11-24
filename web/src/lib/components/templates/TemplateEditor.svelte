@@ -45,7 +45,7 @@
 		open = $bindable(false),
 		value,
 		label,
-		documentType = undefined,
+		documentType,
 		fields,
 		maxlength,
 		purpose = 'rule',
@@ -82,6 +82,8 @@
 	$effect(() => {
 		if (open) {
 			draft = untrack(() => value);
+			// Not the last opening's result while the new one is asked for.
+			preview = null;
 			guard.start();
 		}
 	});

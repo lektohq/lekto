@@ -103,7 +103,7 @@
 			{@render field('address', m.shortcut_address_label(), address)}
 			<Dialog.Footer>
 				<Button variant="outline" onclick={() => (token = null)}>{m.secret_done()}</Button>
-				<Button href={link} target="_blank" rel="noopener">{m.shortcut_add()}</Button>
+				<Button href={link} target="_blank" rel="noopener noreferrer">{m.shortcut_add()}</Button>
 			</Dialog.Footer>
 		{/if}
 	</Dialog.Content>

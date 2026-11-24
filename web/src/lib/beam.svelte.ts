@@ -86,6 +86,12 @@ export function showPages(parts: readonly BeamPart[], index: number, from: strin
 	pushEntry('beam', { ids: [], parts: key, index, page, from });
 }
 
+/** Let go of the parts last shown, and of the images of an added file among them: the editor
+ * they came from closed. */
+export function forgetParts(): void {
+	shownParts = null;
+}
+
 /** The parts the Beam's entry names by `key`, while they are kept (the last shown). */
 export function partsOf(key: string): readonly BeamPart[] | null {
 	return shownParts?.key === key ? shownParts.parts : null;

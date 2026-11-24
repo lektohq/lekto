@@ -8,13 +8,15 @@
 - Errors name the kind of failure only. The URL stays out of them and out of the log: its path
   may carry a secret of the receiver.
 - A request that may not reach the own network (`private` False) resolves the host first and is
-  refused unless every address is public (`core.domain.addresses.is_public`); then it goes to
-  the address that was checked, with the host as `Host` and for TLS (SNI and the certificate),
-  as the logo fetcher does (DNS rebinding).
+  refused unless every address is public (`core.domain.addresses.is_public`), a name without
+  any too; a name server that does not answer for now is a failure that is tried again. Then
+  it goes to the address that was checked, with the host as `Host` and for TLS (SNI and the
+  certificate), as the logo fetcher does (DNS rebinding).
 """
 
 import asyncio
 import logging
+import socket
 import time
 
 import httpx2
@@ -27,9 +29,7 @@ from lekto.adapters.outbound.http_client.resolver import (
     pinned,
     system_resolver,
 )
-from lekto.core.ports.webhook_sender import WebhookRequest, WebhookResponse
-
-REFUSED = "the target has an address in the own network, which this webhook may not reach"
+from lekto.core.ports.webhook_sender import REFUSED, WebhookRequest, WebhookResponse
 
 log = logging.getLogger(__name__)
 
@@ -61,6 +61,13 @@ class HttpWebhookSender:
                 if not request.private:
                     try:
                         address = await checked_address(self._resolve, url.raw_host.decode("ascii"))
+                    except OSError as failure:
+                        if _answers_later(failure):
+                            raise _UnresolvedError from None
+                        # A name that does not exist is refused too: else the log would tell
+                        # which names the own network has (XB-K02).
+                        refused = True
+                        raise _RefusedError from None
                     except NotPublicError:
                         refused = True
                         raise _RefusedError from None
@@ -83,6 +90,8 @@ class HttpWebhookSender:
                     status = response.status_code
         except _RefusedError:
             error = REFUSED
+        except _UnresolvedError:
+            error = UNRESOLVED
         except TimeoutError, httpx2.TimeoutException:
             error = f"no answer within {limit:g} seconds"
         except httpx2.HTTPError as failure:
@@ -97,5 +106,21 @@ class HttpWebhookSender:
         )
 
 
+UNRESOLVED = "the name server gave no answer for the target's name for now"
+"""The error of a request whose host name the name server could not resolve for now
+(`EAI_AGAIN`): a status-less failure, tried again like one."""
+
+
+def _answers_later(failure: OSError) -> bool:
+    """Whether the name server failed for now (`EAI_AGAIN`: no answer, or a failure of its own)
+    rather than said the name has no address. Someone who may not reach the own network
+    cannot bring that about for a name there only, so it tells nothing about them."""
+    return isinstance(failure, socket.gaierror) and failure.errno == socket.EAI_AGAIN
+
+
 class _RefusedError(Exception):
     """The target is not public and the request may not reach it."""
+
+
+class _UnresolvedError(Exception):
+    """The name server could not resolve the target's name for now."""

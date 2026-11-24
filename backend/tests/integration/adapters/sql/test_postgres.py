@@ -3,6 +3,7 @@
 import asyncio
 import random
 from collections.abc import Callable
+from datetime import timedelta
 
 import pytest
 from sqlalchemy import Column, Integer, MetaData, Table, Text, func, select
@@ -10,6 +11,7 @@ from sqlalchemy import Column, Integer, MetaData, Table, Text, func, select
 from lekto.adapters.outbound.sql import Database, SqlWakeup
 from lekto.adapters.outbound.sql import tables as t
 from lekto.adapters.outbound.sql.unit_of_work import SqlOutbox
+from lekto.composition.settings import Settings
 from lekto.core.domain.errors import ConcurrencyError
 from lekto.core.domain.events import DomainEvent
 from lekto.core.domain.users import User
@@ -120,6 +122,46 @@ class TestPostgresMigrations(MigrationSuite):
 
 
 # --- events of transactions that commit out of order ---------------------------------------------
+
+
+async def test_a_connection_the_database_dropped_is_replaced_before_use(
+    database: Database, uow_factory: UnitOfWorkFactory
+) -> None:
+    """After a restart of Postgres the pool holds dead connections: the next request gets a
+    new one, not an error (SQ-K07)."""
+    async with database.engine.connect() as pooled:  # back in the pool afterwards
+        pid = (await pooled.execute(select(func.pg_backend_pid()))).scalar_one()
+    killer = await database.connect_raw()  # outside the pool
+    try:
+        assert await killer.fetchval("SELECT pg_terminate_backend($1)", pid)
+    finally:
+        await killer.close()
+    async with uow_factory() as uow:
+        assert await uow.users.find_by_username("nobody") is None
+
+
+async def test_a_statement_longer_than_the_command_timeout_stops(
+    postgres_settings: Settings,
+) -> None:
+    """A statement may take `command_timeout` at most, then it fails rather than waits for
+    ever (SQ-K07); a short one runs."""
+    assert postgres_settings.db_host and postgres_settings.db_name
+    assert postgres_settings.db_user and postgres_settings.db_password
+    limited = Database.postgres(
+        host=postgres_settings.db_host,
+        port=postgres_settings.db_port,
+        name=postgres_settings.db_name,
+        user=postgres_settings.db_user,
+        password=postgres_settings.db_password.get_secret_value(),
+        command_timeout=timedelta(seconds=0.2),
+    )
+    try:
+        async with limited.engine.connect() as connection:
+            await connection.execute(select(func.pg_sleep(0)))
+            with pytest.raises(TimeoutError):
+                await connection.execute(select(func.pg_sleep(1)))
+    finally:
+        await limited.dispose()
 
 
 async def test_an_event_written_first_but_committed_last_is_not_skipped(

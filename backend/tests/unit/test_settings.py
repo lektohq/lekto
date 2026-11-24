@@ -20,6 +20,7 @@ from lekto.composition.settings import (
     find_unknown_variables,
     load_settings,
 )
+from lekto.core.domain.webhooks import PrivateTargets
 
 POSTGRES = {
     "LEKTO_DB_TYPE": "postgres",
@@ -913,3 +914,11 @@ def test_the_shortcut_link_is_https_and_has_no_default(monkeypatch: pytest.Monke
         load_settings()
     monkeypatch.setenv("LEKTO_SHORTCUT_URL", "https://www.icloud.com/shortcuts/x")
     assert load_settings().shortcut_url == "https://www.icloud.com/shortcuts/x"
+
+
+def test_the_private_targets_are_the_domain_s() -> None:
+    """The setting lists the values of `PrivateTargets` once more, as a Literal: both alike, and
+    the same default (CO-K05)."""
+    field = Settings.model_fields["webhook_private_targets"]
+    assert set(get_args(field.annotation)) == {target.value for target in PrivateTargets}
+    assert field.default == PrivateTargets.ADMINS

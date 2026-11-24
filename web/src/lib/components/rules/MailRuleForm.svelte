@@ -17,14 +17,11 @@
 		withStep,
 		canAddCondition,
 		canAddGroup,
-		FIELD_LABELS,
 		firstValue,
 		FIELDS,
 		hasValue,
 		MAIL_VALUE_MAX,
 		newCondition,
-		operatorText,
-		OPERATORS,
 		OPTIONALS,
 		PARTS,
 		PARTS_LABELS,
@@ -33,6 +30,8 @@
 		type MailRuleForm,
 		type Optional
 	} from '#lib/mail-rules.ts';
+	import { MAIL_FIELD_LABELS, MAIL_FIELD_OPERATORS } from '#lib/mail-traits.ts';
+	import { mailOperatorLabel } from '#lib/rules/describe.ts';
 	import { folderLabel, LIMITS as MAILBOX_LIMITS, type Mailbox } from '#lib/mailboxes.ts';
 	import {
 		userChoice,
@@ -118,7 +117,8 @@
 	function changeField(condition: MailConditionNode, field: MailField) {
 		const choice = ['folder', 'importance', 'flag', 'keyword'];
 		condition.field = field;
-		if (!OPERATORS[field].includes(condition.op)) condition.op = OPERATORS[field][0];
+		if (!MAIL_FIELD_OPERATORS[field].includes(condition.op))
+			condition.op = MAIL_FIELD_OPERATORS[field][0];
 		if (choice.includes(field)) {
 			condition.value = firstValue(
 				field,
@@ -169,16 +169,16 @@
 				<Select
 					aria-label={m.rule_condition_subject()}
 					value={condition.field}
-					options={FIELDS.map((field) => ({ value: field, label: FIELD_LABELS[field]() }))}
+					options={FIELDS.map((field) => ({ value: field, label: MAIL_FIELD_LABELS[field]() }))}
 					onchange={(field) => changeField(condition, field as MailField)}
 					class="w-full sm:w-44"
 				/>
 				<Select
 					aria-label={m.rule_condition_operator()}
 					bind:value={condition.op}
-					options={OPERATORS[condition.field].map((op) => ({
+					options={MAIL_FIELD_OPERATORS[condition.field].map((op) => ({
 						value: op,
-						label: operatorText(condition.field, op)
+						label: mailOperatorLabel(condition.field, op)
 					}))}
 					class="w-full sm:w-48"
 				/>

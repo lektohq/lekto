@@ -42,7 +42,7 @@ from lekto.core.domain.pipeline import (
     via_entry,
 )
 from lekto.core.domain.reasons import Reason
-from lekto.core.domain.rule_planner import Mode, RuleReport, changed_fields
+from lekto.core.domain.rule_planner import Mode, RuleReport, given_fields
 from lekto.core.domain.rules import Rule, Trigger
 from lekto.core.domain.spaces import Space
 from lekto.core.domain.users import User
@@ -258,7 +258,7 @@ class ChangeRules:
         decision of theirs).
         `kept_before`: the facts before a person's decision about one (`fact_decisions`); the
         change is then to the facts, the document's values stay."""
-        changed = changed_fields(changes)
+        changed = given_fields(changes)
         record = person_record(
             changed=changed,
             tags_before=before.tag_ids,

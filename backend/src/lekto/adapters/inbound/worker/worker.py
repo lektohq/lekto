@@ -31,6 +31,7 @@ import logging
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
+from typing import Protocol
 
 from lekto.adapters.inbound.backoff import backoff
 from lekto.adapters.inbound.waiting import (
@@ -58,6 +59,15 @@ from lekto.core.services.updates import UpdateService
 from lekto.core.services.webhooks import WebhookDeliveryService
 
 log = logging.getLogger(__name__)
+
+
+class _JobRunner(Protocol):
+    """A service whose jobs the worker runs."""
+
+    @property
+    def job_kinds(self) -> tuple[str, ...]: ...
+
+    async def run_next_job(self) -> bool: ...
 
 
 @dataclass
@@ -269,50 +279,42 @@ class Worker:
             finally:
                 member.done.set()
 
-    def _job_kinds(self) -> tuple[str, ...]:
-        services = (
+    def _job_services(self) -> tuple[_JobRunner, ...]:
+        """The services that run jobs, in the order a free worker loop asks them (one list for
+        `_job_kinds` and `_run_job`, CO-K09). The cleanup first: it is due once per interval and
+        would otherwise wait for a quiet moment, which a long bulk ingest never has. A mailbox's
+        fetch before the pipeline: due every few minutes, it would wait out a long ingest
+        otherwise; it takes at most a few dozen mails a run. The pipeline, rule applications
+        and changes of many documents before the index: people wait for them (an application
+        and a bulk change show their progress), while the index may lag (the document lists do
+        not read it), and its jobs coalesce per document while they wait. Behind the index, an
+        application would wait after every 25 documents for the index jobs they caused.
+        Training waits for a quiet moment: during a bulk ingest it would be outdated soon. A
+        look for a newer Lekto, once an hour, behind everything."""
+        services: tuple[_JobRunner | None, ...] = (
             self._maintenance,
             self._tasks,
+            self._mail,
+            self._push,
             self._pipeline,
-            self._indexing,
             self._rules,
             self._bulk,
+            self._indexing,
             self._master_data,
             self._logos,
             self._classifier,
-            self._mail,
-            self._push,
             self._updates,
         )
-        return tuple(
-            kind for service in services if service is not None for kind in service.job_kinds
-        )
+        return tuple(service for service in services if service is not None)
+
+    def _job_kinds(self) -> tuple[str, ...]:
+        return tuple(kind for service in self._job_services() for kind in service.job_kinds)
 
     async def _run_job(self) -> bool:
-        # The cleanup first: it is due once per interval and would otherwise wait for a quiet
-        # moment, which a long bulk ingest never has. The pipeline, rule applications and
-        # changes of many documents before the index: people wait for them (an application and
-        # a bulk change show their progress), while the index may lag (the document lists do
-        # not read it), and its jobs coalesce per document while they wait. Behind the index,
-        # an application would wait after every 25 documents for the index jobs they caused.
-        return (
-            await self._maintenance.run_next_job()
-            or (self._tasks is not None and await self._tasks.run_next_job())
-            # A mailbox's fetch before the pipeline: due every few minutes, it would wait out a
-            # long ingest otherwise; it takes at most a few dozen mails a run.
-            or (self._mail is not None and await self._mail.run_next_job())
-            or (self._push is not None and await self._push.run_next_job())
-            or await self._pipeline.run_next_job()
-            or (self._rules is not None and await self._rules.run_next_job())
-            or (self._bulk is not None and await self._bulk.run_next_job())
-            or (self._indexing is not None and await self._indexing.run_next_job())
-            or (self._master_data is not None and await self._master_data.run_next_job())
-            or (self._logos is not None and await self._logos.run_next_job())
-            # Training waits for a quiet moment: during a bulk ingest it would be outdated soon.
-            or (self._classifier is not None and await self._classifier.run_next_job())
-            # A look for a newer Lekto, once an hour, behind everything.
-            or (self._updates is not None and await self._updates.run_next_job())
-        )
+        for service in self._job_services():
+            if await service.run_next_job():
+                return True
+        return False
 
     async def _deliver(self) -> bool:
         return self._webhooks is not None and await self._webhooks.run_next_job()

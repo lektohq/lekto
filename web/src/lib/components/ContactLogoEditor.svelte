@@ -23,7 +23,8 @@
 		contact,
 		fetching,
 		onchanged,
-		beside
+		beside,
+		labelledby
 	}: {
 		contact: Pick<Contact, 'id' | 'name' | 'logo' | 'logo_failure' | 'identifiers'>;
 		/** The server fetches logos. */
@@ -31,17 +32,15 @@
 		onchanged: () => void;
 		/** What stands beside the logo, the actions below both. */
 		beside?: Snippet;
+		/** The label that names the logo and its actions as a group. */
+		labelledby?: string;
 	} = $props();
 
-	let logo = $state<Contact['logo']>(null);
-	let failure = $state<Contact['logo_failure']>(null);
+	// The contact's as given, replaced by what an upload or a fetch answers until it changes.
+	let logo = $derived<Contact['logo']>(contact.logo);
+	let failure = $derived<Contact['logo_failure']>(contact.logo_failure);
 	let busy = $state(false);
 	let input = $state<HTMLInputElement | null>(null);
-
-	$effect(() => {
-		logo = contact.logo;
-		failure = contact.logo_failure;
-	});
 
 	const canFetch = $derived(
 		fetching && logo?.source !== 'uploaded' && domainsOf(contact).length > 0
@@ -176,7 +175,11 @@
 		</div>
 	</div>
 {:else}
-	<div class="flex flex-col gap-2">
+	<div
+		class="flex flex-col gap-2"
+		role={labelledby ? 'group' : undefined}
+		aria-labelledby={labelledby}
+	>
 		<div class="flex items-center gap-3">
 			<ContactAvatar contact={{ name: contact.name, logo }} size="lg" />
 			<div class="flex min-w-0 flex-col text-sm">{@render origin()}</div>

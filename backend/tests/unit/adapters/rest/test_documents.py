@@ -196,6 +196,9 @@ async def test_fields_count_against_the_limit(api: Api) -> None:
             "multipart",
         ),
         ({"files": sample_file(), "data": {"space_id": "no-uuid"}}, 422, "space_id"),
+        # A field the form does not know, as `extra="forbid"` says: `space` instead of
+        # `space_id` would put the document into the personal space unnoticed (RA-K05).
+        ({"files": sample_file(), "data": {"space": "Haushalt"}}, 422, "space"),
     ],
 )
 async def test_malformed_uploads(

@@ -6,6 +6,7 @@
 	import RefreshCw from '@lucide/svelte/icons/refresh-cw';
 	import TriangleAlert from '@lucide/svelte/icons/triangle-exclamation-point';
 	import type { Snippet } from 'svelte';
+	import SectionTitle from '#lib/components/page/SectionTitle.svelte';
 	import { Button } from '#lib/components/ui/button/index.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import type { Changes, Headline, HeadlineTone } from '#lib/run-summary.ts';
@@ -93,7 +94,7 @@
 			/>
 		</span>
 		<div class="flex min-w-0 flex-1 basis-60 flex-col gap-1">
-			<h2 id="run-headline" class="text-lg leading-snug font-semibold">{headline.title}</h2>
+			<SectionTitle id="run-headline" class="leading-snug">{headline.title}</SectionTitle>
 			{#if headline.detail}
 				<p class="text-sm leading-relaxed wrap-break-word text-muted-foreground">
 					{headline.detail}

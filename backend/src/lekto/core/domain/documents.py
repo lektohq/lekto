@@ -11,6 +11,11 @@ from pathlib import PurePath
 from typing import Self
 
 from lekto.core.domain import media_types
+
+# `UNSET` marks a field of DocumentChanges that is left as it is (`domain.changes`); taken from
+# here by what changes documents.
+from lekto.core.domain.changes import UNSET as UNSET
+from lekto.core.domain.changes import Unset as Unset
 from lekto.core.domain.classification import (
     CHANGE_FIELDS,
     CONFIRMING,
@@ -119,11 +124,6 @@ class Channel(StrEnum):
     API = "api"  # uploaded with an API token
     MIGRATION = "migration"  # taken over from another system with its metadata
     MAIL = "mail"  # fetched from a mailbox
-
-
-# `UNSET` marks a field of DocumentChanges that is left as it is (`domain.changes`).
-from lekto.core.domain.changes import UNSET as UNSET  # noqa: E402
-from lekto.core.domain.changes import Unset as Unset  # noqa: E402
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -291,6 +291,8 @@ class Document:
         self.updated_at = require_utc(self.updated_at, "updated_at")
         if self.new_at is not None:
             self.new_at = require_utc(self.new_at, "new_at")
+        if self.confirmed_at is not None:
+            self.confirmed_at = require_utc(self.confirmed_at, "confirmed_at")
         if self.space_confirmed_at is not None:
             self.space_confirmed_at = require_utc(self.space_confirmed_at, "space_confirmed_at")
 

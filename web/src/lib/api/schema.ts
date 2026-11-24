@@ -199,7 +199,7 @@ export interface paths {
 		put?: never;
 		/**
 		 * Start setting up TOTP
-		 * @description A new secret for the authenticator app, shown only now. TOTP is on once a code confirms it (`POST /auth/totp/confirm`). Needs a session; API tokens are refused (403).
+		 * @description A new secret for the authenticator app, shown only now. TOTP is on once a code confirms it (`POST /auth/totp/confirm`). Needs the caller's password (403 `wrong_password`, counted as a failed sign-in); 409 `totp_needs_password` for an account without one, whose sign-in through the provider asks for no code of Lekto's. Needs a session; API tokens are refused (403).
 		 */
 		post: operations['begin_totp_api_v1_auth_totp_post'];
 		delete?: never;
@@ -805,7 +805,7 @@ export interface paths {
 		};
 		/**
 		 * The open identifiers
-		 * @description Admins only. Open are the identifiers no person has confirmed: those training learned at a contact (`learned`), and suggestions (`suggested`): an e-mail domain whose name fits the contact of its documents while it has none, an IBAN its documents give to a person. A person's value (a user's profile) is never open. The most documents first, then the newest. `recommended` keeps those whose documents recommend confirming or rejecting them (`recommendation`). To find words: `POST /search`.
+		 * @description Admins only. Open are the identifiers no person has confirmed: those training learned at a contact (`learned`), and suggestions (`suggested`): an e-mail domain whose name fits the contact of its documents while it has none, an IBAN its documents give to a person. A person's value (a user's profile) is never open. The most documents first, then the newest. `recommended` keeps those whose documents recommend confirming or rejecting them (`recommendation`). To find words: `POST /identifiers/open/search`.
 		 */
 		get: operations['open_identifiers_api_v1_identifiers_open_get'];
 		put?: never;
@@ -3076,7 +3076,7 @@ export interface paths {
 		};
 		/**
 		 * The decisions behind a number of the holders
-		 * @description Admins only. The decisions behind one number of `GET /holders`: measured by the holders of `measure` (a kind with a holder) or by the `recommendation`, with `outcome` (a column), at most a hundred, each with the confirmed documents of its contact that show it.
+		 * @description Admins only. The decisions behind one number of `GET /holders`: measured by the holders of `measure` (a kind with a holder) or by the `recommendation`, with `outcome` (a column), at most 100, each with the confirmed documents of its contact that show it.
 		 */
 		get: operations['holder_cases_api_v1_automation_holders_cases_get'];
 		put?: never;
@@ -5256,7 +5256,7 @@ export interface components {
 			description: string | null;
 			/**
 			 * Title Pattern
-			 * @example Lohn {document_date:YYYY-MM}
+			 * @example Lohn {{ document_date | date: '%Y-%m' }}
 			 */
 			title_pattern: string | null;
 			/**
@@ -5647,7 +5647,7 @@ export interface components {
 		FactOrigin: 'pattern' | 'code' | 'model' | 'person';
 		/**
 		 * FactRole
-		 * @description What a fact is to the document that shows it (`fakten.md`, Rollen).
+		 * @description What a fact is to the document that shows it (`.knowledge/architecture/fact-roles.md`).
 		 * @enum {string}
 		 */
 		FactRole: 'contact' | 'target' | 'own' | 'thread' | 'refers' | 'person';
@@ -5812,7 +5812,7 @@ export interface components {
 			outcome: components['schemas']['Outcome'];
 			/**
 			 * Confidence
-			 * @description 0 to 1, the rule's summary, not a probability: 1 for a value the judge or the checks accept, at most 0.89 for an uncertain one. The measured values are in `candidates` (their `sources`).
+			 * @description 0 to 1, the rule's summary, not a probability: 1 for a value the judge or the checks accept, just below the confidence threshold (`LEKTO_CONFIDENCE_THRESHOLD`) at most for an uncertain one. The measured values are in `candidates` (their `sources`).
 			 */
 			confidence: number;
 			/**
@@ -6364,7 +6364,7 @@ export interface components {
 		HolderCasesOut: {
 			/**
 			 * Cases
-			 * @description At most a hundred.
+			 * @description At most 100.
 			 */
 			cases: components['schemas']['HolderCaseOut'][];
 		};
@@ -9766,6 +9766,7 @@ export interface components {
 			| 'token_invalid'
 			| 'wrong_password'
 			| 'totp_already_on'
+			| 'totp_needs_password'
 			| 'no_totp_setup'
 			| 'totp_off'
 			| 'code_invalid'
@@ -9829,6 +9830,7 @@ export interface components {
 			| 'not_customer_number'
 			| 'not_of_kind'
 			| 'fact_kind_unknown'
+			| 'fact_role_unknown'
 			| 'fact_not_in_text'
 			| 'fact_not_asked'
 			| 'holder_not_listed'
@@ -9945,6 +9947,7 @@ export interface components {
 			| 'mail_password_again'
 			| 'mailbox_paused'
 			| 'mail_too_large'
+			| 'mail_attachments_left'
 			| 'mail_step_failed'
 			| 'mail_step_gone'
 			| 'mail_rule_person_gone'
@@ -11872,6 +11875,20 @@ export interface components {
 		 */
 		TokenScope: 'read' | 'read_write' | 'upload';
 		/**
+		 * TotpBegin
+		 * @example {
+		 *       "password": "********"
+		 *     }
+		 */
+		TotpBegin: {
+			/**
+			 * Password
+			 * Format: password
+			 * @description The caller's password: a session alone sets up no second factor.
+			 */
+			password: string;
+		};
+		/**
 		 * TotpSetupOut
 		 * @description Shown once. Confirm with a code to turn TOTP on.
 		 */
@@ -13437,7 +13454,11 @@ export interface operations {
 			path?: never;
 			cookie?: never;
 		};
-		requestBody?: never;
+		requestBody: {
+			content: {
+				'application/json': components['schemas']['TotpBegin'];
+			};
+		};
 		responses: {
 			/** @description Successful Response */
 			201: {
@@ -13494,6 +13515,57 @@ export interface operations {
 					 *       "title": "Conflict",
 					 *       "status": 409,
 					 *       "detail": "duplicate of document 01999d5e-8a7f-7c1e-b6a3-2f4d5e6f7a8b"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Content Too Large */
+			413: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Content Too Large",
+					 *       "status": 413,
+					 *       "detail": "the request body is larger than 1048576 bytes"
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Unprocessable Content */
+			422: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Unprocessable Content",
+					 *       "status": 422,
+					 *       "detail": "from_node: Input should be 'ocr', 'parse', ..."
+					 *     }
+					 */
+					'application/problem+json': components['schemas']['Problem'];
+				};
+			};
+			/** @description Too Many Requests */
+			429: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					/**
+					 * @example {
+					 *       "type": "about:blank",
+					 *       "title": "Too Many Requests",
+					 *       "status": 429,
+					 *       "detail": "too many failed attempts; try again later"
 					 *     }
 					 */
 					'application/problem+json': components['schemas']['Problem'];

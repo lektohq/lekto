@@ -77,7 +77,7 @@ from lekto.core.ports.clock import Clock
 from lekto.core.ports.identity import PasswordHasher, SecretCipher, Totp
 from lekto.core.ports.unit_of_work import UnitOfWork, UnitOfWorkFactory
 from lekto.core.services._access import load_actor
-from lekto.core.services.webhooks.management import remove_webhooks_of
+from lekto.core.services.webhooks.management import remove_made_through
 
 log = logging.getLogger(__name__)
 
@@ -398,7 +398,7 @@ class AuthService:
             await uow.known_devices.remove_for_user(actor.id)
             if revoke_tokens:
                 tokens = await uow.api_tokens.list_for(actor.id)
-                await remove_webhooks_of(uow, [token.id for token in tokens], now)
+                await remove_made_through(uow, [token.id for token in tokens], now)
                 await uow.api_tokens.remove_for_user(actor.id)
             signed_in = None
             if session is not None:
@@ -420,13 +420,28 @@ class AuthService:
 
     # --- TOTP -----------------------------------------------------------------------------------
 
-    async def begin_totp(self, actor: Actor) -> TotpSetup:
+    async def begin_totp(self, actor: Actor, password: str) -> TotpSetup:
         """Start setting up TOTP with a new secret; it takes effect when a code confirms it.
-        Replaces a setup that was not confirmed. ConflictError if TOTP is on already."""
+        Replaces a setup that was not confirmed. The caller's `password` too: who only holds a
+        session (a browser left open) sets up no factor of their own and locks the owner out
+        (XA-K03); a wrong one counts as a failed sign-in, PermissionDeniedError. ConflictError
+        if TOTP is on already, and for an account without a password: TOTP guards the sign-in
+        with the password, and a provider's (OIDC) asks for no code of Lekto's."""
+        now = self._clock.now()
         async with self._uow() as uow:
             user = await load_actor(uow, actor)
+            stored = await uow.credentials.find(actor.id)
+        if stored is None or stored.password_hash is None:
+            raise ConflictError(because(ReasonCode.TOTP_NEEDS_PASSWORD))
+        reserved, _ = await self._reserve(_throttles(user.username, None), now)
+        if not await self._hasher.verify(stored.password_hash, normalize_password(password)):
+            _log_failure(actor.id, None)
+            raise PermissionDeniedError(because(ReasonCode.WRONG_PASSWORD))
+        async with self._uow() as uow:
+            await _release(uow, reserved)
             credential = await _credential(uow, actor.id)
             if credential.totp_enabled:
+                await uow.commit()
                 raise ConflictError(because(ReasonCode.TOTP_ALREADY_ON))
             secret = self._totp.new_secret()
             credential.totp = TotpSetting(secret=self._encrypt(actor.id, secret))
@@ -458,7 +473,7 @@ class AuthService:
 
     async def disable_totp(self, actor: Actor, code: str) -> None:
         """Turn TOTP off; needs a current code or a recovery code."""
-        await self._with_second_factor(actor, code, _turn_off_totp)
+        await self._with_second_factor(actor, code, Credential.turn_off_totp)
         log.info("TOTP turned off", extra={"user_id": str(actor.id)})
 
     async def renew_recovery_codes(self, actor: Actor, code: str) -> list[str]:
@@ -544,7 +559,7 @@ class AuthService:
             api_token = await uow.api_tokens.find(id)
             if api_token is None or api_token.user_id != actor.id:
                 raise NotFoundError("API token", id)
-            await remove_webhooks_of(uow, [id], self._clock.now())
+            await remove_made_through(uow, [id], self._clock.now())
             await uow.api_tokens.remove(id)
             await uow.commit()
         log.info("API token revoked", extra={"user_id": str(actor.id), "token_id": str(id)})
@@ -604,11 +619,6 @@ class AuthService:
                     reserved.append((key, source_rule))
             await uow.commit()
         return reserved, source_blocked
-
-
-def _turn_off_totp(credential: Credential) -> None:
-    credential.totp = None
-    credential.recovery_codes = set()
 
 
 def _throttles(

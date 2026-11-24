@@ -425,18 +425,18 @@ def test_a_learned_identifier_points_to_the_topic_all_its_documents_carry() -> N
 
 
 def test_a_contact_keeps_entered_learned_and_rejected_identifiers_apart() -> None:
-    iban = Identifier(CUSTOMER, "88770011")  # the names stay from when it was an IBAN
+    customer = Identifier(CUSTOMER, "88770011")
     domain = Identifier(DOMAIN, "stadtwerke.example")
-    vat = Identifier(IdentifierKind.CONTRACT_NUMBER, "C-0815")
-    contact = Contact.create(name="Stadtwerke", now=NOW, identifiers=[iban])
-    contact.set_learned([domain, vat, iban])
+    contract = Identifier(IdentifierKind.CONTRACT_NUMBER, "C-0815")
+    contact = Contact.create(name="Stadtwerke", now=NOW, identifiers=[customer])
+    contact.set_learned([domain, contract, customer])
     assert [(item.kind, item.source) for item in contact.identifiers] == [
         (CUSTOMER, IdentifierSource.MANUAL),
         (DOMAIN, IdentifierSource.LEARNED),
         (IdentifierKind.CONTRACT_NUMBER, IdentifierSource.LEARNED),
     ]
     # Taking over a learned one, rejecting another.
-    contact.set_identifiers([iban, vat], rejected=[domain])
+    contact.set_identifiers([customer, contract], rejected=[domain])
     assert [(item.kind, item.source) for item in contact.identifiers] == [
         (CUSTOMER, IdentifierSource.MANUAL),
         (IdentifierKind.CONTRACT_NUMBER, IdentifierSource.MANUAL),
@@ -497,13 +497,15 @@ def test_a_tax_number_is_not_learned() -> None:
 def test_who_sees_a_contacts_identifier() -> None:
     erika, bob = UserId(new_id()), UserId(new_id())
     own, other = SpaceId(new_id()), SpaceId(new_id())
-    public = Identifier(IBAN, THEIR_IBAN)
+    # The kinds a contact has (`CONTACT_KINDS`).
+    public = Identifier(CUSTOMER, "K0815")
     hers = Identifier(CUSTOMER, "K4711", user_id=erika)
-    learned = Identifier(IBAN, OWN_IBAN, IdentifierSource.LEARNED, learned_in=frozenset({own}))
+    contract = IdentifierKind.CONTRACT_NUMBER
+    learned = Identifier(contract, "C-0815", IdentifierSource.LEARNED, learned_in=frozenset({own}))
     learned_hers = Identifier(
         PERSONNEL, "12345", IdentifierSource.LEARNED, None, erika, frozenset({own, other})
     )
-    old = Identifier(VAT, "DE123456789", IdentifierSource.LEARNED)  # before 0040: no spaces
+    old = Identifier(DOMAIN, "alt.example", IdentifierSource.LEARNED)  # before 0040: no spaces
     rejected = Identifier(DOMAIN, "nord.example", IdentifierSource.REJECTED)
     seen = {
         name: [seen_by(item, user, spaces) for item in (public, hers, learned, learned_hers)]

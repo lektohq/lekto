@@ -52,4 +52,17 @@ describe('the list of webhooks', () => {
 		// One in the head of the page, one in the note.
 		expect(screen.getAllByRole('link', { name: m.webhook_new() })).toHaveLength(2);
 	});
+
+	it('asks for the users only of an admin, who alone sees whose a webhook is (WF-K07)', async () => {
+		const api = fakeApi({ ...masterData(), 'GET /api/v1/webhooks': () => [webhook] });
+		vi.stubGlobal('fetch', api);
+		const shown = render(Page);
+		await screen.findByText('Home Assistant');
+		expect(calls(api)).not.toContain('GET /api/v1/users');
+		shown.unmount();
+		signIn('admin');
+		render(Page);
+		await screen.findByText('Home Assistant');
+		expect(calls(api)).toContain('GET /api/v1/users');
+	});
 });

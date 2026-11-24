@@ -16,7 +16,7 @@
 	// The mail rules (Tobi, 04.11.2026; mock D): one section per mailbox, its rules in the order
 	// they are asked (priority, then name), the first that matches decides; below them the
 	// mailbox's fallback, changed at the mailbox. A row's name opens the rule's page; the
-	// switch pauses it, the pencil edits it. "Postfach ansehen" opens the mailbox's dialog, "Neue
+	// switch pauses it, the pencil edits it. "Postfach ansehen" opens the mailbox's page, "Neue
 	// Regel" makes a rule for that mailbox (Tobi, 05.11.2026). `lookup`: what the rules name
 	// (every space).
 	let { rules = $bindable(), lookup }: { rules: MailRule[]; lookup: MailRuleLookup } = $props();

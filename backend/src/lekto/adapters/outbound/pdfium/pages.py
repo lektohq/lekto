@@ -12,7 +12,7 @@ import PIL
 import pypdfium2
 from PIL import ExifTags, Image, ImageSequence
 
-from lekto.adapters.outbound.imaging import check_pixels, flatten_on_white
+from lekto.adapters.outbound.imaging import DOCUMENT_FORMATS, check_pixels, flatten_on_white
 from lekto.adapters.outbound.pdfium.child import DEFAULT_TIMEOUT, run_child
 from lekto.adapters.outbound.pdfium.library import LOCK, MODULE
 from lekto.core.domain import media_types
@@ -178,7 +178,7 @@ def _image_pages(source: Path, width: int) -> Iterator[Iterator[Image.Image]]:
     which every full-size copy took another 480 MB. A JPEG is decoded at the smallest scale that
     still gives `width`."""
     try:
-        opened = Image.open(source)
+        opened = Image.open(source, formats=DOCUMENT_FORMATS)
     except (OSError, Image.DecompressionBombError) as error:
         raise UnprocessableDocumentError(
             because(ReasonCode.IMAGE_UNREADABLE_DETAIL, detail=str(error))

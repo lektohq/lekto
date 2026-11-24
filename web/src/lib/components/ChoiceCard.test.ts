@@ -10,10 +10,10 @@ describe('ChoiceCard', () => {
 	it('is the label of its radio: a click anywhere chooses it', async () => {
 		const onchange = vi.fn();
 		render(ChoiceCard, { name: 'scope', checked: false, onchange, children: words });
-		const radio = screen.getByRole('radio', { name: 'Every type' });
+		const radio = screen.getByRole('radio', { name: 'Every type' }) as HTMLInputElement;
 		await userEvent.click(screen.getByText('Every type'));
 		expect(onchange).toHaveBeenCalledOnce();
-		expect(radio.closest('label')!.className).toContain('has-[>input:checked]:border-primary');
+		expect(radio.checked).toBe(true);
 	});
 
 	it('cannot be chosen when disabled', async () => {

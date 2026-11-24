@@ -11,6 +11,14 @@ export class ReasonError extends Error {
 	}
 }
 
+/** A form sent with fields still to fill or fix: it stays open with them marked, and says so
+ * (web/DESIGN.md, "Saving and leaving"); its button stays active, so that a person learns what is missing. */
+export class FormIncomplete extends Error {
+	constructor() {
+		super('form incomplete');
+	}
+}
+
 /** A text for the user about a failed call: the problem's reason in the user's language where
  * the API gave one with a code this UI knows, else the detail as the API wrote it. */
 export function describeError(error: unknown): string {
@@ -41,6 +49,7 @@ export function describeError(error: unknown): string {
 			return detail ? `${m.error_forbidden()} ${detail}` : m.error_forbidden();
 		return detail ?? error.problem?.title ?? m.error_unexpected({ status: error.status });
 	}
+	if (error instanceof FormIncomplete) return m.form_invalid();
 	if (error instanceof ReasonError) {
 		return reasonsText([error.reason], null) ?? m.error_unexpected({ status: 200 });
 	}

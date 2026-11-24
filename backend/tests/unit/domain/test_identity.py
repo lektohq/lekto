@@ -16,6 +16,7 @@ from lekto.core.domain.identity import (
     hash_token,
     new_recovery_codes,
     normalize_recovery_code,
+    safe_redirect,
     source_key,
 )
 from lekto.core.domain.ids import UserId, new_id
@@ -103,3 +104,20 @@ def test_sources_are_ipv4_addresses_and_ipv6_networks() -> None:
     assert source_key("2001:db8:1:3::1") != source_key("2001:db8:1:2::1")
     assert source_key("::ffff:192.0.2.7") == "source:192.0.2.7"
     assert source_key("not an address") == "source:not an address"
+
+
+def test_only_paths_here_are_redirect_targets() -> None:
+    for good in ("/", "/inbox", "/documents/1?x=y#z"):
+        assert safe_redirect(good) == good
+    for bad in (
+        None,
+        "",
+        "https://evil.example",
+        "//evil.example/x",
+        "/\\evil.example",
+        "javascript:alert(1)",
+        "/in box",
+        "/x\r\nLocation: https://evil.example",
+        "/" + "a" * 2001,
+    ):
+        assert safe_redirect(bad) == "/"

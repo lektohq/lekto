@@ -51,7 +51,7 @@ describe('OriginCard', () => {
 		expect(screen.getByText('erika@example.test')).toBeTruthy();
 		expect(screen.getByText('Ben <john@example.test>')).toBeTruthy();
 		expect(screen.getByText('Rechnung 4711.pdf')).toBeTruthy();
-		expect(screen.queryByText(m.origin_forwarded())).toBeTruthy();
+		expect(screen.getByText(m.origin_forwarded())).toBeTruthy();
 		expect(screen.getByText('carl@example.test')).toBeTruthy();
 		expect(screen.getByText(m.mail_importance_high())).toBeTruthy();
 		expect(screen.getByText('Lekto, $label1')).toBeTruthy();

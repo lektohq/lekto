@@ -15,19 +15,20 @@ alike.
 import hashlib
 from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import Final
 
 from lekto.core.domain.document_facts import FactRole, HolderKind
 from lekto.core.domain.fields import FieldDefinition, FieldType
 from lekto.core.domain.identifiers import IdentifierKind, Key
-from lekto.core.domain.master_data import one_line
 from lekto.core.domain.text import Shortened
+from lekto.core.domain.validation import one_line
 
 EXTRACT_PROMPT = "extract-6"
 PROPOSE_PROMPT = "propose-6"
 FACTS_PROMPT = "facts-3"
 PROPOSE_SCHEMA = "proposal"
 EXTRACT_SCHEMA = "fields"
-FACTS_SCHEMA = "facts"
+FACTS_SCHEMA: Final = "facts"  # a literal for the API's `ModelCallOut.request`
 """Names of the JSON schemas of the two requests (`StructuredRequest.schema_name`)."""
 
 TITLE_CHARACTERS = 80  # the title the model is asked for; `MAX_TITLE` is what the domain takes
@@ -244,7 +245,7 @@ def _choices_and_description(definition: FieldDefinition) -> str:
     """The choices of a choice field, then what belongs in the field."""
     text = ""
     if definition.data_type is FieldType.CHOICE:
-        text += ": " + ", ".join(f'"{choice}"' for choice in definition.choices)
+        text += ": " + ", ".join(f'"{one_line(choice)}"' for choice in definition.choices)
     if definition.description:
         text += (" — " if text else ": ") + one_line(definition.description)
     return text
@@ -259,7 +260,7 @@ def extract_task(
     for key, definition in keys.items():
         line = f'- {key}: "{one_line(definition.name)}" ({VALUE_FORMS[definition.data_type]})'
         lines.append(line + _choices_and_description(definition))
-    kind = f'The document is of type "{document_type}".' if document_type else ""
+    kind = f'The document is of type "{one_line(document_type)}".' if document_type else ""
     parts = (
         _task_line(EXTRACT_TASK, marker),
         kind,
@@ -297,7 +298,9 @@ def _listed(items: Sequence[Listed]) -> str:
 
 
 def _items(names: Sequence[str]) -> str:
-    return "\n".join(f"- {name}" for name in names) if names else "(none)"
+    # Names an admin gave go in on one line as all others (SA-K05): a break could start an
+    # instruction.
+    return "\n".join(f"- {one_line(name)}" for name in names) if names else "(none)"
 
 
 def document_marker(text: Shortened) -> str:

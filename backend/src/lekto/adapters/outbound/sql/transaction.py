@@ -22,6 +22,9 @@ log = logging.getLogger(__name__)
 
 # Postgres: deadlock_detected, serialization_failure.
 _CONCURRENCY_SQLSTATES = {"40P01", "40001"}
+# SQLite: SQLITE_BUSY, SQLITE_LOCKED (another connection held the database past the busy
+# timeout).
+_SQLITE_BUSY_CODES = {5, 6}
 
 NOTIFY_CHANNELS = {Channel.JOBS: "lekto_jobs", Channel.EVENTS: "lekto_events"}
 """The Postgres channels of the signals; the payload of `lekto_jobs` is the job's kind."""
@@ -33,7 +36,8 @@ class Transaction:
 
     A write that fails leaves the transaction failed: on Postgres it is aborted anyway, so on
     both databases only rollback remains. A broken constraint raises ConflictError; a deadlock
-    or serialization failure (Postgres) raises ConcurrencyError.
+    or serialization failure (Postgres) and a database another connection held past the busy
+    timeout (SQLite, at the start of the write or the commit) raise ConcurrencyError.
     """
 
     def __init__(self, database: Database) -> None:
@@ -58,10 +62,10 @@ class Transaction:
         parameters: Sequence[Mapping[str, Any]] | None = None,
     ) -> CursorResult[Any]:
         connection = self._usable()
-        if not self._writing:
-            await self.database.begin_write(connection)
-            self._writing = True
         try:
+            if not self._writing:
+                await self.database.begin_write(connection)
+                self._writing = True
             return await connection.execute(statement, parameters)
         except DBAPIError as error:
             self._failed = True
@@ -72,7 +76,7 @@ class Transaction:
                 log.info("constraint violated", extra={"error": message[0] if message else ""})
                 # Not chained: the error names the values too (Postgres in its DETAIL; SQ-05).
                 raise ConflictError("the change conflicts with existing data") from None
-            if getattr(error.orig, "sqlstate", None) in _CONCURRENCY_SQLSTATES:
+            if _concurrent(error):
                 log.info("concurrent transaction", extra={"error": str(error.orig)})
                 raise ConcurrencyError("a concurrent change interfered; try again") from error
             raise
@@ -91,6 +95,11 @@ class Transaction:
                 for channel, kind in signals:
                     await self.write(select(func.pg_notify(NOTIFY_CHANNELS[channel], kind or "")))
             await connection.commit()
+        except DBAPIError as error:
+            if not _concurrent(error):
+                raise
+            log.info("concurrent transaction at the commit", extra={"error": str(error.orig)})
+            raise ConcurrencyError("a concurrent change interfered; try again") from error
         finally:
             await self._close()
         if signals and self.database.is_sqlite:
@@ -132,3 +141,11 @@ class Transaction:
         if self._connection is not None:
             connection, self._connection = self._connection, None
             await connection.close()
+
+
+def _concurrent(error: DBAPIError) -> bool:
+    """Whether `error` is a concurrent change that may pass when tried again."""
+    if getattr(error.orig, "sqlstate", None) in _CONCURRENCY_SQLSTATES:
+        return True
+    code = getattr(error.orig, "sqlite_errorcode", None)
+    return code in _SQLITE_BUSY_CODES or "database is locked" in str(error.orig)

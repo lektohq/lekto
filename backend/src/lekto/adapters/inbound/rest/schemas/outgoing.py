@@ -51,6 +51,8 @@ class SentDocument(Sent):
     )
 
 
+# The fields of `Named`, but its own type: what a webhook receives is a contract of its own,
+# not the shape of an answer of the API (Tobi, 23.11.2026, RB-K03).
 class SentRule(Sent):
     id: UUID
     name: str

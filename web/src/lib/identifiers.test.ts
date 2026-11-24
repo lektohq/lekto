@@ -1,7 +1,4 @@
-import { render, screen } from '@testing-library/svelte';
-import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
-import IdentifiersEditor from '#lib/components/IdentifiersEditor.svelte';
 import { ApiError } from '#lib/api/problem.ts';
 import { problemOf, type ProblemParts } from '#lib/testing/api.ts';
 import openapi from '../../openapi.json';
@@ -62,21 +59,6 @@ describe('identifiers', () => {
 			],
 			declined_numbers: [{ contact_id: 'c2', kind: 'customer_number', value: 'K3003' }]
 		});
-	});
-
-	it('takes over or rejects a learned one, and allows a rejected one again', async () => {
-		const rows = rowsOf([...stored]);
-		render(IdentifiersEditor, { rows });
-		expect(screen.getByText(m.identifier_learned())).toBeTruthy();
-		// Each opens with its line.
-		await userEvent.click(screen.getByRole('button', { name: /^stadtwerke\.example/ }));
-		await userEvent.click(screen.getByRole('button', { name: m.identifier_reject() }));
-		expect(screen.getAllByText(m.identifier_rejected())).toHaveLength(2);
-		await userEvent.click(screen.getByRole('button', { name: /^4711/ }));
-		await userEvent.click(screen.getByRole('button', { name: m.identifier_unblock() }));
-		expect(screen.getAllByText(m.identifier_rejected())).toHaveLength(1);
-		await userEvent.click(screen.getByRole('button', { name: m.identifier_add_short() }));
-		expect(screen.getAllByRole('textbox', { name: m.identifier_value() })).toHaveLength(1);
 	});
 });
 

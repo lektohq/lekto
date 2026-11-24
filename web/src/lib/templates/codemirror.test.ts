@@ -75,6 +75,24 @@ describe('completion', () => {
 });
 
 describe('editor', () => {
+	it('cuts what is pasted to the room left, as a field with a maxlength does (WD-K11)', () => {
+		const parent = document.createElement('div');
+		document.body.append(parent);
+		const changes: string[] = [];
+		const editor = mountTemplateEditor({
+			parent,
+			value: 'Lohn ',
+			onchange: (value) => changes.push(value),
+			completions: lists,
+			id: 'short',
+			label: 'Short',
+			maxlength: 10
+		});
+		editor.edit((text) => ({ text: `${text}{{ contact }}`, cursor: 18 }));
+		expect(changes.at(-1)).toBe('Lohn {{ co');
+		editor.destroy();
+	});
+
 	it('colours the template and edits at the selection', () => {
 		const parent = document.createElement('div');
 		document.body.append(parent);

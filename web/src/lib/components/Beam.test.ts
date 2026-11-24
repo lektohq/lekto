@@ -35,7 +35,6 @@ const READING = { ...processingOf(), nodes: processingOf().nodes.slice(0, 1) };
 let processing = processingOf();
 
 beforeEach(() => {
-	vi.mocked(goto).mockClear();
 	vi.stubGlobal(
 		'IntersectionObserver',
 		class {
@@ -289,8 +288,8 @@ describe('Beam', () => {
 		render(Beam);
 		const sheet = await screen.findByRole('dialog', { name: 'Stromrechnung März' });
 		expect(sheet.textContent).toContain(m.beam_place_position({ current: 1, total: 2 }));
-		await waitFor(() => expect(sheet.querySelectorAll('.ring-primary')).toHaveLength(3));
-		expect(sheet.querySelectorAll('.shadow-pinned')).toHaveLength(2);
+		await waitFor(() => expect(sheet.querySelectorAll('[data-mark="found"]')).toHaveLength(3));
+		expect(sheet.querySelectorAll('[data-pinned]')).toHaveLength(2);
 		// The kind stands once, at the own place.
 		expect(sheet.textContent?.match(/IBAN/g)).toHaveLength(1);
 	});
@@ -305,10 +304,10 @@ describe('Beam', () => {
 		);
 		render(Beam);
 		const sheet = await screen.findByRole('dialog', { name: 'Stromrechnung März' });
-		await waitFor(() => expect(sheet.querySelectorAll('.ring-primary')).toHaveLength(2));
+		await waitFor(() => expect(sheet.querySelectorAll('[data-mark="found"]')).toHaveLength(2));
 		expect(sheet.textContent).toContain(fieldLabel('contact', null));
 		expect(sheet.textContent).toContain('Betrag');
-		expect(sheet.querySelectorAll('.shadow-pinned')).toHaveLength(1);
+		expect(sheet.querySelectorAll('[data-pinned]')).toHaveLength(1);
 		// It pages through the documents, not through places.
 		expect(sheet.textContent).toContain(m.beam_position({ current: 1, total: 2 }));
 	});
@@ -325,7 +324,7 @@ describe('Beam', () => {
 		render(Beam);
 		const sheet = await screen.findByRole('dialog', { name: 'Stromrechnung März' });
 		expect(await screen.findAllByRole('img')).toHaveLength(2);
-		expect(sheet.querySelectorAll('.ring-primary')).toHaveLength(0);
+		expect(sheet.querySelectorAll('[data-mark="found"]')).toHaveLength(0);
 	});
 
 	it('marks a value in each document it pages through', async () => {
@@ -341,7 +340,7 @@ describe('Beam', () => {
 		);
 		render(Beam);
 		const sheet = await screen.findByRole('dialog', { name: 'Stromrechnung März' });
-		await waitFor(() => expect(sheet.querySelectorAll('.shadow-pinned')).toHaveLength(1));
+		await waitFor(() => expect(sheet.querySelectorAll('[data-pinned]')).toHaveLength(1));
 		expect(sheet.textContent).toContain(kindLabel('invoice_number'));
 		expect(sheet.textContent).toContain(m.beam_position({ current: 1, total: 2 }));
 	});
@@ -351,8 +350,8 @@ describe('Beam', () => {
 		goTo(LIST, {}, { beam: { ...beam(0), source } });
 		render(Beam);
 		const sheet = await screen.findByRole('dialog', { name: 'Stromrechnung März' });
-		await waitFor(() => expect(sheet.querySelectorAll('.ring-primary')).toHaveLength(2));
-		expect(sheet.querySelectorAll('.shadow-pinned')).toHaveLength(1);
+		await waitFor(() => expect(sheet.querySelectorAll('[data-mark="found"]')).toHaveLength(2));
+		expect(sheet.querySelectorAll('[data-pinned]')).toHaveLength(1);
 		expect(sheet.textContent).not.toContain(m.beam_meaning_only());
 		const sent = calls(vi.mocked(fetch) as ReturnType<typeof fakeApi>);
 		expect(sent).toContain('POST /api/v1/documents/a/search-places');
@@ -364,7 +363,7 @@ describe('Beam', () => {
 		render(Beam);
 		const sheet = await screen.findByRole('dialog', { name: 'Stromrechnung März' });
 		expect(await screen.findByText(m.beam_meaning_only())).toBeTruthy();
-		expect(sheet.querySelectorAll('.ring-primary')).toHaveLength(0);
+		expect(sheet.querySelectorAll('[data-mark="found"]')).toHaveLength(0);
 	});
 
 	it('marks the same document anew for another source (WB-02)', async () => {
@@ -373,20 +372,24 @@ describe('Beam', () => {
 		goTo(LIST, {}, { beam: { ...beam(0), source: { kind: 'search', words: 'Strom Rechnung' } } });
 		render(Beam);
 		const sheet = await screen.findByRole('dialog', { name: 'Stromrechnung März' });
-		await waitFor(() => expect(sheet.querySelectorAll('.ring-primary')).toHaveLength(2));
+		await waitFor(() => expect(sheet.querySelectorAll('[data-mark="found"]')).toHaveLength(2));
 
 		goTo(LIST, {}, { beam: { ...beam(0), source: { kind: 'search', words: 'Zahnarzt' } } });
 		expect(await screen.findByText(m.beam_meaning_only())).toBeTruthy();
 		await waitFor(() =>
 			expect(
-				screen.getByRole('dialog', { name: 'Stromrechnung März' }).querySelectorAll('.ring-primary')
+				screen
+					.getByRole('dialog', { name: 'Stromrechnung März' })
+					.querySelectorAll('[data-mark="found"]')
 			).toHaveLength(0)
 		);
 
 		goTo('/ui/rules/r1/apply', {}, { beam: { ...beam(0), source: { kind: 'rule', rule: 'r1' } } });
 		await waitFor(() =>
 			expect(
-				screen.getByRole('dialog', { name: 'Stromrechnung März' }).querySelectorAll('.ring-primary')
+				screen
+					.getByRole('dialog', { name: 'Stromrechnung März' })
+					.querySelectorAll('[data-mark="found"]')
 			).toHaveLength(3)
 		);
 		expect(screen.queryByText(m.beam_meaning_only())).toBeNull();
@@ -396,8 +399,8 @@ describe('Beam', () => {
 		goTo('/ui/rules/r1/apply', {}, { beam: { ...beam(0), source: { kind: 'rule', rule: 'r1' } } });
 		render(Beam);
 		const sheet = await screen.findByRole('dialog', { name: 'Stromrechnung März' });
-		await waitFor(() => expect(sheet.querySelectorAll('.ring-primary')).toHaveLength(3));
+		await waitFor(() => expect(sheet.querySelectorAll('[data-mark="found"]')).toHaveLength(3));
 		expect(sheet.textContent).toContain('Stadtwerke Musterstadt …');
-		expect(sheet.querySelectorAll('.shadow-pinned')).toHaveLength(1);
+		expect(sheet.querySelectorAll('[data-pinned]')).toHaveLength(1);
 	});
 });

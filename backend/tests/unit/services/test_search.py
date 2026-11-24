@@ -80,7 +80,11 @@ class Scene:
     ) -> SearchService:
         used = self.setup.embeddings if isinstance(embeddings, str) else embeddings
         return SearchService(
-            self.setup.world.uow, self.setup.index, policy or builders.SEARCH, embeddings=used
+            self.setup.world.uow,
+            self.setup.world.clock,
+            self.setup.index,
+            policy or builders.SEARCH,
+            embeddings=used,
         )
 
     async def ids(
@@ -280,7 +284,11 @@ async def test_a_search_with_meaning_pages_on_whatever_the_words_estimate(scene:
     index = Estimating()
     index.replace_all(dict(scene.setup.index.documents))
     service = SearchService(
-        scene.setup.world.uow, index, builders.SEARCH, embeddings=scene.setup.embeddings
+        scene.setup.world.uow,
+        scene.setup.world.clock,
+        index,
+        builders.SEARCH,
+        embeddings=scene.setup.embeddings,
     )
     with_meaning = await service.search(
         Actor(scene.owner.id), "Rechnung", limit=1, semantic_ratio=0.5
@@ -381,7 +389,7 @@ async def test_the_meaning_of_a_query_is_kept_a_while(scene: Scene) -> None:
     embeddings = FakeEmbeddings()
     clock = ManualClock(builders.NOW)
     service = SearchService(
-        scene.setup.world.uow, scene.setup.index, builders.SEARCH, embeddings, clock
+        scene.setup.world.uow, clock, scene.setup.index, builders.SEARCH, embeddings
     )
     for offset in (0, 1):
         page = await service.search(Actor(scene.owner.id), "Rechnung", offset=offset, limit=1)
@@ -396,7 +404,7 @@ async def test_warming_loads_the_model_at_most_once_a_minute(scene: Scene) -> No
     embeddings = FakeEmbeddings()
     clock = ManualClock(builders.NOW)
     service = SearchService(
-        scene.setup.world.uow, scene.setup.index, builders.SEARCH, embeddings, clock
+        scene.setup.world.uow, clock, scene.setup.index, builders.SEARCH, embeddings
     )
     assert await service.warm(Actor(scene.owner.id))
     assert not await service.warm(Actor(scene.reader.id))
@@ -413,7 +421,7 @@ async def test_an_unreachable_index_raises(scene: Scene) -> None:
         async def search(self, query: SearchQuery) -> SearchResult:
             raise SearchUnavailableError("connection refused")
 
-    service = SearchService(scene.setup.world.uow, Down(), builders.SEARCH)  # type: ignore[arg-type]
+    service = SearchService(scene.setup.world.uow, scene.setup.world.clock, Down(), builders.SEARCH)  # type: ignore[arg-type]
     with pytest.raises(SearchUnavailableError) as raised:
         await service.search(Actor(scene.owner.id), "Strom")
     assert raised.value.reason == because(ReasonCode.SEARCH_INDEX_UNAVAILABLE)
@@ -440,7 +448,7 @@ async def test_the_index_never_sees_a_query_without_the_callers_rights(scene: Sc
             seen.append(query)
             return SearchResult(hits=[], estimated_total=0, semantic=False)
 
-    service = SearchService(scene.setup.world.uow, Spy(), builders.SEARCH)  # type: ignore[arg-type]
+    service = SearchService(scene.setup.world.uow, scene.setup.world.clock, Spy(), builders.SEARCH)  # type: ignore[arg-type]
     await service.search(Actor(scene.reader.id), "Strom")
     (query,) = seen
     assert query.visibility.reads == {scene.shared.id}
@@ -464,9 +472,9 @@ async def test_the_floor_of_the_meaning_goes_to_the_index(scene: Scene) -> None:
 
     index: Any = Spy()
     policy = replace(builders.SEARCH, meaning_min_score=0.7)
-    page = await SearchService(scene.setup.world.uow, index, policy).search(
-        Actor(scene.owner.id), "x"
-    )
+    page = await SearchService(
+        scene.setup.world.uow, scene.setup.world.clock, index, policy
+    ).search(Actor(scene.owner.id), "x")
     assert seen[0].meaning_min_score == 0.7
     assert page.word_total == 3
 
@@ -557,7 +565,9 @@ async def test_the_places_of_a_hit_leave_out_leftovers_and_mark_the_best(scene: 
             return named
 
     index: Any = Named()
-    service = SearchService(scene.setup.world.uow, index, builders.SEARCH, store=store)
+    service = SearchService(
+        scene.setup.world.uow, scene.setup.world.clock, index, builders.SEARCH, store=store
+    )
     places = await service.places(Actor(scene.owner.id), document, "Weihnachtsgeld HU")
     assert places.matched == 4  # the leftover is no place
     assert [occurrence.own for occurrence in places.occurrences] == [False, True, False, False]

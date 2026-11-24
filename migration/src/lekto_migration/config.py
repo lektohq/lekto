@@ -87,10 +87,23 @@ def public(url: str | None) -> str | None:
     if not url:
         return url
     parts = urlsplit(url)
-    host = parts.hostname or ""
-    if parts.port:
-        host += f":{parts.port}"
+    # The host as `hostname` gives it (lower case), but an IPv6 address keeps its brackets.
+    host = parts.netloc.rpartition("@")[2].lower()
     return urlunsplit((parts.scheme, host, parts.path, "", ""))
+
+
+def forms(url: str) -> tuple[str, ...]:
+    """The forms of `url` a state file or a plan may hold: `public`'s first, then the one
+    before an IPv6 address kept its brackets (MI-K05, `http://::1:8000`) where it differs. A
+    migration begun before goes on with the same files."""
+    now = public(url) or ""
+    parts = urlsplit(url)
+    try:
+        host = (parts.hostname or "") + (f":{parts.port}" if parts.port else "")
+    except ValueError:  # no port as a number: the earlier form refused it
+        return (now,)
+    before = urlunsplit((parts.scheme, host, parts.path, "", ""))
+    return (now,) if before == now else (now, before)
 
 
 @dataclass(frozen=True)
@@ -140,6 +153,10 @@ class Config:
             raise ConfigError(f"the Paperless API key is missing ({PREFIX}PAPERLESS_TOKEN)")
         if concurrency < 1:
             raise ConfigError("the concurrency is at least 1")
+        if limit is not None and limit < 1:
+            raise ConfigError("the limit is at least 1")
+        if pipeline_timeout <= 0:
+            raise ConfigError("the pipeline timeout is more than 0 seconds")
         return cls(
             paperless_url=paperless.rstrip("/"),
             lekto_url=lekto.rstrip("/") if lekto else None,

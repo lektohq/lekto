@@ -103,6 +103,8 @@
 		children: Snippet;
 	} = $props();
 
+	let content = $state<HTMLElement | null>(null);
+
 	let confirming = $state(false);
 	let staying = false;
 	let scroller = $state<HTMLElement | null>(null);
@@ -227,9 +229,18 @@
 <Dialog.Root
 	bind:open={() => open, (next) => (next || (!saving && guard.wants(dirty))) && (open = next)}
 >
+	<!-- Without a form of its own the first button (deleting, an API token's "Widerrufen") would
+	     take the focus as it opens: the dialog takes it instead, as a sheet does (WZ-K06). -->
 	<Dialog.Content
+		bind:ref={content}
 		{size}
 		showCloseButton={!phone.current}
+		tabindex={-1}
+		onOpenAutoFocus={(event) => {
+			if (action) return;
+			event.preventDefault();
+			content?.focus();
+		}}
 		class={cn(
 			'flex flex-col gap-0 overflow-hidden p-0',
 			phone.current ? FULL_SCREEN : cn('max-h-[calc(100dvh-2rem)]', fixed && FIXED, className)

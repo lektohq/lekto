@@ -9,7 +9,7 @@ import { session } from '#lib/session.svelte.ts';
 export async function load({ url }) {
 	let signedIn: boolean;
 	try {
-		signedIn = await session.load();
+		signedIn = (await session.load()) !== null;
 	} catch (error) {
 		if (isNetworkError(error) && session.user) return;
 		throw error;

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Check from '@lucide/svelte/icons/check';
 	import { PROFILE_LIMITS } from '#lib/profile.ts';
 	import Plus from '@lucide/svelte/icons/plus';
 	import { onMount } from 'svelte';
@@ -18,6 +19,7 @@
 	import { describeError } from '#lib/errors.ts';
 	import { formatDate } from '#lib/i18n.ts';
 	import { userLabel } from '#lib/masterdata.svelte.ts';
+	import { home } from '#lib/navigation.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import { session } from '#lib/session.svelte.ts';
 	import PageHeader from '#lib/components/page/PageHeader.svelte';
@@ -88,7 +90,10 @@
 	</PageHeader>
 
 	{#if !session.isAdmin}
-		<p class="text-muted-foreground">{m.admin_only()}</p>
+		<!-- No retry: it stays so; the way back is the overview. -->
+		<LoadProblem problem={m.admin_only()}>
+			<Button variant="outline" href={home()}>{m.error_home()}</Button>
+		</LoadProblem>
 	{:else if problem}
 		<LoadProblem {problem} onretry={load} />
 	{:else if !users}
@@ -107,6 +112,7 @@
 								onclick={() => (managing = user.id)}>{userLabel(user)}</button
 							>
 							<Badge variant={user.active ? 'green' : 'muted'}>
+								{#if user.active}<Check aria-hidden="true" />{/if}
 								{user.active ? m.user_active() : m.user_inactive()}
 							</Badge>
 						</span>

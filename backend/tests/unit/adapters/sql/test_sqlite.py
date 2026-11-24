@@ -6,8 +6,14 @@ from decimal import Decimal
 import pytest
 from sqlalchemy import text
 
-from lekto.adapters.outbound.sql import Database
+from lekto.adapters.outbound.sql import Database, SqlUnitOfWorkFactory
+from lekto.adapters.outbound.sql import database as sql_database
+from lekto.adapters.outbound.sql import documents as sql_documents
+from lekto.adapters.outbound.sql import facts as sql_facts
+from lekto.adapters.outbound.sql import inbox as sql_inbox
+from lekto.adapters.outbound.sql import relations as sql_relations
 from lekto.core.domain.documents import DocumentChanges
+from lekto.core.domain.errors import ConcurrencyError
 from lekto.core.domain.fields import FieldDefinition, FieldType, Money
 from lekto.core.ports.unit_of_work import UnitOfWorkFactory
 from tests import builders
@@ -153,17 +159,19 @@ async def test_a_second_writing_unit_in_the_same_task_fails_at_once(
 
 async def test_other_tasks_wait_for_the_writer(uow_factory: UnitOfWorkFactory) -> None:
     order: list[str] = []
+    writing = asyncio.Event()
 
     async def write(name: str, hold: float) -> None:
         async with uow_factory() as uow:
             await uow.users.add(builders.user(name))
             order.append(f"{name} writes")
+            writing.set()
             await asyncio.sleep(hold)
             await uow.commit()
             order.append(f"{name} committed")
 
     first = asyncio.create_task(write("first", 0.2))
-    await asyncio.sleep(0.05)
+    await writing.wait()  # the first holds the write lock
     await write("second", 0)
     await first
     assert order == ["first writes", "first committed", "second writes", "second committed"]
@@ -177,6 +185,53 @@ async def test_a_failed_unit_releases_the_task(uow_factory: UnitOfWorkFactory) -
     async with uow_factory() as uow:
         await uow.users.add(builders.user("b"))
         await uow.commit()
+
+
+async def test_a_writer_held_up_past_the_busy_timeout_meets_a_concurrent_change(
+    database: Database, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Another process holds the write lock past the busy timeout: a ConcurrencyError, which
+    a job tries again, not the driver's OperationalError (SQ-K08)."""
+    assert database.sqlite_path is not None
+    short = (*sql_database._SQLITE_PRAGMAS[:-1], "PRAGMA busy_timeout=50")
+    monkeypatch.setattr(sql_database, "_SQLITE_PRAGMAS", short)
+    other, late = Database.sqlite(database.sqlite_path), Database.sqlite(database.sqlite_path)
+    try:
+        async with other.engine.connect() as holder:
+            await holder.exec_driver_sql("BEGIN IMMEDIATE")  # as another process would
+            with pytest.raises(ConcurrencyError):
+                async with SqlUnitOfWorkFactory(late)() as uow:
+                    await uow.users.add(builders.user("late"))
+            await holder.rollback()
+        async with SqlUnitOfWorkFactory(late)() as uow:  # the lock is free again
+            await uow.users.add(builders.user("late"))
+            await uow.commit()
+    finally:
+        await other.dispose()
+        await late.dispose()
+
+
+@pytest.fixture
+def one_key_per_query(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Every query that takes its keys a few at a time takes one: two keys already run the
+    second round, which no contract reaches with `KEYS_PER_QUERY` (TA-K05)."""
+    for module in (sql_documents, sql_facts, sql_inbox, sql_relations):
+        monkeypatch.setattr(module, "KEYS_PER_QUERY", 1)
+
+
+@pytest.mark.usefixtures("one_key_per_query")
+class TestSqliteUnitOfWorkOneKeyPerQuery(UnitOfWorkContract):
+    pass
+
+
+@pytest.mark.usefixtures("one_key_per_query")
+class TestSqliteInboxOneKeyPerQuery(InboxRepositoryContract):
+    pass
+
+
+@pytest.mark.usefixtures("one_key_per_query")
+class TestSqliteAdapterOneKeyPerQuery(SqlAdapterSuite):
+    pass
 
 
 class TestSqlitePushDevices(PushDeviceRepositoryContract):

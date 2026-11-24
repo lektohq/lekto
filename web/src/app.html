@@ -3,8 +3,13 @@
 	<head>
 		<meta charset="utf-8" />
 		<!-- `viewport-fit=cover`: the installed app reaches under the notch and the home indicator;
-		     the bars keep the safe areas free (web/DESIGN.md, "App"). -->
-		<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+		     the bars keep the safe areas free (web/DESIGN.md, "App"). `interactive-widget`: the
+		     keyboard of Android shrinks the page instead of covering it, so that a bar at the
+		     bottom and a sheet stay above it. -->
+		<meta
+			name="viewport"
+			content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content"
+		/>
 		<meta name="color-scheme" content="light dark" />
 		<!-- No address of the app leaves it as a Referer, also behind a proxy or from `pnpm dev`. -->
 		<meta name="referrer" content="no-referrer" />
@@ -15,9 +20,10 @@
 		<meta name="theme-color" content="#ffffff" />
 		<meta name="apple-mobile-web-app-title" content="Lekto" />
 		<meta name="apple-mobile-web-app-status-bar-style" content="default" />
-		<!-- Light or dark before the first paint; a file, not inline, for the content security policy. -->
-		<script src="%sveltekit.assets%/theme.js"></script>
 		%sveltekit.head%
+		<!-- Light or dark before the first paint; a file, not inline, for the content security
+		     policy, and after it, which then covers it too. -->
+		<script src="%sveltekit.assets%/theme.js"></script>
 	</head>
 	<body data-sveltekit-preload-data="hover">
 		<div style="display: contents">%sveltekit.body%</div>

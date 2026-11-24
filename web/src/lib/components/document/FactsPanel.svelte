@@ -488,8 +488,10 @@
 			/>
 		{/if}
 		{#if identifier && attaching === id}
-			<form
-				class="mx-2.5 mb-2.5 flex flex-col gap-2.5 rounded-xl border bg-card p-3"
+			<Card.Root
+				as="form"
+				size="sm"
+				class="mx-2.5 mb-2.5 flex flex-col gap-2.5"
 				onsubmit={(event) => {
 					event.preventDefault();
 					void attach(identifier);
@@ -556,7 +558,7 @@
 						{m.facts_attach()}
 					</Button>
 				</div>
-			</form>
+			</Card.Root>
 		{/if}
 	</div>
 {/snippet}

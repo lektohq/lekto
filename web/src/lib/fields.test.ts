@@ -1,7 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
+import { getLocale, setLocale } from '#lib/paraglide/runtime.js';
 import { emptyValue, isMoney, isPeriod, sameValue, toApi, toInput } from './fields.ts';
 
 describe('field values', () => {
+	const before = getLocale();
+	afterEach(() => setLocale(before, { reload: false }));
+
 	it('keeps text and trims it', () => {
 		expect(toApi('text', '  Hello ')).toBe('Hello');
 		expect(toInput('text', 'Hello')).toBe('Hello');
@@ -13,8 +17,31 @@ describe('field values', () => {
 		expect(toApi('boolean', '')).toBeNull();
 	});
 
-	it('writes a number with a decimal point', () => {
+	it('reads and shows a number in the language of the UI (WG-K05)', () => {
+		setLocale('de', { reload: false });
+		expect(toApi('number', '1.234,5')).toBe('1234.5');
 		expect(toApi('number', '12,5')).toBe('12.5');
+		expect(toInput('number', '1234.5')).toBe('1234,5');
+		// A dot groups only three digits: one typed out of habit is the decimal point, as the
+		// server reads it, not a value a hundred times larger.
+		expect(toApi('number', '12.50')).toBe('12.50');
+		expect(toApi('amount', { amount: '12.50', currency: 'EUR' })).toEqual({
+			amount: '12.50',
+			currency: 'EUR'
+		});
+		expect(toApi('number', '1.234')).toBe('1234');
+		expect(toApi('number', '1.234.567,89')).toBe('1234567.89');
+		expect(toApi('number', '1 234,5')).toBe('1234.5');
+		expect(toApi('number', '-12,5')).toBe('-12.5');
+		expect(toApi('number', ',5')).toBe('0.5');
+		// What fits no notation goes to the API as typed, which refuses it.
+		expect(toApi('number', '1.2.3')).toBe('1.2.3');
+		expect(toApi('number', '1.234,5.6')).toBe('1.234,5.6');
+		setLocale('en', { reload: false });
+		expect(toApi('number', '1,234.5')).toBe('1234.5');
+		expect(toApi('number', '1,234')).toBe('1234');
+		expect(toApi('number', '12,50')).toBe('12.50');
+		expect(toInput('number', '1234.5')).toBe('1234.5');
 	});
 
 	it('reads and writes yes/no', () => {
@@ -24,6 +51,11 @@ describe('field values', () => {
 	});
 
 	it('writes money with an upper-case currency', () => {
+		setLocale('de', { reload: false });
+		expect(toInput('amount', { amount: '84.20', currency: 'EUR' })).toEqual({
+			amount: '84,20',
+			currency: 'EUR'
+		});
 		expect(toApi('amount', { amount: '84,20', currency: 'eur' })).toEqual({
 			amount: '84.20',
 			currency: 'EUR'

@@ -1,5 +1,6 @@
 /** Texts of the rule builder: fields, operators, actions, problems; a rule as sentences. */
 import { formatNumber } from '#lib/i18n.ts';
+import { fieldText } from '#lib/card-fields.ts';
 import { describeValue } from '#lib/describe.ts';
 import { roleLabel, type FactRole } from '#lib/facts.ts';
 import { kindLabel, type IdentifierKind } from '#lib/identifiers.ts';
@@ -240,8 +241,9 @@ export function describeCondition(condition: ConditionNode, lookup: Lookup | nul
 /** A fact condition's subject: "Fact Invoice number (refers to a document)". */
 function factSubject(condition: ConditionNode): string {
 	const kind = condition.factKind ? kindLabel(condition.factKind as IdentifierKind) : '';
-	const role = condition.factRole ? ` (${roleLabel(condition.factRole as FactRole)})` : '';
-	return `${m.rule_field_fact()} ${kind}${role}`;
+	return condition.factRole
+		? m.rule_fact_kind_role({ kind, role: roleLabel(condition.factRole as FactRole) })
+		: m.rule_fact_kind({ kind });
 }
 
 function describeConditionValue(
@@ -321,7 +323,8 @@ export function describeAction(action: ActionNode | ApiAction, lookup: Lookup | 
 			return `${label}: ${action.tag_ids.map((id) => tagName(id, lookup)).join(', ')}`;
 		case 'set_field': {
 			const field = fieldOf(action.field_id, lookup);
-			return `${label}: ${field?.name ?? m.rule_unknown()} = ${describeValue(action.value, null)}`;
+			const value = field ? fieldText(action.value, field) : describeValue(action.value, null);
+			return `${label}: ${field?.name ?? m.rule_unknown()} = ${value}`;
 		}
 		case 'force_review':
 			return `${label}: ${m.rule_quoted({ text: action.reason })}`;

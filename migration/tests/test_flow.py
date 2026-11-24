@@ -643,6 +643,29 @@ async def test_paperless_errors_that_may_pass_are_repeated(setup: Setup) -> None
     assert len(setup.lekto.documents) == 8
 
 
+async def test_the_check_names_every_note_of_a_file_and_the_first_of_a_copy_by_id(
+    setup: Setup,
+) -> None:
+    """A note does not hide another, and which copy comes first does not depend on which
+    download ends first (MI-K06)."""
+    assert await setup.migrate() == 0
+    twelve = setup.archive.documents[2]
+    setup.archive.documents += [
+        {**twelve, "id": 30, "title": "Said to be a photo", "mime_type": "image/jpeg"},
+        {**twelve, "id": 40, "title": "New", "versions": []},
+        {**twelve, "id": 41, "title": "New again", "versions": []},
+    ]
+    setup.archive.files[30] = setup.archive.files[12]
+    setup.archive.files[40] = setup.archive.files[41] = setup.archive.files[12] + b"\n%new"
+    setup.paperless.errors[40] = (502, 1)  # its download ends after 41's
+    assert await setup.run("check", download=True) == 0
+    files = {f["id"]: f for f in setup.report("check")["files"]}
+    assert "the file is application/pdf, Paperless says image/jpeg" in files[30]["note"]
+    assert "Lekto has the file already" in files[30]["note"]
+    assert 40 not in files
+    assert files[41]["note"] == "the same file as document 40"
+
+
 async def test_a_duplicate_is_mapped_not_counted_as_an_error(setup: Setup) -> None:
     assert await setup.migrate() == 0
     existing = by_title(setup, "Document 12")

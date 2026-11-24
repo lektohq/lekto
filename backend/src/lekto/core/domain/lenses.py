@@ -107,6 +107,18 @@ class LensSort(StrEnum):
         return self in {LensSort.FIELD, LensSort.FIELD_DESC}
 
 
+ID_LISTS = (
+    "contact_ids",
+    "document_type_ids",
+    "contact_group_ids",
+    "document_type_group_ids",
+    "topic_ids",
+    "tag_ids",
+    "space_ids",
+)
+"""The filters of a lens that are lists of ids (`LensFilter`), as the adapters store them."""
+
+
 @dataclass(frozen=True, kw_only=True)
 class LensFilter:
     """The filters of a lens, as the documents list takes them: one of the contacts, types,
@@ -127,22 +139,12 @@ class LensFilter:
     relative_period: RelativePeriod | None = None
     facts: tuple[FactCriterion, ...] = ()
 
-    _KINDS = (
-        "contact_ids",
-        "document_type_ids",
-        "contact_group_ids",
-        "document_type_group_ids",
-        "topic_ids",
-        "tag_ids",
-        "space_ids",
-    )
-
     def __post_init__(self) -> None:
         facts = tuple(dict.fromkeys(self.facts))
         if len(facts) > MAX_FILTER_FACTS:
             raise ValidationError(f"facts: at most {MAX_FILTER_FACTS}")
         object.__setattr__(self, "facts", facts)
-        for name in self._KINDS:
+        for name in ID_LISTS:
             values = tuple(dict.fromkeys(getattr(self, name)))  # once each, in order
             object.__setattr__(self, name, values)
         if self.relative_period is not None and (
@@ -159,7 +161,7 @@ class LensFilter:
     def check_values(self) -> None:
         """ValidationError if it names more than `MAX_FILTER_VALUES` of a kind: checked when a
         lens takes the filter, not when one is read."""
-        for name in self._KINDS:
+        for name in ID_LISTS:
             if len(getattr(self, name)) > MAX_FILTER_VALUES:
                 raise ValidationError(f"{name}: at most {MAX_FILTER_VALUES}")
 

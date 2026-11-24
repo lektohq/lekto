@@ -12,6 +12,7 @@ import { calls, fakeApi, json, masterData, noContent, problem } from '#lib/testi
 import { uploads } from '#lib/upload.svelte.ts';
 import Page from './+page.svelte';
 import { goTo } from '#lib/testing/page-state.svelte.ts';
+import { settled } from '#lib/testing/time.ts';
 
 vi.mock('$app/navigation', () => import('#lib/testing/navigation.ts'));
 vi.mock('$app/state', () => import('#lib/testing/app-state.ts'));
@@ -469,7 +470,7 @@ describe('uploading in the inbox', () => {
 		await fireEvent.dragEnter(window, { dataTransfer: { types: ['Files'] } });
 		expect(screen.queryByText(m.upload_drop_overlay())).toBeNull();
 		await fireEvent.drop(window, { dataTransfer: droppedFolder() });
-		await new Promise((resolve) => setTimeout(resolve, 20));
+		await settled();
 		expect(calls(api)).not.toContain('POST /api/v1/documents');
 		expect(screen.getByRole('button', { name: m.upload_title() })).toBeTruthy();
 	});
@@ -484,7 +485,10 @@ describe('uploading in the inbox', () => {
 			await user.click(screen.getByRole('button', { name: m.upload_title() }));
 			const dialog = await screen.findByRole('dialog');
 			expect(within(dialog).queryByRole('combobox')).toBeNull();
-			await user.upload(within(dialog).getByLabelText(m.upload_choose()), [pdf('a.pdf')]);
+			// The field itself is hidden: its button stands for it (WZ-K01).
+			const field = dialog.querySelector<HTMLInputElement>('input[type="file"]')!;
+			expect(within(dialog).queryAllByLabelText(m.upload_choose())).toEqual([]);
+			await user.upload(field, [pdf('a.pdf')]);
 			await waitFor(() => expect(calls(api)).toContain('POST /api/v1/documents'));
 			await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
 			await waitFor(() => expect(document.body.style.pointerEvents).not.toBe('none'));

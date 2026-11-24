@@ -13,14 +13,15 @@ import pytest
 from lekto.adapters.outbound.memory.mail_records import MemoryMailOriginRepository
 from lekto.adapters.outbound.memory.mail_server import MemoryMailSession
 from lekto.adapters.outbound.regex import RegexPatternMatcher
+from lekto.core.domain import mail_intake as intake_domain
 from lekto.core.domain import mail_message
 from lekto.core.domain.condition_tree import Group
 from lekto.core.domain.documents import Channel, Document
-from lekto.core.domain.errors import PermissionDeniedError, ValidationError
+from lekto.core.domain.errors import ConflictError, PermissionDeniedError, ValidationError
 from lekto.core.domain.events import MailboxFetched
 from lekto.core.domain.identifiers import Identifier, IdentifierKind
 from lekto.core.domain.ids import DocumentTypeId, new_id
-from lekto.core.domain.jobs import JobState
+from lekto.core.domain.jobs import JobState, JobStatus
 from lekto.core.domain.mail import (
     Fallback,
     FetchStart,
@@ -43,7 +44,7 @@ from lekto.core.domain.mail_rules import (
 from lekto.core.domain.mail_traits import FlagColor, Importance, MailMarks
 from lekto.core.domain.master_data import DocumentType
 from lekto.core.domain.pipeline import Node
-from lekto.core.domain.reasons import ReasonCode
+from lekto.core.domain.reasons import ReasonCode, because
 from lekto.core.domain.rights import Actor
 from lekto.core.domain.rules import Condition, ConditionField, Operator, RuleScope
 from lekto.core.domain.spaces import SpaceRole
@@ -130,7 +131,7 @@ async def test_everything_for_a_person_makes_documents_of_a_mail(world: World) -
         "message/rfc822",
     ]
     async with world.uow() as uow:
-        (record,) = await uow.mail_records.recent(mailbox.id, limit=5)
+        (record,) = await uow.mail_records.page(mailbox.id, limit=5)
         origins = await uow.mail_origins.of_record(record.id)
         stored = await uow.mailboxes.get(mailbox.id)
         queued = await uow.jobs.find(
@@ -177,15 +178,16 @@ async def test_names_and_header_values_from_a_sender_lose_paths_and_control_char
 
     assert len(await world.visible(person.id)) == 4  # three PDFs and the text
     async with world.uow() as uow:
-        (record,) = await uow.mail_records.recent(mailbox.id, limit=5)
+        (record,) = await uow.mail_records.page(mailbox.id, limit=5)
         origins = await uow.mail_origins.of_record(record.id)
     assert (record.outcome, record.documents, record.subject) == (
         MailOutcome.TAKEN,
         4,
         "Rechnung 1",
     )
-    names = [origin.filename for origin in origins if origin.role is OriginRole.ATTACHMENT]
-    assert names == ["klein.pdf", "x" * 255, "ab.pdf"]
+    # Within a letter the origins come by document id, not in the mail's order.
+    names = {origin.filename for origin in origins if origin.role is OriginRole.ATTACHMENT}
+    assert names == {"klein.pdf", "x" * 255, "ab.pdf"}
 
 
 async def test_what_apple_mail_sends_inline_becomes_a_document(world: World) -> None:
@@ -208,7 +210,7 @@ async def test_nothing_without_a_rule(world: World) -> None:
     await _fetch(world, world.mail_intake())
     assert await world.visible(person.id) == []
     async with world.uow() as uow:
-        (record,) = await uow.mail_records.recent(mailbox.id, limit=5)
+        (record,) = await uow.mail_records.page(mailbox.id, limit=5)
     assert record.outcome is MailOutcome.NO_RULE
 
 
@@ -231,7 +233,7 @@ async def test_a_forward_is_unwrapped_and_a_known_attachment_related(world: Worl
     _deliver(world, bytes(outer))
     await _fetch(world, world.mail_intake(pipeline))
     async with world.uow() as uow:
-        (record,) = await uow.mail_records.recent(mailbox.id, limit=5)
+        (record,) = await uow.mail_records.page(mailbox.id, limit=5)
         (origin,) = await uow.mail_origins.of_record(record.id)
     assert origin.role is OriginRole.COVER and origin.subject == "Rechnung"
     assert [item.address for item in origin.forwarded_by] == ["ben@example.test"]
@@ -262,7 +264,7 @@ async def test_a_mail_attached_deeper_than_five_levels_is_a_document_of_its_own(
     _deliver(world, mails.nested_mail(8))
     await _fetch(world, world.mail_intake())
     async with world.uow() as uow:
-        (record,) = await uow.mail_records.recent(mailbox.id, limit=5)
+        (record,) = await uow.mail_records.page(mailbox.id, limit=5)
         origins = await uow.mail_origins.of_record(record.id)
     assert record.documents == 2
     assert sorted(
@@ -299,8 +301,8 @@ async def test_a_mail_is_fetched_once_across_mailboxes(world: World) -> None:
     )
     await _fetch(world, world.mail_intake())
     async with world.uow() as uow:
-        (of_first,) = await uow.mail_records.recent(first.id, limit=5)
-        (of_second,) = await uow.mail_records.recent(second.id, limit=5)
+        (of_first,) = await uow.mail_records.page(first.id, limit=5)
+        (of_second,) = await uow.mail_records.page(second.id, limit=5)
     # The first mailbox's job was queued first and runs first: it takes the mail, the other
     # mailbox knows its Message-ID then.
     assert (of_first.outcome, of_second.outcome) == (MailOutcome.TAKEN, MailOutcome.KNOWN)
@@ -388,7 +390,7 @@ async def test_a_mail_too_large_is_left_out_and_shows_at_the_mailbox(world: Worl
     await _fetch(world, world.mail_intake(max_attachment=1))  # limit: 1 MB and a byte
     async with world.uow() as uow:
         records = {
-            record.subject: record for record in await uow.mail_records.recent(mailbox.id, limit=5)
+            record.subject: record for record in await uow.mail_records.page(mailbox.id, limit=5)
         }
         stored = await uow.mailboxes.get(mailbox.id)
     large = records["Fotos"]
@@ -475,7 +477,7 @@ async def test_a_run_interrupted_within_a_mail_leaves_no_document_without_it(
         await _fetch(world, service)
     (first,) = await world.visible(person.id)
     async with world.uow() as uow:
-        assert await uow.mail_records.recent(mailbox.id, limit=5) == []
+        assert await uow.mail_records.page(mailbox.id, limit=5) == []
         assert await uow.mail_origins.find(first.id) is not None
 
     monkeypatch.setattr(PipelineService, "receive", receive)
@@ -485,7 +487,7 @@ async def test_a_run_interrupted_within_a_mail_leaves_no_document_without_it(
     documents = await world.visible(person.id)
     assert len(documents) == 3
     async with world.uow() as uow:
-        (record,) = await uow.mail_records.recent(mailbox.id, limit=5)
+        (record,) = await uow.mail_records.page(mailbox.id, limit=5)
         found = [await uow.mail_origins.find(document.id) for document in documents]
     origins = [origin for origin in found if origin is not None]
     assert (record.outcome, record.documents) == (MailOutcome.TAKEN, 3)
@@ -555,7 +557,7 @@ async def test_a_mail_that_cannot_be_read_fails_and_the_next_comes_in(world: Wor
     names = [document.original_filename for document in await world.visible(person.id)]
     assert names == ["Danach.eml"]
     async with world.uow() as uow:
-        records = await uow.mail_records.recent(mailbox.id, limit=5)
+        records = await uow.mail_records.page(mailbox.id, limit=5)
         stored = await uow.mailboxes.get(mailbox.id)
     assert sorted(record.outcome for record in records) == sorted(
         [MailOutcome.FAILED, MailOutcome.TAKEN]
@@ -568,7 +570,7 @@ async def test_the_documents_of_a_mail_relate_and_stay_related(world: World) -> 
     _deliver(world, mails.rich_mail())
     await _fetch(world, world.mail_intake())
     async with world.uow() as uow:
-        (record,) = await uow.mail_records.recent(mailbox.id, limit=5)
+        (record,) = await uow.mail_records.page(mailbox.id, limit=5)
         cover, pdf, inner = (
             item.document_id for item in await uow.mail_origins.of_record(record.id)
         )
@@ -595,7 +597,7 @@ async def test_an_attachment_counts_its_sender_as_evidence(world: World) -> None
     _deliver(world, mails.rich_mail())
     await _fetch(world, world.mail_intake())
     async with world.uow() as uow:
-        (record,) = await uow.mail_records.recent(mailbox.id, limit=5)
+        (record,) = await uow.mail_records.page(mailbox.id, limit=5)
         origins = await uow.mail_origins.of_record(record.id)
         attachment = await uow.documents.get(origins[1].document_id)
     assert origins[1].role is OriginRole.ATTACHMENT
@@ -648,7 +650,7 @@ async def test_a_rule_on_the_marks_and_importance_of_a_mail(world: World) -> Non
     (document,) = await world.visible(person.id)
     assert document.original_filename == "Dringend.eml"
     async with world.uow() as uow:
-        records = {r.subject: r for r in await uow.mail_records.recent(mailbox.id, limit=5)}
+        records = {r.subject: r for r in await uow.mail_records.page(mailbox.id, limit=5)}
         origin = await uow.mail_origins.find(document.id)
         stored = await uow.mailboxes.get(mailbox.id)
     taken = records["Dringend"]
@@ -731,14 +733,14 @@ async def test_the_next_fetch_runs_the_steps_a_stopped_one_left(
     with pytest.raises(asyncio.CancelledError, match="stopped"):
         await _fetch(world, service)
     async with world.uow() as uow:
-        (record,) = await uow.mail_records.recent(mailbox.id, limit=5)
+        (record,) = await uow.mail_records.page(mailbox.id, limit=5)
     assert (record.outcome, record.steps, record.steps_due) == (MailOutcome.TAKEN, (), steps)
 
     await _again(world, service)
     (moved,) = account.boxes["Erledigt"].mails
     assert moved.seen and account.boxes["INBOX"].mails == []
     async with world.uow() as uow:
-        (record,) = await uow.mail_records.recent(mailbox.id, limit=5)
+        (record,) = await uow.mail_records.page(mailbox.id, limit=5)
     assert record.steps == tuple(StepOutcome(step) for step in steps)
     assert record.steps_due == ()
     assert len(await world.visible(person.id)) == 1
@@ -763,7 +765,7 @@ async def test_steps_left_due_count_as_done_when_the_mail_went_with_the_last(
 
     await _again(world, service)
     async with world.uow() as uow:
-        (record,) = await uow.mail_records.recent(mailbox.id, limit=5)
+        (record,) = await uow.mail_records.page(mailbox.id, limit=5)
         stored = await uow.mailboxes.get(mailbox.id)
     assert record.steps == tuple(StepOutcome(step) for step in steps)
     assert record.steps_due == ()
@@ -788,7 +790,7 @@ async def test_steps_left_due_fail_when_the_mail_is_gone_otherwise(
 
     await _again(world, service)
     async with world.uow() as uow:
-        (record,) = await uow.mail_records.recent(mailbox.id, limit=5)
+        (record,) = await uow.mail_records.page(mailbox.id, limit=5)
         stored = await uow.mailboxes.get(mailbox.id)
     assert [step.step for step in record.steps] == list(steps)
     assert {step.failed.code for step in record.steps if step.failed} == {ReasonCode.MAIL_STEP_GONE}
@@ -818,14 +820,14 @@ async def test_a_waiting_mail_a_rule_takes_keeps_its_outcome_and_steps_due(
     with pytest.raises(asyncio.CancelledError, match="stopped"):
         await drain(service)
     async with world.uow() as uow:
-        (record,) = await uow.mail_records.recent(mailbox.id, limit=5)
+        (record,) = await uow.mail_records.page(mailbox.id, limit=5)
     assert (record.outcome, record.documents) == (MailOutcome.TAKEN, 1)
     assert record.steps_due == (MailStep(MailAction.READ),)
 
     await _again(world, service)
     (mail,) = account.boxes["INBOX"].mails
     async with world.uow() as uow:
-        (record,) = await uow.mail_records.recent(mailbox.id, limit=5)
+        (record,) = await uow.mail_records.page(mailbox.id, limit=5)
     assert mail.seen and record.steps == (StepOutcome(MailStep(MailAction.READ)),)
     assert record.steps_due == ()
 
@@ -866,7 +868,7 @@ async def test_a_rule_switched_on_later_takes_the_mails_no_rule_took(world: Worl
     (document,) = await world.visible(person.id)
     assert document.original_filename == "Ihre Rechnung.eml"
     async with world.uow() as uow:
-        records = {r.subject: r for r in await uow.mail_records.recent(mailbox.id, limit=9)}
+        records = {r.subject: r for r in await uow.mail_records.page(mailbox.id, limit=9)}
         origin = await uow.mail_origins.find(document.id)
     taken = records["Ihre Rechnung"]
     assert (taken.outcome, taken.rule, taken.rule_id, taken.documents) == (
@@ -957,7 +959,7 @@ async def test_the_first_matching_rule_takes_a_mail(world: World) -> None:
     (document,) = await world.visible(person.id)
     assert (document.original_filename, document.space_id) == ("Ihre Rechnung.eml", household.id)
     async with world.uow() as uow:
-        records = sorted(await uow.mail_records.recent(mailbox.id, limit=5), key=lambda r: r.uid)
+        records = sorted(await uow.mail_records.page(mailbox.id, limit=5), key=lambda r: r.uid)
         origin = await uow.mail_origins.find(document.id)
     assert [(record.outcome, record.rule) for record in records] == [
         (MailOutcome.NOTHING, "Newsletter"),
@@ -1108,7 +1110,7 @@ async def test_a_document_rule_looks_at_the_mail_a_document_came_with(world: Wor
 
 async def _records(world: World, mailbox: Mailbox) -> list[Any]:
     async with world.uow() as uow:
-        found = await uow.mail_records.recent(mailbox.id, limit=100)
+        found = await uow.mail_records.page(mailbox.id, limit=100)
     return sorted(found, key=lambda r: (r.fetched_at, r.uid))
 
 
@@ -1201,6 +1203,19 @@ async def test_a_mail_that_cannot_be_taken_is_recorded_as_failed_with_its_rule(
     assert (record.outcome, record.rule, record.documents) == (MailOutcome.FAILED, "Strom", 0)
     assert record.reason is not None and "full" in record.reason.text
     assert (await _status(world, mailbox)).error is None  # the fetch itself went well
+
+
+async def test_a_type_a_mailbox_files_mail_texts_as_stays(world: World) -> None:
+    """The mailbox's type for the mail text is a use like a field's: deleting the type is
+    refused, not left to the database's foreign key (SB-K09)."""
+    letter = DocumentType.create(name="E-Mail", now=world.clock.now())
+    async with world.uow() as uow:
+        await uow.document_types.add(letter)
+        await uow.commit()
+    admin, _, _ = await _setup(world, body_type_id=letter.id)
+    with pytest.raises(ConflictError) as raised:
+        await world.master_data.delete_document_type(Actor(admin.id), letter.id)
+    assert raised.value.reason == because(ReasonCode.IN_USE, name="E-Mail")
 
 
 async def test_a_rule_whose_space_or_type_is_gone_pauses_with_the_reason(world: World) -> None:
@@ -1308,6 +1323,34 @@ async def test_the_worker_start_queues_the_fetch_of_every_enabled_mailbox(world:
     assert paused.enabled is False
 
 
+async def test_a_fetch_whose_claim_was_lost_stores_nothing(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Another worker took the job after its lease ran out: what this one found is not stored,
+    and no ConcurrencyError reaches the worker's loop after five tries (SB-K05)."""
+    await _setup(world)
+    service = world.mail_intake()
+    finish = MailIntakeService._finish
+
+    taken: list[Any] = []
+
+    async def overtaken(self: MailIntakeService, job: Any, *args: Any) -> None:
+        async with world.uow() as uow:
+            world.clock.advance(2 * LEASE)
+            taken.append(
+                await uow.jobs.claim(now=world.clock.now(), lease=LEASE, kinds=[FETCH_JOB])
+            )
+            await uow.commit()
+        await finish(self, job, *args)
+
+    monkeypatch.setattr(MailIntakeService, "_finish", overtaken)
+    world.clock.advance(2 * LATER)
+    assert await service.run_next_job()  # ran, and left the job to the other worker
+    async with world.uow() as uow:
+        job = await uow.jobs.get(taken[0].id)
+    assert job.status is JobStatus.RUNNING  # still the other worker's, not completed here
+
+
 async def test_the_job_of_a_deleted_mailbox_ends(world: World) -> None:
     admin, _, mailbox = await _setup(world)
     await world.mailboxes.delete(Actor(admin.id), mailbox.id)
@@ -1358,6 +1401,42 @@ async def test_a_missing_folder_ends_the_fetch_after_the_others(world: World) ->
     assert status.error is not None and status.error.code is ReasonCode.MAIL_FOLDER_MISSING
     assert status.error.params == {"folder": "Nirgends"}
     assert (status.mails, status.last_success_at) == (1, None)
+
+
+async def test_attachments_beyond_the_limit_are_left_and_noted_at_the_record(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The others are named in the head of the cover letter; the record says how many (Tobi,
+    23.11.2026, SB-K10). A limit of two stands in for the hundred."""
+    monkeypatch.setattr(intake_domain, "MAX_ATTACHMENTS", 2)
+    _, person, mailbox = await _setup(world)
+    message = EmailMessage()
+    message["From"] = "a@example.test"
+    message["Date"] = "Wed, 04 Nov 2026 10:00:00 +0100"
+    message["Subject"] = "Unterlagen"
+    message.set_content("Anbei.")
+    for number in range(1, 5):
+        message.add_attachment(
+            mails.PDF + bytes([number]),
+            maintype="application",
+            subtype="pdf",
+            filename=f"{number}.pdf",
+        )
+    _deliver(world, bytes(message))
+    await _fetch(world, world.mail_intake())
+    names = sorted(d.original_filename for d in await world.visible(person.id))
+    assert names == ["1.pdf", "2.pdf", "Unterlagen.eml"]
+    (record,) = await _records(world, mailbox)
+    assert (record.outcome, record.documents) == (MailOutcome.TAKEN, 3)
+    assert record.reason == because(ReasonCode.MAIL_ATTACHMENTS_LEFT, count=2, max=2)
+
+
+async def test_a_mail_within_the_limit_has_no_note(world: World) -> None:
+    _, _, mailbox = await _setup(world)
+    _deliver(world, mails.rich_mail())
+    await _fetch(world, world.mail_intake())
+    (record,) = await _records(world, mailbox)
+    assert record.outcome is MailOutcome.TAKEN and record.reason is None
 
 
 async def test_an_attachment_larger_than_an_upload_is_left_out(world: World) -> None:

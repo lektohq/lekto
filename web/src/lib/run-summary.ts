@@ -3,7 +3,7 @@
  * (it runs, stops before filing, failed, went through), what would help next, and what changed
  * since the run before.
  */
-import { formatNumber } from '#lib/i18n.ts';
+import { formatList, formatNumber } from '#lib/i18n.ts';
 import type { components } from '#lib/api/schema.ts';
 import { describeValue, fieldLabel } from '#lib/describe.ts';
 import { choiceTitle, filingKind, type Viewer } from '#lib/filing.ts';
@@ -17,6 +17,7 @@ import { list, object, person, text } from '#lib/signals.ts';
 import { byPerson, confirmationOf } from '#lib/step-summary.ts';
 import { stuck, type Step } from '#lib/steps.ts';
 import { viaToken } from '#lib/via-token.ts';
+import { isAtWork } from '#lib/pipeline.ts';
 
 type LogEntry = components['schemas']['LogEntry'];
 type ProcessingStatus = components['schemas']['ProcessingStatus'];
@@ -50,7 +51,7 @@ const lastOf = (steps: readonly Step[], node: Node) =>
 const checksOf = (entry: LogEntry | undefined): Json[] =>
 	list(object(entry?.output).fields).map(object);
 
-const names = (steps: readonly Step[]) => steps.map((step) => NODE_LABELS[step.node]()).join(', ');
+const names = (steps: readonly Step[]) => formatList(steps.map((step) => NODE_LABELS[step.node]()));
 
 /**
  * The sentence of a run: while it runs, where it is; stopped before filing, what is open (the
@@ -66,7 +67,7 @@ export function headlineOf(
 ): Headline {
 	switch (run.status) {
 		case 'processing': {
-			const running = steps.filter((step) => step.state?.status === 'running');
+			const running = steps.filter((step) => step.state !== null && isAtWork(step.state));
 			return {
 				tone: 'running',
 				title:
@@ -139,7 +140,7 @@ function review(
 	];
 	const parts: string[] = [];
 	if (spaceCheck) parts.push(...spaceWhy(spaceCheck, verdict, space, lookup, viewer));
-	if (others.length > 0) parts.push(m.run_why_fields({ fields: others.join(', ') }));
+	if (others.length > 0) parts.push(m.run_why_fields({ fields: formatList(others) }));
 	if (ruleReview) parts.push(m.run_why_rule_review());
 	if (parts.length === 0) {
 		const open = stuck(steps);
@@ -179,7 +180,7 @@ function spaceWhy(
 	}
 	const unseen = list(check.unseen_by).map((id) => person(id, lookup));
 	if (unseen.length === 1) parts.push(m.run_why_unseen_one({ name: unseen[0] }));
-	else if (unseen.length > 1) parts.push(m.run_why_unseen({ names: unseen.join(', ') }));
+	else if (unseen.length > 1) parts.push(m.run_why_unseen({ names: formatList(unseen) }));
 	return parts;
 }
 

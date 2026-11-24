@@ -53,8 +53,10 @@ from lekto.core.domain.fields import (
     FieldType,
     FieldValue,
     Writing,
+    field_from_input,
     field_from_json,
     read_written,
+    require_known_currency,
 )
 from lekto.core.domain.identifiers import IdentifierKind, normalise_identifier
 from lekto.core.domain.identity import ViaToken
@@ -87,6 +89,20 @@ MAX_ACTIONS = 20
 MAX_TEXT = 500
 MAX_PATTERN = 200
 MAX_LIST = 100
+
+
+MAIL_PREFIX = "mail_"
+"""A document rule's condition on the mail the document came with: the prefix and the name of
+the mail's trait (`mail_traits.MAIL_OPERATORS`), `mail_subject`."""
+
+
+def mail_trait(field: ConditionField) -> str:
+    """The mail's trait a condition field looks at: `subject` of `mail_subject`."""
+    return field.value.removeprefix(MAIL_PREFIX)
+
+
+TEXT_TARGET = "text"
+"""What a `matches` condition on the document's text runs against (`Condition.target`)."""
 
 
 class RuleScope(StrEnum):
@@ -184,7 +200,7 @@ _FIELD_OPERATORS: dict[ConditionField, frozenset[Operator]] = {
     ConditionField.RELATION: _REFERENCE_OPERATORS,
     ConditionField.MAIL_MAILBOX: _REFERENCE_OPERATORS,
 } | {
-    ConditionField(f"mail_{name}"): frozenset(Operator(op) for op in ops)
+    ConditionField(f"{MAIL_PREFIX}{name}"): frozenset(Operator(op) for op in ops)
     for name, ops in MAIL_OPERATORS.items()
 }
 TAG_FIELDS: dict[ConditionField, TagScope] = {
@@ -334,7 +350,7 @@ class Condition:
             case ConditionField.FACT:
                 _text(value, MAX_PATTERN if self.op is Operator.MATCHES else MAX_TEXT)
             case field if field in MAIL_FIELDS and field is not ConditionField.MAIL_MAILBOX:
-                check_mail_value(field.value.removeprefix("mail_"), value, label=field.value)
+                check_mail_value(mail_trait(field), value, label=field.value)
 
     @property
     def target(self) -> str:
@@ -344,7 +360,7 @@ class Condition:
             assert self.fact_kind is not None
             role = "" if self.fact_role is None else self.fact_role.value
             return f"fact:{self.fact_kind.value}:{role}"
-        return "text" if self.field_id is None else str(self.field_id)
+        return TEXT_TARGET if self.field_id is None else str(self.field_id)
 
     @property
     def values(self) -> list[JsonValue]:
@@ -764,11 +780,17 @@ def title_rule(document_type: DocumentType) -> RuleDefinition:
 
 
 def check_fields(
-    definition: RuleDefinition, definitions: Mapping[FieldId, FieldDefinition], writing: Writing
+    definition: RuleDefinition,
+    definitions: Mapping[FieldId, FieldDefinition],
+    writing: Writing,
+    *,
+    saved: bool = False,
 ) -> None:
     """Conditions and actions on fields fit the field's data type. ValidationError
     otherwise, naming the place; a missing field is a ValidationError too. `writing`: how the
-    templates write values (`TemplateRenderer.writing`), by which text without markup is read."""
+    templates write values (`TemplateRenderer.writing`), by which text without markup is read.
+    `saved`: the rule is saved now, its values are given now (`field_from_input`); a rule saved
+    before keeps fitting with an amount in a currency the check of today refuses."""
     places = [
         *condition_places(definition.conditions),
         *(
@@ -792,13 +814,15 @@ def check_fields(
             if condition.op in (Operator.CONTAINS, Operator.MATCHES):
                 continue
             for value in condition.values:
-                condition_value(field, condition.op, value)
+                compared = condition_value(field, condition.op, value)
+                if saved:
+                    require_known_currency(field, compared, value)
     for index, action in enumerate(definition.actions):
         if isinstance(action, SetField):
             with _at(f"actions[{index}]"):
                 field = _field(definitions, action.field_id)
                 if not is_template(field, action.value):
-                    field_from_json(field, action.value)
+                    (field_from_input if saved else field_from_json)(field, action.value)
                 elif (
                     # Text without markup writes itself: it must be readable now. A template's
                     # syntax and values are checked where the rule is saved (a port renders it).

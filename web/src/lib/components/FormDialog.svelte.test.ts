@@ -114,6 +114,35 @@ describe('FormDialog', () => {
 			expect(props.open).toBe(true);
 		});
 
+		it('focuses an editor without a form itself, not its first button (WZ-K06)', async () => {
+			const body = createRawSnippet(() => ({ render: () => `<p>A token</p>` }));
+			render(
+				EditorShell as never,
+				{
+					open: true,
+					title: 'Token',
+					ondelete: vi.fn(async () => {}),
+					deleteTitle: 'Widerrufen?',
+					children: body
+				} as never
+			);
+			const dialog = await screen.findByRole('dialog');
+			await waitFor(() => expect(document.activeElement).toBe(dialog));
+		});
+
+		it('asks for an editor too, which says itself that it holds something (WT1-K17)', async () => {
+			const user = userEvent.setup();
+			const body = createRawSnippet(() => ({ render: () => `<p>Its fields</p>` }));
+			const props = $state({ open: true, title: 'Kontakt', dirty: true, children: body });
+			render(EditorShell as never, props as never);
+			await screen.findByText('Its fields');
+			await user.keyboard('{Escape}');
+			const asked = await screen.findByRole('alertdialog', { name: m.unsaved_title() });
+			expect(props.open).toBe(true);
+			await user.click(within(asked).getByRole('button', { name: m.unsaved_discard() }));
+			await waitFor(() => expect(props.open).toBe(false));
+		});
+
 		it('closes at once with nothing typed, and on "Abbrechen" with something typed', async () => {
 			const user = userEvent.setup();
 			const untouched = dialog(vi.fn());

@@ -25,6 +25,7 @@ import { goTo } from '#lib/testing/page-state.svelte.ts';
 import { returnTo } from '#lib/return-to.svelte.ts';
 import Page from './+page.svelte';
 import { streamEvents } from '#lib/testing/events.ts';
+import { elapse, fakeTime } from '#lib/testing/time.ts';
 
 type Document = components['schemas']['DocumentDetails'];
 
@@ -72,6 +73,23 @@ function serve(current: () => Document, routes: Parameters<typeof fakeApi>[0] = 
 	return api;
 }
 
+/** doc-1 waiting for a decision (yellow), with what its review asks and without an original. */
+function waiting() {
+	const yellow = documentOf({
+		lane: 'yellow',
+		processing: { ...documentOf().processing, status: 'review' }
+	});
+	const routes = {
+		'GET /api/v1/documents/doc-1/review': () => ({
+			document: yellow,
+			open: [{ node: 'judge', outcome: 'uncertain', reason: 'Widerspruch', fields: [] }],
+			nodes: []
+		}),
+		'GET /api/v1/documents/doc-1/original': () => new Response('', { status: 404 })
+	};
+	return { yellow, routes };
+}
+
 const seen = (api: ReturnType<typeof fakeApi>) =>
 	calls(api).filter((call) => call === 'PUT /api/v1/documents/doc-1/seen');
 
@@ -83,6 +101,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+	// jsdom has none: some tests give one.
+	delete (Element.prototype as Partial<Element>).scrollIntoView;
 	phone.override(null);
 	events.stop();
 	session.clear();
@@ -125,6 +145,39 @@ describe('the frame of the page', () => {
 		expect(screen.getByRole('heading', { level: 1, name: m.document_generic() })).toBeTruthy();
 		expect(await screen.findByText(m.document_not_found())).toBeTruthy();
 		expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+	});
+
+	it('drops "not found" as soon as it goes to another document (WF-K02)', async () => {
+		let answer: (() => void) | null = null;
+		serve(() => documentOf(), {
+			'GET /api/v1/documents/doc-1': () => notFound('document', 'doc-1'),
+			'GET /api/v1/documents/doc-2': async () => {
+				await new Promise<void>((resolve) => (answer = resolve));
+				return documentOf({ id: 'doc-2', title: 'Zweites' });
+			}
+		});
+		render(Page);
+		expect(await screen.findByText(m.document_not_found())).toBeTruthy();
+		goTo('/ui/documents/doc-2', { id: 'doc-2' });
+		await waitFor(() => expect(answer).not.toBeNull());
+		expect(screen.queryByText(m.document_not_found())).toBeNull(); // while doc-2 still loads
+	});
+
+	it('asks the facts beside the review and the reading, not after them (WF-K03)', async () => {
+		let review: (() => void) | null = null;
+		// Read again: it has its text, and so facts to ask.
+		const read = documentOf({ lane: 'green', processing: { ...documentOf().processing, run: 2 } });
+		const api = serve(() => read, {
+			'GET /api/v1/documents/doc-1/review': async () => {
+				await new Promise<void>((resolve) => (review = resolve));
+				return { fields: [] };
+			},
+			'GET /api/v1/documents/doc-1/facts': () => ({ facts: [], codes: [] })
+		});
+		render(Page);
+		await waitFor(() => expect(review).not.toBeNull());
+		await waitFor(() => expect(calls(api)).toContain('GET /api/v1/documents/doc-1/facts'));
+		review!();
 	});
 
 	it('says so when the open document is gone on reading it anew', async () => {
@@ -183,16 +236,18 @@ describe('the document view and seen', () => {
 
 	it('loads the document once after a burst of events of a run', async () => {
 		// Issue #75: a run sends two events for each node, some of them side by side.
+		fakeTime(); // the page gathers a burst for a while (`coalesced`): it passes at once
 		const api = serve(() => documentOf({ lane: null }));
 		render(Page);
-		await waitFor(() => expect(seen(api)).toHaveLength(1));
+		await vi.waitFor(() => expect(seen(api)).toHaveLength(1));
 		for (const node of ['signal_llm', 'signal_classifier', 'signal_neighbours', 'signal_facts']) {
 			emit?.('document.node_started', { document_id: 'doc-1', node, run: 1 });
 			emit?.('document.node_completed', { document_id: 'doc-1', node, run: 1, outcome: 'ok' });
 		}
 		const loads = () => calls(api).filter((call) => call === 'GET /api/v1/documents/doc-1');
-		await waitFor(() => expect(loads()).toHaveLength(2));
-		await new Promise((resolve) => setTimeout(resolve, 400));
+		await elapse(1000);
+		expect(loads()).toHaveLength(2);
+		await elapse(10_000);
 		expect(loads()).toHaveLength(2);
 	});
 
@@ -254,6 +309,7 @@ describe('the document view and seen', () => {
 
 describe('the inbox while one document is open', () => {
 	it('drops another document once it left the inbox, read anew', async () => {
+		fakeTime(); // the page gathers events for a while (`coalesced`): it passes at once
 		goTo('/ui/documents/doc-1?from=inbox', { id: 'doc-1' });
 		let items = ['doc-1', 'doc-2', 'doc-3'];
 		const api = serve(() => documentOf({ lane: 'green' }), {
@@ -263,18 +319,21 @@ describe('the inbox while one document is open', () => {
 			})
 		});
 		render(Page);
-		expect(await screen.findByText(m.doc_inbox_position({ position: 1, total: 3 }))).toBeTruthy();
+		const position = (total: number) =>
+			vi.waitFor(() => screen.getByText(m.doc_inbox_position({ position: 1, total })));
+		expect(await position(3)).toBeTruthy();
 		const read = () => calls(api).filter((call) => call.startsWith('GET /api/v1/inbox?')).length;
 		const before = read();
 		// Someone confirmed doc-2 elsewhere: it turned green.
 		items = ['doc-1', 'doc-3'];
 		emit?.('document.lane_changed', { document_id: 'doc-2', old: 'yellow', new: 'green' });
-		expect(await screen.findByText(m.doc_inbox_position({ position: 1, total: 2 }))).toBeTruthy();
+		await elapse(1000);
+		expect(await position(2)).toBeTruthy();
 		expect(read()).toBe(before + 1);
 		// A document outside the inbox changes: nothing to read.
 		emit?.('document.updated', { document_id: 'doc-elsewhere', fields: ['title'] });
 		emit?.('document.node_completed', { document_id: 'doc-3', node: 'ocr' });
-		await new Promise((resolve) => setTimeout(resolve, 50));
+		await elapse(10_000);
 		expect(read()).toBe(before + 1);
 	});
 
@@ -298,17 +357,9 @@ describe('the inbox while one document is open', () => {
 describe('confirming from the inbox', () => {
 	it('opens next the document that waits for a decision', async () => {
 		goTo('/ui/documents/doc-1?from=inbox', { id: 'doc-1' });
-		const yellow = documentOf({
-			lane: 'yellow',
-			processing: { ...documentOf().processing, status: 'review' }
-		});
+		const { yellow, routes } = waiting();
 		const api = serve(() => yellow, {
-			'GET /api/v1/documents/doc-1/review': () => ({
-				document: yellow,
-				open: [{ node: 'judge', outcome: 'uncertain', reason: 'Widerspruch', fields: [] }],
-				nodes: []
-			}),
-			'GET /api/v1/documents/doc-1/original': () => new Response('', { status: 404 }),
+			...routes,
 			'GET /api/v1/inbox': () => ({
 				items: [
 					inboxItem('review', { id: 'doc-1' }),
@@ -329,17 +380,9 @@ describe('confirming from the inbox', () => {
 
 	it('goes back to the inbox when nothing else waits for a decision', async () => {
 		goTo('/ui/documents/doc-1?from=inbox', { id: 'doc-1' });
-		const yellow = documentOf({
-			lane: 'yellow',
-			processing: { ...documentOf().processing, status: 'review' }
-		});
+		const { yellow, routes } = waiting();
 		serve(() => yellow, {
-			'GET /api/v1/documents/doc-1/review': () => ({
-				document: yellow,
-				open: [{ node: 'judge', outcome: 'uncertain', reason: 'Widerspruch', fields: [] }],
-				nodes: []
-			}),
-			'GET /api/v1/documents/doc-1/original': () => new Response('', { status: 404 }),
+			...routes,
 			'GET /api/v1/inbox': () => ({
 				items: [inboxItem('review', { id: 'doc-1' }), inboxItem('new', { id: 'doc-new' })],
 				next_cursor: null
@@ -440,7 +483,9 @@ describe('the document tab', () => {
 		serve(parsed, readable);
 		render(Page);
 		const facts = await screen.findByRole('complementary', { name: m.facts_title() });
-		await screen.findByRole('region', { name: m.content_page({ page: 1 }) });
+		await waitFor(() =>
+			expect(globalThis.document.querySelector('[data-page="1"]')).not.toBeNull()
+		);
 		await userEvent.click(await within(facts).findByRole('button', { name: /EBeschV/ }));
 		expect(globalThis.document.querySelector('mark[data-mark]')?.textContent).toBe('EBeschV');
 		// Nothing is remembered in the browser; a switch puts the view in the link.
@@ -491,7 +536,9 @@ describe('the document tab', () => {
 			})
 		});
 		render(Page);
-		await screen.findByRole('region', { name: m.content_page({ page: 1 }) });
+		await waitFor(() =>
+			expect(globalThis.document.querySelector('[data-page="1"]')).not.toBeNull()
+		);
 		await fireEvent.mouseEnter(await screen.findByRole('group', { name: m.field_date() }));
 		await waitFor(() =>
 			expect(globalThis.document.querySelector('mark[data-mark]')?.textContent).toBe('EBeschV 4711')
@@ -570,8 +617,12 @@ describe('the document tab', () => {
 		serve(parsed, readable);
 		render(Page);
 		const bar = await screen.findByRole('group', { name: m.view_pane() });
-		const text = () => screen.queryByRole('region', { name: m.content_page({ page: 1 }) });
-		await waitFor(() => expect(text()).not.toBeNull());
+		// The text pane as it is seen: a hidden one is no region to anybody.
+		const text = () => screen.queryByRole('region', { name: m.view_text() });
+		await waitFor(() =>
+			expect(globalThis.document.querySelector('[data-page="1"]')).not.toBeNull()
+		);
+		expect(text()).not.toBeNull();
 		// The bar of four instead of the panes' switches; the right pane hidden.
 		expect(screen.queryByRole('group', { name: m.view_left() })).toBeNull();
 		expect(screen.queryByRole('complementary', { name: m.facts_title() })).toBeNull();

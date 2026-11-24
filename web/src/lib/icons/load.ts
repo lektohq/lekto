@@ -9,20 +9,19 @@ import { currentName } from '#lib/icons/renamed.ts';
 
 const loaded = new Map<string, Promise<Component | null>>();
 
-/** The icon named `name`, loaded once; null for a name Lucide does not have. */
+/** The icon named `name`, loaded once; null for a name Lucide does not have. A load that
+ * failed (the network) is not kept: the next asks again. */
 export function loadIcon(name: string): Promise<Component | null> {
 	let found = loaded.get(name);
 	if (!found) {
 		const curated = curatedModule(currentName(name));
+		const failed = () => {
+			loaded.delete(name);
+			return null;
+		};
 		found = curated
-			? curated().then(
-					(module) => module.default,
-					() => null
-				)
-			: import('#lib/icons/lucide.ts').then(
-					(index) => index.loadIcon(name),
-					() => null
-				);
+			? curated().then((module) => module.default, failed)
+			: import('#lib/icons/lucide.ts').then((index) => index.loadIcon(name), failed);
 		loaded.set(name, found);
 	}
 	return found;

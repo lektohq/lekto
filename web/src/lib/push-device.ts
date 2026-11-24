@@ -3,6 +3,7 @@ import { api } from '#lib/api/client.ts';
 import { setAppBadge } from '#lib/app-badge.ts';
 import { BASE } from '#lib/base.ts';
 import { appleDevice, isAndroid } from '#lib/install.svelte.ts';
+import { m } from '#lib/paraglide/messages.js';
 
 /**
  * Notifications on this device (web/DESIGN.md, "App"): whether it can have them, its
@@ -174,7 +175,7 @@ function browserName(agent: string): string {
 	if (/Firefox\//.test(agent)) return 'Firefox';
 	if (/Chrome\//.test(agent)) return 'Chrome';
 	if (/Safari\//.test(agent)) return 'Safari';
-	return 'Browser';
+	return m.device_browser(); // the same word in both languages, but a text a person reads
 }
 
 function systemName(agent: string): string {

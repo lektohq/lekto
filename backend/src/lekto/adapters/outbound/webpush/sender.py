@@ -11,7 +11,6 @@
 """
 
 import asyncio
-import base64
 import json
 import logging
 import os
@@ -26,6 +25,7 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
 from lekto.adapters.outbound.http_client import CONNECT_TIMEOUT, describe_failure
+from lekto.core.domain.encoding import base64url, from_base64url
 from lekto.core.domain.push import PushDevice, PushMessage
 from lekto.core.ports.push import PushOutcome, PushResult
 
@@ -36,18 +36,10 @@ JWT_LIFETIME = 12 * 60 * 60
 TIMEOUT = 10.0
 
 
-def b64url(data: bytes) -> str:
-    return base64.urlsafe_b64encode(data).rstrip(b"=").decode("ascii")
-
-
-def unb64url(text: str) -> bytes:
-    return base64.urlsafe_b64decode(text + "=" * (-len(text) % 4))
-
-
 def private_key_of(text: str) -> ec.EllipticCurvePrivateKey:
     """Lekto's VAPID key from its 32 bytes, base64url (`lekto vapid-key` writes one). Raises
     ValueError for anything else."""
-    raw = unb64url(text.strip())
+    raw = from_base64url(text.strip())
     if len(raw) != 32:
         raise ValueError("a VAPID private key is 32 bytes, base64url")
     return ec.derive_private_key(int.from_bytes(raw, "big"), ec.SECP256R1())
@@ -56,7 +48,7 @@ def private_key_of(text: str) -> ec.EllipticCurvePrivateKey:
 def new_private_key() -> str:
     """A new VAPID private key, base64url."""
     key = ec.generate_private_key(ec.SECP256R1())
-    return b64url(key.private_numbers().private_value.to_bytes(32, "big"))
+    return base64url(key.private_numbers().private_value.to_bytes(32, "big"))
 
 
 def public_bytes(key: ec.EllipticCurvePrivateKey | ec.EllipticCurvePublicKey) -> bytes:
@@ -102,12 +94,12 @@ def vapid_header(endpoint: str, key: ec.EllipticCurvePrivateKey, subject: str, n
         "exp": int(now) + JWT_LIFETIME,
         "sub": subject,
     }
-    head = b64url(json.dumps({"typ": "JWT", "alg": "ES256"}, separators=(",", ":")).encode())
-    body = b64url(json.dumps(claims, separators=(",", ":")).encode())
+    head = base64url(json.dumps({"typ": "JWT", "alg": "ES256"}, separators=(",", ":")).encode())
+    body = base64url(json.dumps(claims, separators=(",", ":")).encode())
     signing_input = f"{head}.{body}".encode("ascii")
     r, s = decode_dss_signature(key.sign(signing_input, ec.ECDSA(hashes.SHA256())))
-    signature = b64url(r.to_bytes(32, "big") + s.to_bytes(32, "big"))
-    return f"vapid t={head}.{body}.{signature}, k={b64url(public_bytes(key))}"
+    signature = base64url(r.to_bytes(32, "big") + s.to_bytes(32, "big"))
+    return f"vapid t={head}.{body}.{signature}, k={base64url(public_bytes(key))}"
 
 
 class WebPushSender:
@@ -127,7 +119,7 @@ class WebPushSender:
 
     @property
     def public_key(self) -> str:
-        return b64url(public_bytes(self._key))
+        return base64url(public_bytes(self._key))
 
     async def send(self, device: PushDevice, message: PushMessage) -> PushResult:
         payload = json.dumps(message.payload(device.locale), separators=(",", ":")).encode()

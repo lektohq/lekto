@@ -12,6 +12,8 @@ const sources = import.meta.glob<string>('/src/**/*.svelte', {
 const ALLOWED_FILES = new Set(['/src/lib/components/Logo.svelte']);
 // Attributes whose value a user reads or hears.
 const READ_ATTRIBUTES = new Set(['alt', 'title', 'placeholder', 'aria-label', 'aria-description']);
+// Props of components that end up as such a text (WT2-K08).
+const READ_PROPS = new Set([...READ_ATTRIBUTES, 'label', 'description', 'hint']);
 
 /** Text with letters, not only separators and numbers such as " · " or "42". */
 function isText(value: string): boolean {
@@ -21,6 +23,14 @@ function isText(value: string): boolean {
 interface Node {
 	type?: string;
 	[key: string]: unknown;
+}
+
+/** The text of a string literal with letters, else null. */
+function literal(expression: unknown): string | null {
+	const node = expression as Node | null;
+	return node?.type === 'Literal' && typeof node.value === 'string' && isText(node.value)
+		? node.value
+		: null;
 }
 
 function findings(source: string): string[] {
@@ -35,17 +45,30 @@ function findings(source: string): string[] {
 		if (node.type === 'Text' && typeof node.data === 'string' && isText(node.data)) {
 			found.push(node.data.trim());
 		}
-		if (node.type === 'Attribute') {
-			// Values of other attributes (classes, types) are code.
-			if (!READ_ATTRIBUTES.has(String(node.name))) return;
-			const parts = Array.isArray(node.value) ? (node.value as Node[]) : [];
-			for (const part of parts) {
-				if (part.type === 'Text' && typeof part.data === 'string' && isText(part.data)) {
-					found.push(`${String(node.name)}="${part.data}"`);
+		// `{'Hello'}`: a text in braces is a text all the same.
+		if (node.type === 'ExpressionTag' && literal(node.expression)) {
+			found.push(`{'${literal(node.expression)}'}`);
+		}
+		if (Array.isArray(node.attributes)) {
+			// A component's props that a user reads count as its element's attributes do.
+			const read = node.type === 'Component' ? READ_PROPS : READ_ATTRIBUTES;
+			for (const attribute of node.attributes as Node[]) {
+				if (attribute.type !== 'Attribute' || !read.has(String(attribute.name))) continue;
+				const parts = Array.isArray(attribute.value)
+					? (attribute.value as Node[])
+					: [attribute.value as Node];
+				for (const part of parts) {
+					const text =
+						part?.type === 'Text' && typeof part.data === 'string' && isText(part.data)
+							? part.data
+							: part?.type === 'ExpressionTag'
+								? literal(part.expression)
+								: null;
+					if (text) found.push(`${String(attribute.name)}="${text}"`);
 				}
 			}
-			return;
 		}
+		if (node.type === 'Attribute') return; // the values of the others (classes, types) are code
 		for (const [key, child] of Object.entries(node)) {
 			// Scripts and styles are code, not markup.
 			if (key === 'instance' || key === 'module' || key === 'css') continue;
@@ -72,6 +95,12 @@ describe('markup', () => {
 		expect(findings('<p>Hello</p>')).toEqual(['Hello']);
 		expect(findings('<input placeholder="Name" />')).toEqual(['placeholder="Name"']);
 		expect(findings('<p>{m.x()} · {m.app_name()}</p><p>42</p>')).toEqual([]);
+		expect(findings(`<p>{'Hello'}</p>`)).toEqual([`{'Hello'}`]);
+		expect(findings('<Field label="Name" hint={m.x()} />')).toEqual(['label="Name"']);
+		expect(findings(`<Field description={'Hello'} kind="text" />`)).toEqual([
+			'description="Hello"'
+		]);
+		expect(findings('<input label="Name" />')).toEqual([]); // no attribute of an element
 	});
 });
 

@@ -8,7 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from lekto.adapters.inbound.rest.schemas.common import IdentifierKeyOut
 from lekto.adapters.inbound.schemas import RequestBody
-from lekto.core.domain.documents import UNSET
+from lekto.core.domain.changes import UNSET
 from lekto.core.domain.identifiers import (
     MAX_IDENTIFIER_VALUE,
     MAX_IDENTIFIERS,

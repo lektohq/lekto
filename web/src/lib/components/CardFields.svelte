@@ -1,13 +1,13 @@
 <script lang="ts">
 	import Clock from '@lucide/svelte/icons/clock';
 	import TriangleAlert from '@lucide/svelte/icons/triangle-exclamation-point';
-	import { dueText, type CardLine, type Due } from '#lib/card-fields.ts';
-	import { formatDate } from '#lib/i18n.ts';
+	import { dueDay, dueText, type CardLine, type Due } from '#lib/card-fields.ts';
 
 	// The fields a lens shows on a card (`card-fields.ts`): an amount with its deadline on one
 	// line, the others as name and value. The deadline says how soon in words, red with a
-	// warning once passed, yellow with a clock within seven days; the day in its tooltip. In a
-	// narrow card what does not fit wraps rather than being cut.
+	// warning once passed, yellow with a clock within seven days; the day is read out with them
+	// (no room beside them in a card; Tobi, 23.11.2026, WB-K05). In a narrow card what does not
+	// fit wraps rather than being cut.
 	let { lines }: { lines: readonly CardLine[] } = $props();
 </script>
 
@@ -19,7 +19,6 @@
 			due.state === 'soon' && 'font-semibold text-lane-yellow-foreground',
 			due.state === 'later' && 'text-muted-foreground'
 		]}
-		title="{name}: {formatDate(due.day)}"
 	>
 		{#if due.state === 'overdue'}
 			<TriangleAlert class="size-3.5" aria-hidden="true" />
@@ -28,6 +27,7 @@
 		{/if}
 		<span class="sr-only">{name}:</span>
 		{dueText(due)}
+		{#if dueDay(due)}<span class="sr-only">, {dueDay(due)}</span>{/if}
 	</span>
 {/snippet}
 

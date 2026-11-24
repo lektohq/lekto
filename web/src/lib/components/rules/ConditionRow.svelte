@@ -16,6 +16,7 @@
 	import { session } from '#lib/session.svelte.ts';
 	import { IDENTIFIER_KINDS, NUMBER_KINDS, PERSON_KINDS, labelOfKind } from '#lib/identifiers.ts';
 	import type { Lookup } from '#lib/masterdata.svelte.ts';
+	import { readNumber } from '#lib/i18n.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import { own } from '#lib/utils.ts';
 	import { CHANNEL_LABELS, fieldLabel, mailPartLabel, operatorLabel } from '#lib/rules/describe.ts';
@@ -151,7 +152,7 @@
 			return;
 		}
 		typed = text;
-		const number = text.trim().replace(',', '.');
+		const number = readNumber(text);
 		condition.value = number === '' ? NaN : Number(number);
 	}
 	const shownNumber = $derived(

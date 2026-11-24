@@ -33,11 +33,11 @@
 				{m.update_meta({
 					running: version.lekto_version,
 					published: formatDate(latest.published_at),
-					checked: version.checked_at ? formatMoment(version.checked_at, 'short') : ''
+					checked: version.checked_at ? formatMoment(version.checked_at) : ''
 				})}
 			</Alert.Description>
 		</div>
-		<Button variant="outline" size="sm" href={latest.url} target="_blank" rel="noopener">
+		<Button variant="outline" size="sm" href={latest.url} target="_blank" rel="noopener noreferrer">
 			<ExternalLink aria-hidden="true" />
 			{m.update_release_notes()}
 		</Button>

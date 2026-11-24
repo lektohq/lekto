@@ -7,8 +7,8 @@ from uuid import UUID
 from PIL import Image
 
 from lekto.core.domain.ids import MailboxId, new_id
-from lekto.core.domain.mail_intake import SMALL_IMAGE, kept, record_id
-from lekto.core.domain.mail_message import MailPart
+from lekto.core.domain.mail_intake import MAX_ATTACHMENTS, SMALL_IMAGE, Letter, kept, record_id
+from lekto.core.domain.mail_message import MailMessage, MailPart
 
 
 def test_a_mail_has_the_same_record_id_at_every_fetch() -> None:
@@ -55,3 +55,28 @@ def test_small_images_are_left_out_by_their_bytes_or_their_edges() -> None:
     assert kept(MailPart("bill.pdf", "application/pdf", b"%PDF-1.7"))
     unknown = b"\x00" * SMALL_IMAGE  # no head that says: by its bytes alone
     assert kept(MailPart("scan.tif", "image/tiff", unknown))
+
+
+def test_a_letter_takes_at_most_max_attachments_and_names_the_others() -> None:
+    """The others are named in the head of the cover letter, as those Lekto cannot read
+    (Tobi, 23.11.2026, SB-K10)."""
+    pdfs = [MailPart(f"{n}.pdf", "application/pdf", b"%PDF-1.7") for n in range(1, 103)]
+    zip_ = MailPart("x.zip", "application/zip", b"PK\x03\x04")
+    letter = Letter(
+        MailMessage(
+            sender=(),
+            to=(),
+            cc=(),
+            subject="Unterlagen",
+            date=None,
+            message_id=None,
+            html=None,
+            text="Anbei.",
+            attachments=(*pdfs[:50], zip_, *pdfs[50:]),
+            pictures=(),
+            messages=(),
+        )
+    )
+    assert MAX_ATTACHMENTS == 100
+    assert letter.taken == tuple(pdfs[:100])
+    assert letter.left == (zip_, *pdfs[100:])  # in the mail's order

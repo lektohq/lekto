@@ -198,13 +198,13 @@
 	];
 	const SAMPLE_CONTACTS = [
 		{ id: 'c1', name: 'Stadtwerke Musterstadt', topic_ids: [] },
-		{ id: 'c2', name: 'Hanse Versicherung', topic_ids: [] }
+		{ id: 'c2', name: 'Muster Versicherung', topic_ids: [] }
 	];
 	let sampleNumbers = $state<IdentifierRow[]>([
-		row('customer_number', '200445118', 'manual', null, null, 'c1'),
-		row('meter_number', '1ESY1160447122', 'learned', null, null, 'c1'),
-		row('contract_number', 'HV-30-4418720', 'learned', null, null, 'c2'),
-		row('mandate_reference', 'HV4418720', 'rejected', null, null, 'c2')
+		row('customer_number', '12345', 'manual', null, null, 'c1'),
+		row('meter_number', '1ESY12345', 'learned', null, null, 'c1'),
+		row('contract_number', 'MV-12345', 'learned', null, null, 'c2'),
+		row('mandate_reference', 'MV12345', 'rejected', null, null, 'c2')
 	]);
 	let formOpen = $state(false);
 	// The parts the pages build on, each for itself (WF-08).
@@ -223,14 +223,14 @@
 		{ value: 'two', label: `${m.dev_sample_option()} 2` }
 	];
 	const CONTACTS = [
-		{ value: 'c1', label: 'Stadtwerke Nord' },
-		{ value: 'c2', label: 'Hausverwaltung Ost', keywords: 'HVO' }
+		{ value: 'c1', label: 'Stadtwerke Musterstadt' },
+		{ value: 'c2', label: 'Muster Hausverwaltung', keywords: 'MHV' }
 	];
 </script>
 
 <svelte:head><title>{m.dev_components_title()} · {m.app_name()}</title></svelte:head>
 
-<div class="flex flex-col gap-10">
+<div class="flex flex-col gap-6">
 	<PageHeader title={m.dev_components_title()} subtitle={m.dev_components_hint()} />
 
 	<section class="flex flex-col gap-3" aria-labelledby="dev-type">

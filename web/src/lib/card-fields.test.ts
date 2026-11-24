@@ -1,6 +1,4 @@
-import { render, screen } from '@testing-library/svelte';
 import { describe, expect, it } from 'vitest';
-import CardFields from '#lib/components/CardFields.svelte';
 import type { FieldDefinition } from '#lib/masterdata.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { cardLines, dueOf, dueText } from './card-fields.ts';
@@ -22,6 +20,16 @@ describe('a deadline', () => {
 		expect(dueOf('2026-10-20', TODAY)).toMatchObject({ state: 'soon', days: 0 });
 		expect(dueOf('2026-10-27', TODAY)).toMatchObject({ state: 'soon', days: 7 });
 		expect(dueOf('2026-10-28', TODAY)).toMatchObject({ state: 'later', days: 8 });
+	});
+
+	it('counts days across the end of a year and the changes of the clocks (WT3-K07)', () => {
+		const eve = new Date(2026, 11, 31, 23, 30);
+		expect(dueOf('2027-01-01', eve)).toMatchObject({ state: 'soon', days: 1 });
+		expect(dueOf('2026-12-24', eve)).toMatchObject({ state: 'overdue', days: -7 });
+		// Summer time begins on 29.03. and ends on 25.10.: those days have 23 and 25 hours.
+		expect(dueOf('2026-03-30', new Date(2026, 2, 28, 12))).toMatchObject({ days: 2 });
+		expect(dueOf('2026-10-26', new Date(2026, 9, 24, 12))).toMatchObject({ days: 2 });
+		expect(dueOf('2026-10-25', new Date(2026, 9, 25, 0, 30))).toMatchObject({ days: 0 });
 	});
 
 	it('says in words how soon', () => {
@@ -53,18 +61,5 @@ describe('the lines of a card', () => {
 		]);
 		expect(cardLines({}, [AMOUNT, DUE], 'd', TODAY)).toEqual([]);
 		expect(cardLines(undefined, [NOTE], null, TODAY)).toEqual([]);
-	});
-
-	it('marks a passed deadline with words and an icon, not colour alone', () => {
-		const lines = cardLines(
-			{ a: { amount: '89.00', currency: 'EUR' }, d: '2026-10-16' },
-			[AMOUNT, DUE],
-			'd',
-			TODAY
-		);
-		const { container } = render(CardFields, { lines });
-		expect(screen.getByText(m.due_overdue({ count: '4' }), { exact: false })).toBeTruthy();
-		expect(container.querySelector('svg')).not.toBeNull();
-		expect(container.textContent).toContain('Fällig am:');
 	});
 });

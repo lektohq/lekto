@@ -45,7 +45,6 @@
 	const chosen = $derived(period.period ? null : days);
 	let older = $state(false);
 
-	const today = new Date();
 	const fixed = (days: Pick<Filters, 'dateFrom' | 'dateTo'>): Period => ({ ...days, period: null });
 
 	const most = $derived(Math.max(1, ...years.map((year) => year.count)));
@@ -91,7 +90,7 @@
 			<Chip
 				size={phone.current ? 'md' : 'sm'}
 				pressed={active}
-				onclick={() => onchange(active ? NONE : quickPick(quick, today))}
+				onclick={() => onchange(active ? NONE : quickPick(quick, new Date()))}
 			>
 				{QUICK_PICKS[quick]()}
 			</Chip>

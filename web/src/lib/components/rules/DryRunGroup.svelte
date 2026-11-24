@@ -64,7 +64,7 @@
 			size="sm"
 			label={open ? m.rule_group_fold() : m.rule_group_unfold()}
 			aria-expanded={open}
-			aria-controls="{id}-items"
+			aria-controls={open ? `${id}-items` : undefined}
 			onclick={onfold}
 		>
 			<ChevronDown

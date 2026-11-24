@@ -18,6 +18,8 @@ type SpaceLike = Pick<components['schemas']['SpaceOut'], 'id' | 'role' | 'person
 type UserLike = Pick<components['schemas']['UserOut'], 'id' | 'personal_space_id' | 'active'>;
 type RuleLike = Pick<components['schemas']['RuleOut'], 'scope' | 'space_id'> & {
 	managed_by_document_type_id?: string | null;
+	/** Its steps, where known: a rule that asks runs on arrival only. */
+	actions?: readonly { type: string }[];
 };
 
 const isAdmin = (user: Actor): boolean => user?.role === 'admin';
@@ -34,8 +36,8 @@ export function canEdit(document: Document, user: Actor): boolean {
 /** Spaces the caller files into and moves into: the ones they edit (every one for admins), also
  * another user's personal space they edit, which stays theirs to move into when its user is
  * deactivated. Other personal spaces take documents as a hand-over (`handOverTargets`). */
-export function editableSpaces<T extends SpaceLike>(spaces: readonly T[], user: Actor): T[] {
-	return spaces.filter((space) => user !== null && space.role === 'edit');
+export function editableSpaces<T extends SpaceLike>(spaces: readonly T[]): T[] {
+	return spaces.filter((space) => space.role === 'edit');
 }
 
 /** The other users a document is handed over to: into their personal space
@@ -88,11 +90,6 @@ export function canManageWebhook(webhook: Owned, user: Actor): boolean {
 	return owns(webhook, user) || isAdmin(user);
 }
 
-/** The spaces a rule may belong to: those the caller edits (every one for admins). */
-export function ruleSpaces<T extends SpaceLike>(spaces: readonly T[]): T[] {
-	return spaces.filter((space) => space.role === 'edit');
-}
-
 /** Change, enable, disable and delete a rule: a space rule the editors of its space, a global
  * rule admins (admins any rule); the rule of a document type's title pattern nobody (it follows
  * the type). */
@@ -103,9 +100,11 @@ export function canChangeRule(rule: RuleLike, user: Actor, spaces: readonly Spac
 }
 
 /** Apply a rule to existing documents: a space rule the editors of its space and admins; a
- * global rule anyone (on the documents they edit). */
+ * global rule anyone (on the documents they edit). Not a rule that asks a webhook: it runs on
+ * arrival only (the API refuses its dry run). */
 export function canApplyRule(rule: RuleLike, user: Actor, spaces: readonly SpaceLike[]): boolean {
 	if (user === null) return false;
+	if (rule.actions?.some((action) => action.type === 'ask_webhook')) return false;
 	return rule.scope === 'global' || isAdmin(user) || edits(spaces, rule.space_id);
 }
 

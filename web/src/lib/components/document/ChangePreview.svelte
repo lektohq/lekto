@@ -81,7 +81,7 @@
 			membersBefore.length === membersAfter.length &&
 			membersAfter.every((member) => membersBefore.some((item) => key(item) === key(member)))
 	);
-	const spaceName = (id: string) => spaceNameFor(id, lookup, session.user?.id, '') || id;
+	const spaceName = (id: string) => spaceNameFor(id, lookup, session.user?.id);
 	const person = (member: Member) => {
 		const name = userName(lookup?.users ?? [], member.user_id);
 		return member.role === 'read' ? m.space_member_reads({ name }) : name;

@@ -112,6 +112,18 @@ def test_a_model_of_another_format() -> None:
         _Model.load(buffer.getvalue())
 
 
+def test_a_model_that_is_no_archive() -> None:
+    """A single array (`.npy`) and a broken zip are no model either: the port's error, not
+    numpy's or zipfile's (AD-K06)."""
+    single = io.BytesIO()
+    np.save(single, np.array([1.0, 2.0]))
+    broken = io.BytesIO()
+    np.savez_compressed(broken, format=np.array(FORMAT))
+    for data in (single.getvalue(), broken.getvalue()[:40]):
+        with pytest.raises(ClassifierError, match="cannot be read"):
+            _Model.load(data)
+
+
 def test_with_more_classes_too() -> None:
     insurer = [
         TrainingExample(f"Nord Versicherung Beitragsrechnung Police {n}", INSURER, INVOICE)

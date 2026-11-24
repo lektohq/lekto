@@ -48,7 +48,7 @@ from lekto.core.domain.pipeline import (
     ProcessingStatus,
 )
 from lekto.core.domain.reading import PageReading, PageWords, reading_to_json, readings_to_json
-from lekto.core.domain.reasons import ReasonCode, written
+from lekto.core.domain.reasons import ReasonCode, because, written
 from lekto.core.domain.rights import Actor
 from lekto.core.domain.users import Role
 from lekto.core.domain.verdict import judge_contact
@@ -1513,6 +1513,24 @@ async def test_a_new_version_leaves_a_field_set_by_hand_as_it_is(world: World) -
     check = field_check(seeded, outcome, "Rechnungsnummer")
     assert check.ok and check.reason == "'Rechnungsnummer' is set by hand"
     assert number.id not in outcome.changes.fields
+
+
+def test_a_value_a_person_confirmed_stays_sure_when_read_again() -> None:
+    """A new version reads the confirmed value only as a suggestion: it is OK again, and as sure
+    as a person's (SA-K09), not OK with the uncertain check's confidence."""
+    document = builders.received()
+    document.confirmed_at = NOW
+    document.processing.new_version = True
+    contact = "0199a6c4-0000-7000-8000-000000000001"
+    unsure = FieldCheck(
+        field="contact",
+        outcome=Outcome.UNCERTAIN,
+        confidence=0.0,
+        reasons=(because(ReasonCode.NEW_VERSION_DIFFERS),),
+        suggestion=contact,
+    )
+    kept = nodes._kept(unsure, document, contact)
+    assert (kept.ok, kept.value, kept.confidence) == (True, contact, 1.0)
 
 
 async def signalled(

@@ -4,11 +4,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { m } from '#lib/paraglide/messages.js';
 import { TEXT_HINT } from '#lib/viewer/text-hint.ts';
 import PageViewer from './PageViewer.svelte';
+import { elapse, fakeTime } from '#lib/testing/time.ts';
 
 // jsdom lays nothing out: the viewer gets a width and its paddings by hand.
 let clientWidth: PropertyDescriptor | undefined;
 
 beforeEach(() => {
+	// Zooming keeps its place by scrolling the window, which jsdom does not do.
+	vi.spyOn(window, 'scrollBy').mockImplementation(() => {});
 	clientWidth = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientWidth');
 	Object.defineProperty(HTMLElement.prototype, 'clientWidth', { configurable: true, value: 800 });
 	vi.spyOn(window, 'getComputedStyle').mockReturnValue({
@@ -108,6 +111,7 @@ describe('PageViewer', () => {
 	});
 
 	it('never scrolls the page behind a dialog to reveal a place (the Beam)', async () => {
+		fakeTime(); // what reveals a place runs a frame or more later: a second passes at once
 		const scroll = vi.spyOn(window, 'scrollBy').mockImplementation(() => {});
 		const dialog = document.body.appendChild(document.createElement('div'));
 		dialog.setAttribute('role', 'dialog');
@@ -118,7 +122,7 @@ describe('PageViewer', () => {
 		});
 		component.reveal(place);
 		await rerender({ sizes: [{ width: 600, height: 800 }], loading: false });
-		await new Promise((resolve) => setTimeout(resolve, 50));
+		await elapse(1000);
 		expect(scroll).not.toHaveBeenCalled();
 		dialog.remove();
 	});

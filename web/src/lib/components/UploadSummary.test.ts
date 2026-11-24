@@ -7,6 +7,7 @@ import { session } from '#lib/session.svelte.ts';
 import { fakeApi, json, problem } from '#lib/testing/api.ts';
 import { uploads } from '#lib/upload.svelte.ts';
 import UploadSummary from './UploadSummary.svelte';
+import { elapse, fakeTime } from '#lib/testing/time.ts';
 
 const pdf = (name: string) => ({
 	file: new File(['%PDF-1.7'], name, { type: 'application/pdf' }),
@@ -24,6 +25,8 @@ afterEach(() => {
 
 describe('UploadSummary', () => {
 	it('sums up what came of the uploads and stays until dismissed', async () => {
+		fakeTime(); // the summary stays however long: a minute passes at once
+		const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
 		const answers = [
 			json({ id: 'doc-1' }, 202),
 			json({ id: 'doc-2' }, 202),
@@ -41,14 +44,16 @@ describe('UploadSummary', () => {
 				{ name: 'Scans/.DS_Store', reason: 'hidden' }
 			]
 		});
-		const summary = await screen.findByRole('region', { name: m.upload_summary_label() });
+		const summary = await vi.waitFor(() =>
+			screen.getByRole('region', { name: m.upload_summary_label() })
+		);
 		const line = [
 			m.upload_summary_uploaded({ count: 2 }),
 			m.upload_summary_duplicate(),
 			m.upload_summary_skipped({ count: 2 })
 		].join(', ');
 		// Shown, and said once all files are through.
-		await waitFor(() => expect(within(summary).getAllByText(line)).toHaveLength(2));
+		await vi.waitFor(() => expect(within(summary).getAllByText(line)).toHaveLength(2));
 		expect(summary.querySelector('[aria-live="polite"]')?.textContent).toBe(line);
 		const twin = within(summary).getByText('twin.pdf').closest('li')!;
 		expect(within(twin).getByText(m.upload_duplicate())).toBeTruthy();
@@ -66,9 +71,9 @@ describe('UploadSummary', () => {
 		expect(within(summary).queryByText('a.pdf')).toBeNull();
 
 		// It stays (nothing takes it away by itself) until dismissed.
-		await new Promise((resolve) => setTimeout(resolve, 50));
+		await elapse(60_000);
 		expect(screen.getByRole('region', { name: m.upload_summary_label() })).toBeTruthy();
-		await userEvent.click(within(summary).getByRole('button', { name: m.upload_dismiss() }));
+		await user.click(within(summary).getByRole('button', { name: m.upload_dismiss() }));
 		expect(screen.queryByRole('region', { name: m.upload_summary_label() })).toBeNull();
 	});
 

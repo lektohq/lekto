@@ -25,8 +25,5 @@ export function systemTab(params: Pick<URLSearchParams, 'get'>, admin: boolean):
  * by their label, and "Oct" alone names two in twenty months.
  */
 export function monthLabel(start: string, withYear: boolean): string {
-	return formatDate(
-		`${start}T12:00:00`,
-		withYear ? { month: 'short', year: '2-digit' } : { month: 'short' }
-	);
+	return formatDate(start, withYear ? { month: 'short', year: '2-digit' } : { month: 'short' });
 }

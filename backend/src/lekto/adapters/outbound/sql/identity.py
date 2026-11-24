@@ -22,6 +22,7 @@ from sqlalchemy import (
 )
 
 from lekto.adapters.outbound.sql import tables as t
+from lekto.adapters.outbound.sql.purging import delete_in_batches
 from lekto.adapters.outbound.sql.repositories import (
     SqlRepository,
     Values,
@@ -153,10 +154,11 @@ class SqlSessionRepository:
 
     async def purge(self, *, now: datetime, idle_before: datetime) -> int:
         table = t.sessions
-        statement = delete(table).where(
-            or_(table.c.expires_at <= now, table.c.last_seen_at <= idle_before)
+        return await delete_in_batches(
+            self._tx.write,
+            table,
+            or_(table.c.expires_at <= now, table.c.last_seen_at <= idle_before),
         )
-        return (await self._tx.write(statement)).rowcount
 
 
 def _session(row: Row[Any]) -> Session:
@@ -284,7 +286,7 @@ class SqlKnownDeviceRepository:
 
     async def purge(self, *, now: datetime) -> int:
         table = t.known_devices
-        return (await self._tx.write(delete(table).where(table.c.expires_at <= now))).rowcount
+        return await delete_in_batches(self._tx.write, table, table.c.expires_at <= now)
 
 
 def _known_device(row: Row[Any]) -> KnownDevice:
@@ -410,8 +412,9 @@ class SqlLoginFailureRepository:
 
     async def purge(self, *, before: datetime) -> int:
         table = t.login_failures
-        statement = delete(table).where(
+        return await delete_in_batches(
+            self._tx.write,
+            table,
             table.c.first_failure_at < before,
             or_(table.c.blocked_until.is_(None), table.c.blocked_until < before),
         )
-        return (await self._tx.write(statement)).rowcount

@@ -97,6 +97,57 @@ export function formatNumber(value: number, options?: Intl.NumberFormatOptions):
 	return new Intl.NumberFormat(formatLocale(), options).format(value);
 }
 
+/** The decimal and group separators of the user's format ("," and "." in German). */
+function separators(): { decimal: string; group: string } {
+	const parts = new Intl.NumberFormat(formatLocale()).formatToParts(12345.6);
+	const of = (type: string, otherwise: string) =>
+		parts.find((part) => part.type === type)?.value ?? otherwise;
+	return { decimal: of('decimal', '.'), group: of('group', ',') };
+}
+
+/** A number typed in the user's format as the API writes it (WG-K05), read as the server reads
+ * a number a model wrote (`evidence.read_number`): "1.234,5" in German and "1,234.5" in English
+ * are "1234.5". A separator groups only three digits after it: what only the other format fits
+ * is read in that one ("12.50" in German is "12.50", not 1250), what both fit in the user's
+ * ("1.234" in German is 1234). Text that fits neither comes back without its spaces, for the
+ * API to refuse. */
+export function readNumber(text: string): string {
+	const { decimal } = separators();
+	const bare = text.trim().replace(/\s/g, '');
+	const sign = bare.startsWith('-') ? '-' : '';
+	const digits = bare.slice(sign.length);
+	const [own, other] = decimal === ',' ? [',', '.'] : ['.', ','];
+	const read = notation(digits, own, `${other}'`) ?? notation(digits, other, `${own}'`);
+	return read === null ? bare : sign + read;
+}
+
+/** `text` with `mark` as its decimal separator and thousands grouped by one of `groups` (one
+ * kind in a number), as the API writes it; null if it does not fit that notation. */
+function notation(text: string, mark: string, groups: string): string | null {
+	const at = text.lastIndexOf(mark);
+	const whole = at < 0 ? text : text.slice(0, at);
+	const fraction = at < 0 ? '' : text.slice(at + 1);
+	if (at >= 0 && (whole.includes(mark) || !/^\d+$/.test(fraction))) return null;
+	if (at >= 0 && whole === '') return `0.${fraction}`; // ",5"
+	const parts = whole.split(new RegExp(`[${groups.replace(/[\]\\^-]/g, '\\$&')}]`));
+	const grouped = parts.length > 1;
+	if (grouped && (parts[0].length > 3 || parts.slice(1).some((part) => part.length !== 3))) {
+		return null;
+	}
+	if (grouped && new Set([...whole].filter((char) => groups.includes(char))).size > 1) {
+		return null;
+	}
+	if (!parts.every((part) => /^\d+$/.test(part))) return null;
+	return parts.join('') + (at >= 0 ? `.${fraction}` : '');
+}
+
+/** A number of the API ("1234.5") in the user's format for a field, without groups, so that
+ * it reads as typed ("1234,5" in German). */
+export function shownNumber(value: string): string {
+	const { decimal } = separators();
+	return decimal === '.' ? value : value.replace('.', decimal);
+}
+
 /** A share (0 to 1) as whole percent (`87 %`). */
 export function formatPercent(value: number): string {
 	return formatNumber(value, { style: 'percent', maximumFractionDigits: 0 });

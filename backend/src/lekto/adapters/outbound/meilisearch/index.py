@@ -379,23 +379,26 @@ class MeilisearchIndex:
             raise SearchIndexError("the index has no embedder, so it takes no vectors")
         if query.filter.lanes is not None and not query.filter.lanes:
             return []
-        # One more, in case the document itself is among them (`id` is not filterable).
         body: dict[str, Any] = {
             "q": "",
             "vector": list(query.vector),
             "hybrid": {"embedder": EMBEDDER, "semanticRatio": 1.0},
-            "limit": query.limit + 1,
+            "limit": query.limit,
             "attributesToRetrieve": ["id", "version"],
             "showRankingScore": True,
         }
-        if (expression := filter_expression(query.visibility, query.filter)) is not None:
+        expression = filter_expression(query.visibility, query.filter)
+        if query.exclude is not None:  # the document itself, by its filterable `id`
+            itself = f"id != {_quote(query.exclude)}"
+            expression = itself if expression is None else f"({expression}) AND {itself}"
+        if expression is not None:
             body["filter"] = expression
         data = await self._request("POST", f"/indexes/{self._index}/search", json=body)
         try:
             hits = [_hit_of(item) for item in data["hits"]]
         except KeyError, TypeError, ValueError:
             raise SearchIndexError("Meilisearch sent an unusable search result") from None
-        return [hit for hit in hits if hit.id != query.exclude][: query.limit]
+        return hits
 
     async def begin_rebuild(self) -> IndexBuild:
         await self._ensure_ready()

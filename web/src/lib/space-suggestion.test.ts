@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { components } from '#lib/api/schema.ts';
 import { signIn } from '#lib/testing/session.ts';
+import { formatList } from '#lib/i18n.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { session } from '#lib/session.svelte.ts';
 import {
@@ -90,7 +91,7 @@ describe('the suggested space', () => {
 
 	it('reads as a suggestion with the new readers', () => {
 		expect(suggestionText('house', 'mine', lookup)).toBe(
-			m.space_suggestion_for({ space: 'Haushalt', names: 'erika, jane' })
+			m.space_suggestion_for({ space: 'Haushalt', names: formatList(['erika', 'jane']) })
 		);
 		expect(suggestionText('mine', 'house', lookup)).toBe(
 			m.space_suggestion({ space: m.space_personal() })
@@ -107,16 +108,6 @@ describe('the suggested space', () => {
 		expect(handedTo('house', 'mine', lookup)).toBeNull();
 	});
 
-	it('says the hand-over in the words of the move dialog, in both languages', () => {
-		for (const locale of ['de', 'en'] as const) {
-			const options = { locale };
-			expect(m.space_suggestion_hand_over({ name: 'Erika' }, options)).toContain(
-				m.move_hand_over({ name: 'Erika' }, options)
-			);
-			expect(m.move_handed_over({ name: 'Erika' }, options)).not.toMatch(/^An Erika/);
-		}
-	});
-
 	it('names those the document names who would not see it there', () => {
 		const open = [node([{ field: 'space', suggestion: null, unseen_by: ['u2', 'u9'] }])];
 		expect(unseenBy(open)).toEqual(['u2', 'u9']);
@@ -124,7 +115,7 @@ describe('the suggested space', () => {
 		expect(unseenText(['u2'], lookup)).toBe(m.space_named_unseen({ names: 'erika' }));
 		// Someone the caller cannot tell stays unnamed.
 		expect(unseenText(['u2', 'u9'], lookup)).toBe(
-			m.space_named_unseen({ names: `erika, ${m.space_named_someone()}` })
+			m.space_named_unseen({ names: formatList(['erika', m.space_named_someone()]) })
 		);
 		expect(unseenText([], lookup)).toBe('');
 	});

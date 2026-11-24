@@ -8,7 +8,8 @@
 	import { Toaster } from '#lib/components/ui/sonner/index.ts';
 	import { BASE } from '#lib/base.ts';
 	import { getLocale } from '#lib/i18n.ts';
-	import { install } from '#lib/install.svelte.ts';
+	// Heard from the start: the browser's offer to install may come before a page asks for it.
+	import '#lib/install.svelte.ts';
 	import { setThemeColor } from '#lib/theme-color.ts';
 
 	let { children } = $props();
@@ -22,7 +23,6 @@
 	});
 
 	onMount(() => {
-		install.watch();
 		startAppUpdates();
 		// A tap on a notification moves the open app through its router.
 		return answerOpen(BASE, (path) => goto(path));
@@ -31,6 +31,8 @@
 
 <!-- No transition-blocking <style> element: the CSP allows no inline style elements. -->
 <ModeWatcher disableHeadScriptInjection disableTransitions={false} />
+{@render children()}
+<!-- After the page: not the first stop of Tab. -->
 <!-- Above the home indicator of the installed app and beside the notch (web/DESIGN.md,
      "App"): the library takes `mobileOffset` up to 600 px of width only, a phone held sideways
      is wider and takes `offset`. -->
@@ -50,4 +52,3 @@
 		left: 'calc(16px + env(safe-area-inset-left))'
 	}}
 />
-{@render children()}

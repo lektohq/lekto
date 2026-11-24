@@ -83,6 +83,32 @@
 	let fresh = $state(0);
 </script>
 
+{#snippet calendarHead()}
+	<DatePicker.PrevButton>
+		{#snippet child({ props })}
+			<button
+				{...props}
+				class="grid size-8 place-items-center rounded-lg hover:bg-secondary max-sm:size-11"
+				aria-label={m.date_previous_month()}
+			>
+				<ChevronLeft class="size-4" aria-hidden="true" />
+			</button>
+		{/snippet}
+	</DatePicker.PrevButton>
+	<DatePicker.Heading class="text-sm font-medium" />
+	<DatePicker.NextButton>
+		{#snippet child({ props })}
+			<button
+				{...props}
+				class="grid size-8 place-items-center rounded-lg hover:bg-secondary max-sm:size-11"
+				aria-label={m.date_next_month()}
+			>
+				<ChevronRight class="size-4" aria-hidden="true" />
+			</button>
+		{/snippet}
+	</DatePicker.NextButton>
+{/snippet}
+
 <DatePicker.Root
 	bind:value={
 		() => {
@@ -153,34 +179,17 @@
 		<DatePicker.Content
 			sideOffset={6}
 			collisionPadding={8}
-			class="z-50 rounded-2xl border bg-popover p-3 text-popover-foreground shadow-lg"
+			class="z-50 rounded-lg bg-popover p-3 text-popover-foreground shadow-md ring-1 ring-foreground/10"
 		>
 			<DatePicker.Calendar>
 				{#snippet children({ months, weekdays })}
-					<DatePicker.Header class="flex items-center justify-between gap-2 pb-2">
-						<DatePicker.PrevButton>
-							{#snippet child({ props })}
-								<button
-									{...props}
-									class="grid size-8 place-items-center rounded-lg hover:bg-secondary max-sm:size-11"
-									aria-label={m.date_previous_month()}
-								>
-									<ChevronLeft class="size-4" aria-hidden="true" />
-								</button>
-							{/snippet}
-						</DatePicker.PrevButton>
-						<DatePicker.Heading class="text-sm font-medium" />
-						<DatePicker.NextButton>
-							{#snippet child({ props })}
-								<button
-									{...props}
-									class="grid size-8 place-items-center rounded-lg hover:bg-secondary max-sm:size-11"
-									aria-label={m.date_next_month()}
-								>
-									<ChevronRight class="size-4" aria-hidden="true" />
-								</button>
-							{/snippet}
-						</DatePicker.NextButton>
+					<!-- A <div>: a <header> in the portal below the body would be a second banner. -->
+					<DatePicker.Header>
+						{#snippet child({ props })}
+							<div {...props} class="flex items-center justify-between gap-2 pb-2">
+								{@render calendarHead()}
+							</div>
+						{/snippet}
 					</DatePicker.Header>
 					{#each months as month (month.value.toString())}
 						<DatePicker.Grid class="border-collapse">

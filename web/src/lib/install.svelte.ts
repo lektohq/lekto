@@ -12,6 +12,16 @@ interface InstallPromptEvent extends Event {
 class Install {
 	#prompt = $state<InstallPromptEvent | null>(null);
 
+	// The browser's offer may come before the app is drawn: heard from the start.
+	constructor() {
+		if (typeof window === 'undefined') return;
+		window.addEventListener('beforeinstallprompt', (event) => {
+			event.preventDefault();
+			this.#prompt = event as InstallPromptEvent;
+		});
+		window.addEventListener('appinstalled', () => (this.#prompt = null));
+	}
+
 	/** Whether the browser would install the app now. */
 	get available(): boolean {
 		return this.#prompt !== null;
@@ -23,15 +33,6 @@ class Install {
 		if (!prompt) return;
 		this.#prompt = null;
 		await prompt.prompt();
-	}
-
-	/** Listen for the browser's offer; once, when the app starts. */
-	watch(): void {
-		window.addEventListener('beforeinstallprompt', (event) => {
-			event.preventDefault();
-			this.#prompt = event as InstallPromptEvent;
-		});
-		window.addEventListener('appinstalled', () => (this.#prompt = null));
 	}
 }
 

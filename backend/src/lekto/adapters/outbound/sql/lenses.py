@@ -19,7 +19,15 @@ from lekto.core.domain.ids import (
     TagId,
     UserId,
 )
-from lekto.core.domain.lenses import Grouping, Layout, Lens, LensFilter, LensSort, RelativePeriod
+from lekto.core.domain.lenses import (
+    ID_LISTS,
+    Grouping,
+    Layout,
+    Lens,
+    LensFilter,
+    LensSort,
+    RelativePeriod,
+)
 from lekto.core.domain.validation import name_key
 
 
@@ -80,21 +88,10 @@ class SqlLensRepository(SqlRepository[LensId, Lens]):
         }
 
 
-_LISTS = (
-    "contact_ids",
-    "document_type_ids",
-    "contact_group_ids",
-    "document_type_group_ids",
-    "topic_ids",
-    "tag_ids",
-    "space_ids",
-)
-
-
 def _filter_json(filter: LensFilter) -> dict[str, Any]:
     """The filter as JSON: the lists of ids as text, the days in ISO."""
     return {
-        **{name: [str(id) for id in getattr(filter, name)] for name in _LISTS},
+        **{name: [str(id) for id in getattr(filter, name)] for name in ID_LISTS},
         "field_id": None if filter.field_id is None else str(filter.field_id),
         "date_from": None if filter.date_from is None else filter.date_from.isoformat(),
         "date_to": None if filter.date_to is None else filter.date_to.isoformat(),

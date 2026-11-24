@@ -23,7 +23,7 @@ from lekto.core.domain.ids import FieldId, LensId, short_id
 from lekto.core.domain.lenses import MAX_FILTER_VALUES, MAX_QUERY_LENGTH
 from lekto.core.domain.periods import Period
 from lekto.core.domain.rights import Actor, TokenRight
-from lekto.core.ports.repository import DocumentFilter, each_tag
+from lekto.core.ports.repository import DocumentFilter, DocumentOrder, SortKey, each_tag
 
 LIST_SIZE = 20
 """Documents one list returns unless the client asks for more."""
@@ -34,6 +34,9 @@ type GroupName = Literal["year", "month", "contact", "document_type", "topic", "
 
 if set(get_args(LaneName.__value__)) != {lane.value for lane in LaneFilter}:
     raise RuntimeError("LaneName must name every LaneFilter")  # one lane more reaches both
+
+
+_CREATED = DocumentOrder(SortKey.CREATED)
 
 
 class ListItem(BaseModel):
@@ -132,7 +135,10 @@ def add_listing_tools(tools: Tools, context: ApiContext) -> None:
             documents = [item.document for item in page.items]
             following = page.next_offset
         else:
-            listed = await context.documents.query(user, filter, offset=offset, limit=limit + 1)
+            # In REST's order without `sort`: newest first by when they came in (RA-K10).
+            listed = await context.documents.query(
+                user, filter, order=_CREATED, offset=offset, limit=limit + 1
+            )
             documents = [item.document for item in listed[:limit]]
             following = offset + limit if len(listed) > limit else None
         return compact(

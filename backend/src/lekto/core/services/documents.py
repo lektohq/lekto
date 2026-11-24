@@ -76,7 +76,7 @@ from lekto.core.domain.permissions import (
 from lekto.core.domain.pipeline import Node, NodeRun
 from lekto.core.domain.reasons import Action, ReasonCode, because
 from lekto.core.domain.rights import Actor, TokenRight
-from lekto.core.domain.rule_planner import changed_fields
+from lekto.core.domain.rule_planner import given_fields
 from lekto.core.domain.spaces import Space, SpaceRole
 from lekto.core.domain.tag_tree import TagTree
 from lekto.core.domain.text_places import TextPlaces
@@ -141,11 +141,11 @@ from lekto.core.services.tasks.settling import cancel_tasks
 log = logging.getLogger(__name__)
 
 _SHOWN_ALIKE = 5
+"""Documents an ambiguous short id names at most in its error."""
 
 TEXT_MAX = 20_000
 """The most characters of a document's text one piece holds, unless set otherwise
 (`LEKTO_MCP_TEXT_MAX`)."""
-"""Documents an ambiguous short id names at most in its error."""
 AGGREGATE_MAX = 10_000
 """Documents `DocumentService.aggregate` counts at most, as many as an action on many takes."""
 _AMONG_PER_QUERY = 200
@@ -750,15 +750,12 @@ class DocumentService:
             order=DocumentOrder(SortKey.DOCUMENT_DATE),
             limit=limit,
         )
-        async with self._uow() as uow:
-            kept = {
-                item.document.id: await uow.document_facts.of_document(item.document.id)
-                for item in listed
-            }
+        async with self._uow() as uow:  # all at once, not one query a document (SB-K02)
+            kept = await uow.document_facts.of_documents([item.document.id for item in listed])
         places = []
         for item in listed:
             document = item.document
-            fact = _kept_fact(kept[document.id], kind, value)
+            fact = _kept_fact(kept.get(document.id, []), kind, value)
             if fact is None:
                 continue
             dated = document.document_date or document.created_at.date()
@@ -1231,7 +1228,7 @@ class DocumentService:
                         Decision.CHANGE,
                         before=before,
                         after=document,
-                        given=changed_fields(given),
+                        given=given_fields(given),
                         definitions=definitions,
                         now=now,
                         via=via,

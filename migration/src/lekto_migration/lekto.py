@@ -133,7 +133,7 @@ class Lekto:
             except LektoRateLimitError as error:
                 if last:
                     raise _error(error) from None
-                await self._sleep(_wait(error.retry_after))
+                await self._sleep(rate_limit_wait(error.retry_after))
             except (LektoServerError, LektoConnectionError) as error:
                 hopeless = isinstance(error, LektoServerError) and error.status not in RETRY_STATUS
                 if last or hopeless:
@@ -334,8 +334,9 @@ def _body[M](model: _Request[M], values: dict[str, Any]) -> M:
         raise ApiError(422, f"not sent: {error}") from None
 
 
-def _wait(seconds: float | None) -> float:
-    """Seconds to wait after too many requests (`Retry-After`); five if Lekto names none."""
+def rate_limit_wait(seconds: float | None) -> float:
+    """Seconds to wait after too many requests (`Retry-After`); five if the server names none,
+    a minute at most."""
     return 5.0 if seconds is None else min(max(seconds, 0.0), 60.0)
 
 

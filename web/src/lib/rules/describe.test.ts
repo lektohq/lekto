@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { FieldDefinition } from '#lib/masterdata.svelte.ts';
+import { formatNumber } from '#lib/i18n.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { actionTemplate, describeAction, describeCondition, operatorLabel } from './describe.ts';
 import { fieldOf, lookupOf } from '#lib/testing/master-data.ts';
@@ -13,7 +14,11 @@ const lookup = lookupOf({
 	documentTypes: [],
 	tags: [],
 	spaces: [],
-	fields: [textField('f1', 'Notiz', 'text'), textField('f2', 'Betrag', 'amount')]
+	fields: [
+		textField('f1', 'Notiz', 'text'),
+		textField('f2', 'Betrag', 'amount'),
+		textField('f3', 'Menge', 'number')
+	]
 });
 
 describe('the template of an action', () => {
@@ -40,6 +45,14 @@ describe('the template of an action', () => {
 		const value = '{{ steps.erp.total }} EUR';
 		expect(actionTemplate({ type: 'set_field', field_id: 'f2', value }, lookup)?.template).toBe(
 			value
+		);
+	});
+});
+
+describe('a fixed value of a field', () => {
+	it('is written as its type shows it: a number in the format of the user (WG-K06)', () => {
+		expect(describeAction({ type: 'set_field', field_id: 'f3', value: '12345.5' }, lookup)).toBe(
+			`${m.rule_action_set_field()}: Menge = ${formatNumber(12345.5)}`
 		);
 	});
 });

@@ -7,7 +7,8 @@ import {
 	type IdentifierKind,
 	type IdentifierRow,
 	kindLabel,
-	row
+	row,
+	rowsOf
 } from '#lib/identifiers.ts';
 import type { Tag } from '#lib/masterdata.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
@@ -206,6 +207,13 @@ describe('IdentifiersEditor, a user’s identifiers at contacts', () => {
 		expect(group('Muster Versicherung').getAttribute('aria-expanded')).toBe('true');
 		expect(line(/P3/)).toBeTruthy();
 		expect(screen.queryByRole('button', { name: /^Stadtwerke/ })).toBeNull();
+		// Closed by hand during the search, it stays closed (WB-K01); a new search opens it.
+		await user.click(group('Muster Versicherung'));
+		expect(group('Muster Versicherung').getAttribute('aria-expanded')).toBe('false');
+		expect(screen.queryByRole('button', { name: /P3/ })).toBeNull();
+		await user.clear(screen.getByLabelText(m.identifier_search()));
+		await user.type(screen.getByLabelText(m.identifier_search()), 'P3');
+		expect(group('Muster Versicherung').getAttribute('aria-expanded')).toBe('true');
 	});
 
 	it('shows them by source, with how many each has', async () => {
@@ -265,5 +273,28 @@ describe('IdentifiersEditor, where a learned one stands', () => {
 		await user.click(screen.getByRole('button', { name: m.identifier_whence() }));
 		await vi.waitFor(() => expect(info).toHaveBeenCalledWith(m.identifier_whence_none()));
 		expect(testPage.state.beam).toBeUndefined();
+	});
+});
+
+describe('IdentifiersEditor, the sources of a contact’s identifiers', () => {
+	const stored = [
+		{ kind: 'iban', value: 'DE89370400440532013000', source: 'manual', topic_id: null },
+		{ kind: 'email_domain', value: 'stadtwerke.example', source: 'learned', topic_id: null },
+		{ kind: 'customer_number', value: '4711', source: 'rejected', topic_id: null }
+	] as const;
+
+	it('takes over or rejects a learned one, and allows a rejected one again', async () => {
+		const rows = rowsOf([...stored]);
+		render(IdentifiersEditor, { rows });
+		expect(screen.getByText(m.identifier_learned())).toBeTruthy();
+		// Each opens with its line.
+		await userEvent.click(screen.getByRole('button', { name: /^stadtwerke\.example/ }));
+		await userEvent.click(screen.getByRole('button', { name: m.identifier_reject() }));
+		expect(screen.getAllByText(m.identifier_rejected())).toHaveLength(2);
+		await userEvent.click(screen.getByRole('button', { name: /^4711/ }));
+		await userEvent.click(screen.getByRole('button', { name: m.identifier_unblock() }));
+		expect(screen.getAllByText(m.identifier_rejected())).toHaveLength(1);
+		await userEvent.click(screen.getByRole('button', { name: m.identifier_add_short() }));
+		expect(screen.getAllByRole('textbox', { name: m.identifier_value() })).toHaveLength(1);
 	});
 });

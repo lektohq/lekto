@@ -10,6 +10,7 @@ import pytest
 
 from lekto.adapters.inbound.evaluation import EvaluationSetError, load_queries, load_set
 from lekto.adapters.inbound.evaluation.search import QueryOutcome, RatioResult, SearchCase
+from lekto.composition import search_evaluation as search_evaluation_module
 from lekto.composition.__main__ import main
 from lekto.composition.errors import ConfigurationError
 from lekto.composition.search_evaluation import parse_ratios, run_search_evaluation
@@ -233,3 +234,41 @@ def test_the_floor_keeps_what_a_word_or_the_meaning_finds() -> None:
     assert by_word.kept(0.8) and by_meaning.kept(0.74) and not by_meaning.kept(0.76)
     assert result.floor(0.70) == (1.0, 0.5)
     assert result.floor(0.76) == (0.5, 1.0)
+
+
+class Closing:
+    """A model client that says whether it was closed."""
+
+    model = endpoint = "stand-in"
+
+    def __init__(self) -> None:
+        self.closed = False
+
+    async def aclose(self) -> None:
+        self.closed = True
+
+
+async def broken(*args: object, **kwargs: object) -> None:
+    raise RuntimeError("the run failed")
+
+
+async def test_the_embedding_clients_are_closed_however_the_run_ends(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """One client per model, each released, also after a failed run (CO-K11)."""
+    clients: list[Closing] = []
+
+    def embeddings(settings: Settings) -> Closing:
+        clients.append(Closing())
+        return clients[-1]
+
+    monkeypatch.setattr(search_evaluation_module, "openai_embeddings", embeddings)
+    monkeypatch.setattr(search_evaluation_module, "evaluate_search", broken)
+    settings = Settings.model_construct(
+        meilisearch_url="http://meilisearch:7700", embedding_base_url="http://ollama:11434/v1"
+    )
+    with pytest.raises(RuntimeError):
+        await run_search_evaluation(
+            settings, cases=SET, output=tmp_path / "r.md", models=["a", "b"]
+        )
+    assert [client.closed for client in clients] == [True, True]

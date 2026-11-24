@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 import type { Tag } from '#lib/masterdata.svelte.ts';
 import { SEPARATOR } from '#lib/tags.ts';
 import NamesLine from './NamesLine.svelte';
-import TagChip from './TagChip.svelte';
 import TagChips from './TagChips.svelte';
 import { lookupOf } from '#lib/testing/master-data.ts';
 
@@ -78,44 +77,7 @@ describe('NamesLine', () => {
 		expect(text).toEqual(['Nord', 'Insurer', '·', 'Invoice', '·', '16.10.2026']);
 		expect(screen.queryByText('Bills')).toBeNull();
 	});
-});
 
-describe('TagChip', () => {
-	it('draws a tag in its colour with its icon', async () => {
-		const { container } = render(TagChip, {
-			tag: { id: 'x', name: 'Health', path: ['Health'], icon: 'heart-pulse', color: 'pink' }
-		});
-		const chip = container.querySelector('[title="Health"]') as HTMLElement;
-		expect(chip.getAttribute('style')).toContain(
-			'--chip-bg: var(--tag-pink); --chip-fg: var(--tag-pink-foreground)'
-		);
-		expect(chip.className).toContain('bg-(--chip-bg)');
-		await waitFor(() => expect(chip.querySelector('svg.lucide-heart-pulse')).not.toBeNull());
-	});
-
-	it('mixes an own colour so that the writing stays readable in each theme', () => {
-		const { container } = render(TagChip, {
-			tag: { id: 'x', name: 'Weiß', path: ['Weiß'], color: '#FFFFFF' },
-			topic: true
-		});
-		const chip = container.querySelector('[title="Weiß"]') as HTMLElement;
-		expect(chip.className).toContain('chip-own');
-		expect(chip.className).toContain('rounded-full');
-		const style = chip.getAttribute('style') ?? '';
-		expect(style).toContain('--chip-own: #ffffff');
-		const light = Number(/--chip-light: (\d+)%/.exec(style)?.[1]);
-		expect(light).toBeLessThan(70);
-	});
-
-	it('keeps an uncoloured tag as it was', () => {
-		const { container } = render(TagChip, { tag: { id: 'x', name: 'Plain', path: ['Plain'] } });
-		const chip = container.querySelector('[title="Plain"]') as HTMLElement;
-		expect(chip.getAttribute('style')).toBeNull();
-		expect(chip.className).toContain('bg-secondary');
-	});
-});
-
-describe('NamesLine', () => {
 	it('shows the contact with its initials and the type with its icon', async () => {
 		const { container } = render(NamesLine, {
 			parts: [

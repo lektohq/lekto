@@ -12,13 +12,12 @@ from cryptography.hazmat.primitives.asymmetric.utils import encode_dss_signature
 
 from lekto.adapters.outbound.webpush.sender import (
     WebPushSender,
-    b64url,
     encrypt,
     new_private_key,
-    unb64url,
     vapid_header,
 )
 from lekto.composition.container import USER_AGENT
+from lekto.core.domain.encoding import base64url, from_base64url
 from lekto.core.domain.ids import UserId, new_id
 from lekto.core.domain.push import PushKind, PushMessage
 from lekto.core.ports.push import PushOutcome, PushSender
@@ -53,19 +52,19 @@ class TestWebPushSender(PushSenderContract):
 def test_the_encryption_is_rfc_8291s_example() -> None:
     """RFC 8291, appendix A: the same keys, salt and text give the same body."""
     sender = ec.derive_private_key(
-        int.from_bytes(unb64url("yfWPiYE-n46HLnH0KqZOF1fJJU3MYrct3AELtAQ-oRw"), "big"),
+        int.from_bytes(from_base64url("yfWPiYE-n46HLnH0KqZOF1fJJU3MYrct3AELtAQ-oRw"), "big"),
         ec.SECP256R1(),
     )
     body = encrypt(
         b"When I grow up, I want to be a watermelon",
-        unb64url(
+        from_base64url(
             "BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4"
         ),
-        unb64url("BTBZMqHH6r4Tts7J_aSIgg"),
-        salt=unb64url("DGv6ra1nlYgDCS1FRnbzlw"),
+        from_base64url("BTBZMqHH6r4Tts7J_aSIgg"),
+        salt=from_base64url("DGv6ra1nlYgDCS1FRnbzlw"),
         sender=sender,
     )
-    assert b64url(body) == (
+    assert base64url(body) == (
         "DGv6ra1nlYgDCS1FRnbzlwAAEABBBP4z9KsN6nGRTbVYI_c7VJSPQTBtkgcy27mlmlMoZIIgDll6e3vCYLocInmYWAmS"
         "6TlzAC8wEqKK6PBru3jl7A_yl95bQpu6cVPTpK4Mqgkf1CXztLVBSt2Ks3oZwbuwXPXLWyouBWLVWGNWQexSgSxsj_Q"
         "ulcy4a-fN"
@@ -79,9 +78,9 @@ def test_the_vapid_token_is_signed_for_the_push_services_origin() -> None:
     head, body, signature = token.split(".")
     claims = json.loads(base64.urlsafe_b64decode(body + "=" * (-len(body) % 4)))
     assert claims == {"aud": "https://web.push.apple.com", "exp": 1_800_043_200, "sub": SUBJECT}
-    raw = unb64url(signature)
+    raw = from_base64url(signature)
     der = encode_dss_signature(int.from_bytes(raw[:32], "big"), int.from_bytes(raw[32:], "big"))
-    verifier = ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP256R1(), unb64url(public))
+    verifier = ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP256R1(), from_base64url(public))
     verifier.verify(der, f"{head}.{body}".encode(), ec.ECDSA(hashes.SHA256()))
     with pytest.raises(InvalidSignature):
         verifier.verify(der, f"{head}.{body}x".encode(), ec.ECDSA(hashes.SHA256()))

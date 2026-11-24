@@ -30,7 +30,7 @@
 	import DocumentRow from '#lib/components/DocumentRow.svelte';
 	import BulkSkipped from '#lib/components/BulkSkipped.svelte';
 	import DocumentsBulkBar from '#lib/components/DocumentsBulkBar.svelte';
-	import PageEditor from '#lib/components/document/PageEditor.svelte';
+	import PageEditor from '#lib/components/document/PageEditorOnDemand.svelte';
 	import { mergeBlocked, type Candidate, type Mergeable } from '#lib/merge.ts';
 	import { BulkRun, type BulkSelection } from '#lib/bulk.svelte.ts';
 	import { MAX_DOCUMENTS, MAX_HITS } from '#lib/bulk.ts';
@@ -155,7 +155,7 @@
 	// A link may ask for a layout (`layout=stream`: the stream of a contact, #145).
 	const asked = $derived(LAYOUTS.find((value) => value === params.get('layout')) ?? null);
 	// "Back" from a document returns to the list as it is now (`returnTo`).
-	$effect(() => returnTo.rememberDocuments(page.url, query));
+	$effect(() => returnTo.rememberDocuments(page.url, query, searchNote.ratio(query) === 0));
 
 	$effect(() => {
 		if (asked) layout = asked;
@@ -636,7 +636,7 @@
 			refresh();
 		});
 		const stopMeaning = events.on('search.meaning_ready', (event) =>
-			searchNote.meaningReady(String(event.query ?? ''))
+			searchNote.meaningReady(typeof event.query === 'string' ? event.query : '')
 		);
 		return () => {
 			refresh.cancel();

@@ -32,6 +32,9 @@ LEASE = timedelta(minutes=10)
 """Lease of a job that takes seconds to minutes; one that may take longer has its own."""
 STOPPED = "interrupted: the worker stopped"
 """The error a job given back when the worker stops carries."""
+CONFLICT_ATTEMPTS = 5
+"""Attempts of a long operation's job (bulk, a rule's application) a concurrent change may end
+while the job is still held, each run again at once; then the operation stops (SC-K10)."""
 STORE_ATTEMPTS = 10
 STORE_BACKOFF = 0.02
 """Storing a result again while a row changed meanwhile: at most `STORE_ATTEMPTS` times, waiting
@@ -199,6 +202,16 @@ class JobRunner:
         async with self._uow() as uow:
             current = await uow.jobs.get(job.id)
         return current.status is JobStatus.RUNNING and current.attempts == job.attempts
+
+    async def claim_lost(self, job: Job, error: Exception) -> bool:
+        """Whether `error` ended the attempt because the job's claim was lost: a
+        ConcurrencyError while another worker owns the job now (logged). Any other
+        ConcurrencyError (a deadlock, a row changed meanwhile) failed this attempt like any
+        error, and the caller runs the job again as it does after one (SA-08, SC-K10)."""
+        if isinstance(error, ConcurrencyError) and not await self.still_claimed(job):
+            lost(job)
+            return True
+        return False
 
     async def storing(self, job: Job, store: Callable[[], Awaitable[None]]) -> None:
         """Store what a job did with `store`, again while a row changed meanwhile, unless the

@@ -63,7 +63,7 @@
 				// Another person than this tab knew before: the app starts afresh, so that nothing
 				// it holds in memory of the one before stays.
 				if (session.another) window.location.replace(data.next);
-				else await goto(data.next, { replaceState: true });
+				else await goto(data.next, { replace: true });
 			} else if (response.status === 401 && error?.second_factor_required) {
 				await showStep('totp');
 			} else if (response.status === 401) {
@@ -92,7 +92,7 @@
 
 <svelte:head><title>{m.login_submit()} · {m.app_name()}</title></svelte:head>
 
-<div class="flex min-h-screen">
+<div class="flex min-h-dvh">
 	<aside class="hidden w-[560px] shrink-0 flex-col justify-between bg-panel p-14 lg:flex">
 		<Logo class="text-xl" />
 		<div class="flex flex-col gap-5">
@@ -105,13 +105,13 @@
 	</aside>
 
 	<div class="flex flex-1 flex-col">
-		<div class="flex items-center justify-between gap-2 px-6 py-6 sm:px-8 lg:justify-end">
+		<header class="flex items-center justify-between gap-2 px-6 py-6 sm:px-8 lg:justify-end">
 			<Logo class="text-xl lg:hidden" />
 			<div class="flex items-center gap-2">
 				<LanguageMenu />
 				<ThemeMenu />
 			</div>
-		</div>
+		</header>
 
 		<main class="flex flex-1 items-center justify-center px-6 pb-20">
 			<div class="flex w-full max-w-[400px] flex-col gap-7">

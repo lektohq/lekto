@@ -8,10 +8,12 @@
 import { SvelteMap } from 'svelte/reactivity';
 import { api } from '#lib/api/client.ts';
 import { unwrap } from '#lib/api/call.ts';
+import { isNetworkError } from '#lib/errors.ts';
 import type { IdentifierKind } from '#lib/identifiers.ts';
 
 const values = new SvelteMap<string, string>();
-// Asked once per page, answered or not: not reactive, so a label may ask while it renders.
+// Asked once per page, answered or refused (asked again only where no answer came): not
+// reactive, so a label may ask while it renders.
 // eslint-disable-next-line svelte/prefer-svelte-reactivity
 const asked = new Set<string>();
 
@@ -38,8 +40,10 @@ async function ask(kind: IdentifierKind, ref: string): Promise<void> {
 			api.GET('/api/v1/identifiers/refs/{kind}/{ref}', { params: { path: { kind, ref } } })
 		);
 		values.set(key(kind, ref), found.value);
-	} catch {
-		// A reference of another instance or a damaged one: the label names the kind only.
+	} catch (error) {
+		// No answer at all (offline): the next label asks again. A refusal (a reference of
+		// another instance, a damaged one) stays: the label names the kind only.
+		if (isNetworkError(error)) asked.delete(key(kind, ref));
 	}
 }
 

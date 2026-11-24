@@ -133,6 +133,12 @@ beforeEach(() => {
 	vi.stubGlobal('fetch', fetchMock);
 });
 
+/** The name of the button that pins any value as a number, in the messages' words. */
+const pinAny = (name: string) => {
+	const [before, after] = m.facts_attach_value({ value: '§' }).split('§');
+	return name.startsWith(before) && name.endsWith(after);
+};
+
 describe('FactsPanel', () => {
 	it('shows what supports the contact, what has no contact, and the codes', () => {
 		render(FactsPanel, props());
@@ -147,7 +153,7 @@ describe('FactsPanel', () => {
 		// The owner's own IBAN stands on many contacts' documents.
 		expect(screen.getByText(m.facts_other_contacts({ count: 6 }))).toBeTruthy();
 		// Only a pin to attach, its label on hover.
-		expect(screen.getAllByRole('button', { name: /^Pin .* as an identifier$/ })).toHaveLength(2);
+		expect(screen.getAllByRole('button', { name: pinAny })).toHaveLength(2);
 		// The GiroCode read, its amount as the field's; another code as it is.
 		expect(screen.getByText(m.code_giro())).toBeTruthy();
 		expect(screen.getByText(m.code_same_as({ field: 'Rechnungsbetrag' }))).toBeTruthy();
@@ -269,7 +275,7 @@ describe('FactsPanel', () => {
 		const onchanged = vi.fn();
 		render(FactsPanel, props({ onchanged }));
 		const user = userEvent.setup();
-		await user.click(screen.getAllByRole('button', { name: /^Pin .* as an identifier$/ })[0]);
+		await user.click(screen.getAllByRole('button', { name: pinAny })[0]);
 		const form = screen.getByText(
 			m.facts_attach_title({ kind: m.identifier_kind_customer_number() })
 		).parentElement!;
@@ -294,7 +300,7 @@ describe('FactsPanel', () => {
 		});
 		render(FactsPanel, props({ lookup: withTopics, topicId: 'p1' }));
 		const user = userEvent.setup();
-		await user.click(screen.getAllByRole('button', { name: /^Pin .* as an identifier$/ })[0]);
+		await user.click(screen.getAllByRole('button', { name: pinAny })[0]);
 		// The topic is the tag picker with one choice: the document's is chosen.
 		const field = screen.getByRole('group', { name: m.facts_attach_topic() });
 		await user.click(
@@ -406,7 +412,7 @@ describe('FactsPanel', () => {
 		render(FactsPanel, props({ admin: false }));
 		const own = screen.getByRole('heading', { name: /Stadtwerke Musterstadt GmbH/ });
 		expect(within(own).queryByRole('button')).toBeNull();
-		expect(screen.queryAllByRole('button', { name: /^Pin .* as an identifier$/ })).toHaveLength(0);
+		expect(screen.queryAllByRole('button', { name: pinAny })).toHaveLength(0);
 		expect(screen.getByText(m.facts_attach_admins())).toBeTruthy();
 	});
 
@@ -415,7 +421,7 @@ describe('FactsPanel', () => {
 			...FACTS.identifiers[2],
 			value: 'DE17100500000123456789',
 			contact_id: BANK,
-			holder: { kind: 'third_party', name: 'Hausverwaltung Ost', source: 'rule' }
+			holder: { kind: 'third_party', name: 'Muster Hausverwaltung', source: 'rule' }
 		} as Facts['identifiers'][number];
 		render(FactsPanel, props({ facts: { ...FACTS, identifiers: [...FACTS.identifiers, payee] } }));
 		const fold = screen.getByRole('button', { name: new RegExp(m.facts_third_one()) });
@@ -428,7 +434,7 @@ describe('FactsPanel', () => {
 			screen.getByText(
 				m.facts_holder_named({
 					holder: m.fact_holder_third_party(),
-					name: 'Hausverwaltung Ost',
+					name: 'Muster Hausverwaltung',
 					source: m.fact_holder_source_rule()
 				})
 			)

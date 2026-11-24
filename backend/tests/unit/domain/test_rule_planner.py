@@ -11,6 +11,7 @@ from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.fields import FieldDefinition, FieldType, Money, Url, Writing
 from lekto.core.domain.ids import ContactId, FieldId, RuleId, SpaceId, TagId, new_id
 from lekto.core.domain.json_value import JsonValue
+from lekto.core.domain.master_data import MAX_TITLE_PATTERN
 from lekto.core.domain.periods import Period
 from lekto.core.domain.pipeline import Outcome
 from lekto.core.domain.reasons import Reason, ReasonCode, because, written
@@ -23,11 +24,12 @@ from lekto.core.domain.rule_planner import (
     RulePlan,
     RuleReport,
     Situation,
-    changed_fields,
+    given_fields,
     plan,
     reviewing_rules,
 )
 from lekto.core.domain.rules import (
+    MAX_TEXT,
     AddTags,
     ConditionField,
     ForceReview,
@@ -1026,8 +1028,8 @@ def test_changed_fields() -> None:
 
     changes = DocumentChanges(title="x", contact_id=None, fields={attr: None})
 
-    assert changed_fields(changes) == {"title", "contact", f"field:{attr}"}
-    assert changed_fields(DocumentChanges()) == frozenset()
+    assert given_fields(changes) == {"title", "contact", f"field:{attr}"}
+    assert given_fields(DocumentChanges()) == frozenset()
 
 
 def test_plan_to_json() -> None:
@@ -1146,7 +1148,7 @@ def test_a_contact_a_rule_sets_clears_a_topic_it_does_not_enable() -> None:
 
 
 def test_changed_fields_name_the_topic() -> None:
-    assert changed_fields(DocumentChanges(topic_id=None)) == {"topic"}
+    assert given_fields(DocumentChanges(topic_id=None)) == {"topic"}
 
 
 def test_the_rules_that_forced_a_review_read_back_from_the_log() -> None:
@@ -1166,3 +1168,9 @@ def test_the_rules_that_forced_a_review_read_back_from_the_log() -> None:
     stored = RulePlan(DocumentChanges(), None, reports, [], []).to_json()
     assert reviewing_rules(stored) == {reviewing}
     assert reviewing_rules(None) == set()
+
+
+def test_a_type_s_title_pattern_fits_into_its_rule() -> None:
+    """`title_rule` writes the pattern into a rule's `set_title`: the type takes no longer one than
+    a rule (DB-K10)."""
+    assert MAX_TITLE_PATTERN <= MAX_TEXT

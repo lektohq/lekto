@@ -1,6 +1,6 @@
 from collections.abc import Iterable, Mapping
 
-from lekto.core.domain.documents import UNSET, Unset
+from lekto.core.domain.changes import UNSET, Unset
 from lekto.core.domain.errors import ConflictError, NotFoundError, PermissionDeniedError
 from lekto.core.domain.ids import SpaceId, UserId
 from lekto.core.domain.permissions import can_choose_members, can_manage_space

@@ -106,54 +106,77 @@ export function saveErrorsAt(
 	const result: SaveErrors = { byKey: {}, general: null };
 	const detail = error instanceof ApiError ? (error.problem?.detail ?? '') : '';
 	if (error instanceof ApiError && error.status === 422 && detail) {
-		// "; " joins the errors, but may stand in a message too: a part without a place
-		// continues the one before.
-		const placed = new RegExp(`^((?:${places.heads.join('|')})\\b[\\w.[\\]-]*): (.+)$`);
-		const errors: { path: string | null; message: string }[] = [];
-		for (const part of detail.split('; ')) {
-			const match = placed.exec(part);
-			const last = errors.at(-1);
-			if (match) errors.push({ path: match[1], message: match[2] });
-			else if (last) last.message += `; ${part}`;
-			else errors.push({ path: null, message: part });
-		}
+		const errors = partsOfDetail(detail, places);
 		const reason = error.problem?.reason;
-		// A reason that names its place (`at`: a template's unknown value at "actions[0]"): in
-		// the user's language at that block.
-		const at = reason?.params.at;
-		if (reason && typeof at === 'string') {
-			const key = places.keyAt(at);
-			if (key) result.byKey[key] = describeError(error);
-			else result.general = describeError(error);
-			return result;
+		if (reason && typeof reason.params.at === 'string') {
+			placedReason(error, reason.params.at, places, result);
+		} else if (reason && errors.every((part) => part.path === null)) {
+			unplacedReason(error, reason, places, result);
+		} else {
+			byPlace(errors, places, result);
 		}
-		// No place, but a reason with a code: in the user's language, and a pattern's at the
-		// conditions that match by it.
-		if (reason && errors.every((part) => part.path === null)) {
-			const message = describeError(error);
-			const pattern = PATTERN_CODES.has(reason.code) ? reason.params.pattern : undefined;
-			const blocks = typeof pattern === 'string' ? (places.matching?.(pattern) ?? []) : [];
-			for (const key of blocks) result.byKey[key] = message;
-			if (blocks.length === 0) result.general = message;
-			return result;
-		}
-		// Request validation tries every kind of a condition or group; drop the kinds that are not
-		// the block's, unless nothing else is left.
-		const fitting = errors.filter(
-			(error) => error.path === null || (places.fits?.(error.path) ?? true)
-		);
-		const rest: string[] = [];
-		for (const error of fitting.length > 0 ? fitting : errors) {
-			const key = error.path === null ? null : places.keyAt(error.path);
-			if (key) result.byKey[key] ??= error.message;
-			else rest.push(error.path === null ? error.message : `${error.path}: ${error.message}`);
-		}
-		result.general = rest.length > 0 ? rest.join('; ') : null;
 		return result;
 	}
 	if (more(result)) return result;
 	result.general = describeError(error);
 	return result;
+}
+
+type DetailPart = { path: string | null; message: string };
+type ProblemReason = NonNullable<NonNullable<ApiError['problem']>['reason']>;
+
+/** The errors of a 422's detail, each with its place where it names one. "; " joins them, but
+ * may stand in a message too: a part without a place continues the one before. */
+function partsOfDetail(detail: string, places: Places): DetailPart[] {
+	const placed = new RegExp(`^((?:${places.heads.join('|')})\\b[\\w.[\\]-]*): (.+)$`);
+	const errors: DetailPart[] = [];
+	for (const part of detail.split('; ')) {
+		const match = placed.exec(part);
+		const last = errors.at(-1);
+		if (match) errors.push({ path: match[1], message: match[2] });
+		else if (last) last.message += `; ${part}`;
+		else errors.push({ path: null, message: part });
+	}
+	return errors;
+}
+
+/** A reason that names its place (`at`: a template's unknown value at "actions[0]"): in the
+ * user's language at that block. */
+function placedReason(error: ApiError, at: string, places: Places, result: SaveErrors): void {
+	const key = places.keyAt(at);
+	if (key) result.byKey[key] = describeError(error);
+	else result.general = describeError(error);
+}
+
+/** No place, but a reason with a code: in the user's language, and a pattern's at the
+ * conditions that match by it. */
+function unplacedReason(
+	error: ApiError,
+	reason: ProblemReason,
+	places: Places,
+	result: SaveErrors
+): void {
+	const message = describeError(error);
+	const pattern = PATTERN_CODES.has(reason.code) ? reason.params.pattern : undefined;
+	const blocks = typeof pattern === 'string' ? (places.matching?.(pattern) ?? []) : [];
+	for (const key of blocks) result.byKey[key] = message;
+	if (blocks.length === 0) result.general = message;
+}
+
+/** Each error at its block, the rest together. Request validation tries every kind of a
+ * condition or group: the kinds that are not the block's are dropped, unless nothing else is
+ * left. */
+function byPlace(errors: DetailPart[], places: Places, result: SaveErrors): void {
+	const fitting = errors.filter(
+		(error) => error.path === null || (places.fits?.(error.path) ?? true)
+	);
+	const rest: string[] = [];
+	for (const error of fitting.length > 0 ? fitting : errors) {
+		const key = error.path === null ? null : places.keyAt(error.path);
+		if (key) result.byKey[key] ??= error.message;
+		else rest.push(error.path === null ? error.message : `${error.path}: ${error.message}`);
+	}
+	result.general = rest.length > 0 ? rest.join('; ') : null;
 }
 
 /** The parts of a place: names, indexes (`all[1]`, `all.1`) and the schema parts request

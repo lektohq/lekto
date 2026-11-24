@@ -226,7 +226,7 @@
 				</span>
 				<a
 					href="?tab=jobs"
-					class="inline-flex items-center gap-1.5 text-meta text-brand hover:underline"
+					class="relative inline-flex items-center gap-1.5 text-meta text-brand after:absolute after:inset-x-0 after:-inset-y-0.5 hover:underline max-sm:after:-inset-y-3"
 				>
 					{m.search_open_link()}<ArrowRight class="size-3.5" aria-hidden="true" />
 				</a>

@@ -2,7 +2,7 @@ import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { components } from '#lib/api/schema.ts';
-import { showPages } from '#lib/beam.svelte.ts';
+import { forgetParts, showPages } from '#lib/beam.svelte.ts';
 import { quoted } from '#lib/i18n.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { fakeApi, problem } from '#lib/testing/api.ts';
@@ -11,7 +11,8 @@ import PageEditor from './PageEditor.svelte';
 // The Beam is the app's: here only what the editor hands it.
 vi.mock('#lib/beam.svelte.ts', async (original) => ({
 	...(await original<typeof import('#lib/beam.svelte.ts')>()),
-	showPages: vi.fn()
+	showPages: vi.fn(),
+	forgetParts: vi.fn()
 }));
 
 type Document = components['schemas']['DocumentDetails'];
@@ -81,7 +82,11 @@ describe('PageEditor', () => {
 		await user.click(screen.getByRole('button', { name: m.page_cut_after({ page: '1' }) }));
 		expect(
 			screen.getByText(
-				`${m.page_edit_part({ number: '2' })} · ${m.page_edit_part_pages({ first: '2', last: '3' })}`
+				// As the DOM's text is read: the no-break space of "S. 2–3" as a space.
+				`${m.page_edit_part({ number: '2' })} · ${m.page_edit_part_pages({ first: '2', last: '3' })}`.replace(
+					/\s+/g,
+					' '
+				)
 			)
 		).toBeTruthy();
 		await user.click(screen.getByRole('button', { name: m.page_edit_next_parts({ count: 2 }) }));
@@ -120,6 +125,28 @@ describe('PageEditor', () => {
 		expect(onedited).toHaveBeenCalled();
 	});
 
+	it('lets the Beam forget its parts when it closes (WG-K11)', async () => {
+		const shown = render(PageEditor, { open: true, document: DOCUMENT, onedited: vi.fn() });
+		vi.mocked(forgetParts).mockClear();
+		await shown.rerender({ open: false, document: DOCUMENT, onedited: vi.fn() });
+		expect(forgetParts).toHaveBeenCalled();
+	});
+
+	it('lets go of the window when it closes in the middle of a press', async () => {
+		const removed = vi.spyOn(window, 'removeEventListener');
+		const { unmount } = render(PageEditor, {
+			open: true,
+			document: DOCUMENT,
+			onedited: vi.fn()
+		});
+		const tile = page(1).closest('[data-page-tile]') as HTMLElement;
+		await fireEvent.pointerDown(tile, { button: 0, pointerType: 'touch' });
+		unmount();
+		const gone = removed.mock.calls.map(([type]) => type);
+		expect(gone).toEqual(expect.arrayContaining(['pointermove', 'pointerup', 'pointercancel']));
+		removed.mockRestore();
+	});
+
 	it('chooses all pages or none from "Auswählen", the tools staying where they are', async () => {
 		const user = userEvent.setup();
 		open();
@@ -136,6 +163,8 @@ describe('PageEditor', () => {
 		};
 		await choose(m.page_edit_select_all());
 		expect(screen.getByRole('region', { name: m.page_edit_chosen({ count: 3 }) })).toBeTruthy();
+		// The count is said as it changes, also by "Alle wählen" (WZ-K10).
+		expect(within(bar()).getByRole('status').textContent).toBe(m.page_edit_chosen({ count: 3 }));
 		expect(tools()).toEqual(before);
 		await choose(m.bulk_select_none());
 		expect(screen.getByRole('region', { name: m.page_edit_none() })).toBeTruthy();

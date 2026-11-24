@@ -72,7 +72,7 @@ def neighbours(*values: tuple[ContactId | None, DocumentTypeId | None]) -> tuple
 
 
 NAMED_UTILITY = FactsView(named=frozenset({UTILITY.id}))
-UTILITY_IBAN = FactsView(identifiers={UTILITY.id: ("iban",)})
+UTILITY_CUSTOMER = FactsView(identifiers={UTILITY.id: ("customer_number",)})
 
 
 # --- contact ----------------------------------------------------------------------------------
@@ -140,8 +140,9 @@ def test_each_source_tells_its_value_and_from_where_it_names_one() -> None:
     )
     (bank, *_) = judge_contact(signals, CONTACTS).candidates
     by = {source.signal: source for source in bank.sources}
-    assert (by["signal_llm"].score, by["signal_llm"].threshold) == (1.0, 0.9)
-    assert (by["signal_classifier"].score, by["signal_classifier"].threshold) == (0.77, 0.8)
+    accept, sure = builders.THRESHOLDS.accept, builders.THRESHOLDS.classifier
+    assert (by["signal_llm"].score, by["signal_llm"].threshold) == (1.0, accept)
+    assert (by["signal_classifier"].score, by["signal_classifier"].threshold) == (0.77, sure)
     assert not by["signal_classifier"].names
     assert (by["signal_neighbours"].votes, by["signal_neighbours"].similarity) == (2, 0.91)
     for source in bank.sources:
@@ -238,7 +239,9 @@ def test_a_payslip_of_a_new_employer_is_green_by_its_proof() -> None:
         (
             Signals(
                 model=model(sender="Stadtwerke Musterstadt"),
-                facts=FactsView(named=frozenset({UTILITY.id}), identifiers={BANK.id: ("iban",)}),
+                facts=FactsView(
+                    named=frozenset({UTILITY.id}), identifiers={BANK.id: ("customer_number",)}
+                ),
             ),
             "an identifier of 'Beispielbank' stands in the text",
         ),
@@ -247,7 +250,9 @@ def test_a_payslip_of_a_new_employer_is_green_by_its_proof() -> None:
             Signals(
                 model=model(sender="Stadtwerke Musterstadt"),
                 classifier=classifier(UTILITY.id),
-                facts=FactsView(named=frozenset({UTILITY.id}), identifiers={BANK.id: ("iban",)}),
+                facts=FactsView(
+                    named=frozenset({UTILITY.id}), identifiers={BANK.id: ("customer_number",)}
+                ),
             ),
             "an identifier of 'Beispielbank' stands in the text",
         ),
@@ -256,7 +261,7 @@ def test_a_payslip_of_a_new_employer_is_green_by_its_proof() -> None:
             Signals(
                 model=model(sender="Erika Musterfrau"),
                 classifier=classifier(UTILITY.id),
-                facts=UTILITY_IBAN,
+                facts=UTILITY_CUSTOMER,
             ),
             "'Erika Musterfrau' is no contact, and only other signals point to "
             "'Stadtwerke Musterstadt'",
@@ -275,7 +280,7 @@ def test_an_uncertain_value_shows_a_confidence_below_the_threshold() -> None:
     signals = Signals(
         model=model(sender="Stadtwerke Musterstadt"),
         classifier=classifier(UTILITY.id),
-        facts=FactsView(named=frozenset({UTILITY.id}), identifiers={BANK.id: ("iban",)}),
+        facts=FactsView(named=frozenset({UTILITY.id}), identifiers={BANK.id: ("customer_number",)}),
     )
     for accept in (0.9, 0.8):
         thresholds = replace(builders.THRESHOLDS, accept=accept, suggest=min(0.75, accept))
@@ -338,12 +343,14 @@ def test_classes_of_the_model_that_no_longer_exist_are_left_out() -> None:
 
 
 def test_an_identifier_alone_is_a_suggestion() -> None:
-    check = judge_contact(Signals(facts=UTILITY_IBAN), CONTACTS)
+    check = judge_contact(Signals(facts=UTILITY_CUSTOMER), CONTACTS)
     assert (check.outcome, check.suggestion) == (Outcome.UNCERTAIN, str(UTILITY.id))
     (candidate,) = check.candidates
-    assert candidate.sources[0].identifiers == ("iban",)
+    assert candidate.sources[0].identifiers == ("customer_number",)
     # With the classifier sure of it as well, it is green.
-    sure = judge_contact(Signals(classifier=classifier(UTILITY.id), facts=UTILITY_IBAN), CONTACTS)
+    sure = judge_contact(
+        Signals(classifier=classifier(UTILITY.id), facts=UTILITY_CUSTOMER), CONTACTS
+    )
     assert sure.outcome is Outcome.OK
 
 

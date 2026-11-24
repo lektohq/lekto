@@ -22,7 +22,7 @@ from collections.abc import Collection, Iterable, Sequence
 from dataclasses import dataclass
 from datetime import date
 
-from lekto.core.domain.documents import UNSET, Unset
+from lekto.core.domain.changes import UNSET, Unset
 from lekto.core.domain.errors import (
     ConflictError,
     NotFoundError,

@@ -58,6 +58,7 @@ def test_create_trims_and_keeps_the_defaults() -> None:
         MailboxChanges(folders=()),
         MailboxChanges(folders=("INBOX", " ")),
         MailboxChanges(folders=tuple(f"f{index}" for index in range(21))),
+        MailboxChanges(folders=("INBOX", "x" * 1001)),  # also in the core, not only REST (DB-K06)
         MailboxChanges(interval=timedelta(seconds=30)),
         MailboxChanges(interval=timedelta(days=2)),
         MailboxChanges(start=FetchStart.SINCE_DATE),

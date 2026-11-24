@@ -1,8 +1,8 @@
 """Waking a process that waits for work, so that it need not poll the database.
 
 A signal is sent by the unit of work that commits a job becoming queued (`enqueue`,
-`reschedule`, `release`, `retry`; channel `JOBS`, with the job's kind) or events added to the
-outbox (channel `EVENTS`). It arrives after the commit, never after a rollback. A signal is a
+`reschedule`, `release`, `retry`, `hasten`; channel `JOBS`, with the job's kind) or events added
+to the outbox (channel `EVENTS`). It arrives after the commit, never after a rollback. A signal is a
 hint, not a guarantee: an adapter may lose one (a connection that broke), so a receiver also
 looks at the queue now and then (a safety net) and whenever `Signal.live` is False.
 """

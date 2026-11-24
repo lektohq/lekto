@@ -34,13 +34,27 @@ class SpacesOut(BaseModel):
     spaces: list[SpaceOut]
 
 
+class LensFactOut(BaseModel):
+    """A fact the documents have; what is missing is any."""
+
+    kind: str | None = None
+    value: str | None = None
+    role: str | None = None
+
+
 class LensOut(BaseModel):
+    """Every filter of a lens, as `documents_list lens=` applies them (CO-K08)."""
+
     name: str
     query: str | None
     contacts: list[str]
     document_types: list[str]
+    groups: list[str]  # of contacts and of types
     tags: list[str]
     topics: list[str]
+    spaces: list[str]
+    field: str | None
+    facts: list[LensFactOut]
     document_period: str | None
     document_date_from: str | None
     document_date_to: str | None
@@ -88,7 +102,7 @@ def add_space_tools(tools: Tools, context: ApiContext) -> None:
     )
     async def lenses_list(ctx: Context) -> str:
         user = principal_of(ctx).actor
-        names = await Names.load(context, user)
+        names = await (await Names.load(context, user)).with_spaces(context, user)
         lenses = await context.lenses.list_lenses(user)
         return compact(LensesOut(lenses=[_lens(lens, names) for lens in lenses]))
 
@@ -101,6 +115,7 @@ async def space_name(context: ApiContext, user: Actor, id: SpaceId) -> str:
 
 def _lens(lens: Lens, names: Names) -> LensOut:
     chosen = lens.filter
+    field = None if chosen.field_id is None else names.fields.get(chosen.field_id)
 
     def named(ids: Iterable[UUID], table: Mapping[UUID, str]) -> list[str]:
         return [table[id] for id in ids if id in table]
@@ -110,8 +125,19 @@ def _lens(lens: Lens, names: Names) -> LensOut:
         query=lens.query,
         contacts=named(chosen.contact_ids, names.contacts),
         document_types=named(chosen.document_type_ids, names.document_types),
+        groups=named((*chosen.contact_group_ids, *chosen.document_type_group_ids), names.groups),
         tags=named(chosen.tag_ids, names.tags),
         topics=named(chosen.topic_ids, names.topics),
+        spaces=named(chosen.space_ids, names.spaces),
+        field=None if field is None else field.name,
+        facts=[
+            LensFactOut(
+                kind=None if fact.kind is None else fact.kind.value,
+                value=fact.value,
+                role=None if fact.role is None else fact.role.value,
+            )
+            for fact in chosen.facts
+        ],
         document_period=None if chosen.relative_period is None else chosen.relative_period.value,
         document_date_from=None if chosen.date_from is None else chosen.date_from.isoformat(),
         document_date_to=None if chosen.date_to is None else chosen.date_to.isoformat(),

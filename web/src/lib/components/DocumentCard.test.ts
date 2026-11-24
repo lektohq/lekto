@@ -32,6 +32,16 @@ describe('the archive', () => {
 		);
 	});
 
+	it('names its link by the title first, then contact, type and date (WZ-K03)', () => {
+		render(DocumentCard, { document: listed({ page_count: 3 }), lookup: null });
+		const link = screen.getByRole('link', { name: /Stromrechnung/ });
+		const name = link.getAttribute('aria-labelledby')!.split(' ');
+		const said = name.map((id) => document.getElementById(id)?.textContent?.trim());
+		expect(said[0]).toBe(listed().title);
+		expect(said[1]).toBe(m.doc_no_contact());
+		expect(said.join(' ')).not.toContain(m.doc_pages_short({ count: '3' }));
+	});
+
 	it('shows no progress of a document in processing', () => {
 		render(DocumentCard, { document: listed({ lane: null }), lookup: null });
 		expect(screen.queryByRole('progressbar')).toBeNull();

@@ -14,14 +14,14 @@
 	import Segmented from '#lib/components/Segmented.svelte';
 	import Select from '#lib/components/Select.svelte';
 	import TemplateInput from '#lib/components/templates/TemplateInput.svelte';
-	import { Button, buttonVariants } from '#lib/components/ui/button/index.ts';
+	import { Button } from '#lib/components/ui/button/index.ts';
 	import { Choice } from '#lib/components/ui/choice/index.ts';
 	import * as Field from '#lib/components/ui/field/index.ts';
 	import { Input } from '#lib/components/ui/input/index.ts';
 	import { WEBHOOK_EVENT_TYPES } from '#lib/events.svelte.ts';
+	import { FormIncomplete } from '#lib/errors.ts';
 	import { m } from '#lib/paraglide/messages.js';
 	import { session } from '#lib/session.svelte.ts';
-	import { cn } from '#lib/utils.ts';
 	import { TIMEOUT_MINUTES } from '#lib/tasks.ts';
 	import {
 		EVENT_LABELS,
@@ -37,9 +37,12 @@
 	type Webhook = components['schemas']['WebhookOut'];
 	type Body = components['schemas']['BodyFormat'];
 	type ModelCall = components['schemas']['ModelCallKind'];
-	// A header of the webhook's own. `kept`: it is stored already, its value hidden; left empty,
-	// the value stays as it is.
-	type Header = { name: string; value: string; kept: boolean };
+	// A header of the webhook's own. `kept`: the name it is stored under, its value hidden; left
+	// empty, the value stays as it is, while the name is that one (HTTP spells it in any case).
+	// Renamed, it is another header, which needs a value.
+	type Header = { name: string; value: string; kept: string | null };
+	const stillKept = (header: Header) =>
+		header.kept !== null && header.kept.toLowerCase() === header.name.trim().toLowerCase();
 
 	// The form of a webhook on its own page (Tobi, 26.10.2026; a dialog before): create one
 	// (`webhook` null) or change it. A new secret (creating a signed webhook, or switching
@@ -69,7 +72,7 @@
 	let types = $state<string[]>(given ? given.event_types.filter((type) => type !== '*') : []);
 	let signed = $state(given?.signed ?? true);
 	let headers = $state<Header[]>(
-		(given?.headers ?? []).map((header) => ({ name: header, value: '', kept: true }))
+		(given?.headers ?? []).map((header) => ({ name: header, value: '', kept: header }))
 	);
 	let body = $state<Body>(given?.body ?? 'thin');
 	let template = $state(given?.body_template ?? '');
@@ -124,27 +127,34 @@
 
 	// A new header needs a value; a kept one may stay empty (unchanged).
 	const headersComplete = $derived(
-		headers.every((header) => header.name.trim() !== '' && (header.kept || header.value !== ''))
+		headers.every(
+			(header) => header.name.trim() !== '' && (stillKept(header) || header.value !== '')
+		)
 	);
 	// Only changed headers go to the API: a value that cannot be read any more is not asked for
 	// when the headers were not touched.
 	const headersChanged = $derived(
-		headers.some((header) => header.value !== '' || !header.kept) ||
+		headers.some((header) => header.value !== '' || !stillKept(header)) ||
 			headers.map((header) => header.name.trim()).join('\n') !== (webhook?.headers ?? []).join('\n')
 	);
+	const openTasksValid = $derived(
+		Number.isInteger(openTasks) &&
+			openTasks >= WEBHOOK_LIMITS.openTasks.min &&
+			openTasks <= WEBHOOK_LIMITS.openTasks.max
+	);
+	const templateMissing = $derived(body === 'template' && template.trim() === '');
 	const incomplete = $derived(
 		name.trim() === '' ||
 			url.trim() === '' ||
 			eventsMissing ||
 			!headersComplete ||
-			(body === 'template' && template.trim() === '') ||
-			!(
-				Number.isInteger(openTasks) &&
-				openTasks >= WEBHOOK_LIMITS.openTasks.min &&
-				openTasks <= WEBHOOK_LIMITS.openTasks.max
-			) ||
+			templateMissing ||
+			!openTasksValid ||
 			!callMinutesValid
 	);
+	// Sent once while incomplete: from then on what is missing is marked.
+	let tried = $state(false);
+	const marked = (missing: boolean) => (tried && missing) || undefined;
 
 	function headerBody() {
 		return headers.map((header) =>
@@ -189,6 +199,10 @@
 	}
 
 	async function save() {
+		if (incomplete) {
+			tried = true;
+			throw new FormIncomplete();
+		}
 		const event_types = trigger === 'rules' ? [] : all ? ['*'] : types;
 		const content = {
 			body,
@@ -243,7 +257,13 @@
 	{#snippet children({ busy, error })}
 		<Field.Field>
 			<Field.Label for="wh-name">{m.field_name()}</Field.Label>
-			<Input id="wh-name" bind:value={name} maxlength={WEBHOOK_LIMITS.name} required />
+			<Input
+				id="wh-name"
+				bind:value={name}
+				maxlength={WEBHOOK_LIMITS.name}
+				required
+				aria-invalid={marked(name.trim() === '')}
+			/>
 		</Field.Field>
 		<Field.Field>
 			<HintLabel
@@ -258,6 +278,7 @@
 				bind:value={url}
 				maxlength={WEBHOOK_LIMITS.url}
 				required
+				aria-invalid={marked(url.trim() === '')}
 				aria-describedby="wh-url-hint"
 			/>
 		</Field.Field>
@@ -295,7 +316,10 @@
 					{/if}
 				</fieldset>
 				{#if eventsMissing}
-					<p id="wh-events-missing" class="text-sm text-muted-foreground">
+					<p
+						id="wh-events-missing"
+						class={tried ? 'text-sm text-destructive' : 'text-sm text-muted-foreground'}
+					>
 						{m.webhook_events_missing()}
 					</p>
 				{:else}
@@ -331,6 +355,7 @@
 					label={m.webhook_body_template()}
 					purpose="webhook"
 					maxlength={WEBHOOK_LIMITS.body}
+					invalid={tried && templateMissing}
 				/>
 			{/if}
 		</div>
@@ -347,15 +372,23 @@
 						bind:value={header.name}
 						maxlength={WEBHOOK_LIMITS.headerName}
 						required
+						aria-invalid={marked(header.name.trim() === '')}
 					/>
+					<!-- A header's value is no password of the person: no manager offers to make or keep
+					     one (Tobi, 23.11.2026, WC-K08); masked all the same. -->
 					<Input
 						aria-label={m.webhook_header_value()}
 						type="password"
-						autocomplete="new-password"
+						autocomplete="off"
+						data-1p-ignore
+						data-lpignore="true"
+						data-bwignore
+						data-form-type="other"
 						class="font-mono"
-						placeholder={header.kept ? m.webhook_header_kept() : ''}
+						placeholder={stillKept(header) ? m.webhook_header_kept() : ''}
 						bind:value={header.value}
 						maxlength={WEBHOOK_LIMITS.headerValue}
+						aria-invalid={marked(!stillKept(header) && header.value === '')}
 					/>
 					<IconButton
 						type="button"
@@ -371,7 +404,7 @@
 					type="button"
 					variant="outline"
 					disabled={headers.length >= WEBHOOK_LIMITS.headers}
-					onclick={() => headers.push({ name: '', value: '', kept: false })}
+					onclick={() => headers.push({ name: '', value: '', kept: null })}
 				>
 					<Plus aria-hidden="true" />
 					{m.webhook_header_add()}
@@ -394,6 +427,7 @@
 				class="max-w-32"
 				bind:value={openTasks}
 				required
+				aria-invalid={!openTasksValid || undefined}
 				aria-describedby="wh-open-tasks-hint wh-open-tasks-rule"
 			/>
 			<Field.Description id="wh-open-tasks-rule"
@@ -444,12 +478,10 @@
 		<div class="flex flex-col gap-3 border-t pt-4">
 			{#if error}<Field.Error>{error}</Field.Error>{/if}
 			<div class="flex flex-wrap justify-end gap-2">
-				<a
-					href={cancelHref}
-					class={cn(buttonVariants({ variant: 'ghost' }))}
-					onclick={() => (leaving = true)}>{m.cancel()}</a
-				>
-				<Button type="submit" {busy} disabled={incomplete}>
+				<Button href={cancelHref} variant="ghost" onclick={() => (leaving = true)}>
+					{m.cancel()}
+				</Button>
+				<Button type="submit" {busy}>
 					{webhook ? m.save() : m.create()}
 				</Button>
 			</div>

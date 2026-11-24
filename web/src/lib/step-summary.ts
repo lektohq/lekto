@@ -4,7 +4,7 @@
  */
 import type { components } from '#lib/api/schema.ts';
 import { describeValue, fieldLabel } from '#lib/describe.ts';
-import { formatNumber, formatList, formatMoment } from '#lib/i18n.ts';
+import { formatList, formatMoment, formatNumber } from '#lib/i18n.ts';
 import type { Lookup } from '#lib/masterdata.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
 import { labelled, outputReasonText, reasonsText } from '#lib/reasons.ts';
@@ -22,6 +22,7 @@ import {
 	text
 } from '#lib/signals.ts';
 import { tokenOf, viaToken } from '#lib/via-token.ts';
+import { own } from '#lib/utils.ts';
 
 type LogEntry = components['schemas']['LogEntry'];
 type ProcessingStatus = components['schemas']['ProcessingStatus'];
@@ -95,7 +96,7 @@ export function stepSummary(
 	const output = object(entry.output);
 	const abstained = outputReasonText(output.abstained_reason, output.abstained, labelled(lookup));
 	if (abstained && (SIGNAL_NODES as readonly string[]).includes(node)) {
-		return `${m.signal_abstained()}: ${abstained}`;
+		return m.signal_abstained_because({ reason: abstained });
 	}
 	switch (node) {
 		case 'receive':
@@ -147,7 +148,7 @@ const NOT_LOOKED: Record<string, () => string> = {
 function separated(output: Json): string | null {
 	if (output.not_looked === 'too_long')
 		return m.summary_not_looked_too_long({ max: formatNumber(count(output.max)) });
-	if (typeof output.not_looked === 'string') return NOT_LOOKED[output.not_looked]?.() ?? null;
+	if (typeof output.not_looked === 'string') return own(NOT_LOOKED, output.not_looked)?.() ?? null;
 	if (!Array.isArray(output.sheets)) return null;
 	if (output.sheets.length === 0) return m.summary_no_separator();
 	const found = summaryOfSheets(output.sheets.map(count));
@@ -155,7 +156,7 @@ function separated(output: Json): string | null {
 	if (parts === 0) return found;
 	const made =
 		parts === 1 ? m.summary_parts_one() : m.summary_parts({ count: formatNumber(parts) });
-	return `${found}: ${made}`;
+	return m.summary_sheets_parts({ sheets: found, parts: made });
 }
 
 /** The separator sheets on `sheets` (pages): "2 Trennblätter (S. 4 und 8)". */
@@ -188,7 +189,7 @@ function proposed(proposal: Json): string {
 		sender && recipient
 			? m.summary_from_to({ sender, recipient })
 			: (sender ?? (recipient ? m.summary_to({ recipient }) : null));
-	const what = type ?? (created ? `${created} (${m.candidate_new()})` : null);
+	const what = type ?? (created ? m.candidate_new_named({ name: created }) : null);
 	const parts = [who, what].filter(Boolean);
 	return parts.length > 0 ? parts.join(SEPARATOR) : m.summary_nothing();
 }
@@ -222,7 +223,7 @@ function alike(output: Json, lookup: Lookup | null): string {
 	const name = named(contact, lookup);
 	return share === total
 		? m.summary_neighbours_all({ documents, contact: name })
-		: m.summary_neighbours_most({ documents, share: String(share), contact: name });
+		: m.summary_neighbours_most({ documents, share: formatNumber(share), contact: name });
 }
 
 /** "Personalnummer gehört zu Muster Bäckerei · nennt Jane Doe": the first known
@@ -238,9 +239,9 @@ function found(output: Json, lookup: Lookup | null): string {
 					contact: named(identifier.contact_id, lookup)
 				})
 			: names.length > 0
-				? m.summary_named({ names: names.join(', ') })
+				? m.summary_named({ names: formatList(names) })
 				: null,
-		persons.length > 0 ? m.summary_named({ names: persons.join(', ') }) : null
+		persons.length > 0 ? m.summary_named({ names: formatList(persons) }) : null
 	].filter(Boolean);
 	return parts.length > 0 ? parts.join(SEPARATOR) : m.summary_facts_none();
 }
@@ -253,7 +254,7 @@ function judged(output: Json, open: boolean, lookup: Lookup | null): string {
 		(check) => check.outcome === 'uncertain' || check.outcome === 'failed'
 	);
 	if (unsure.length > 0) {
-		const fields = unsure.map((check) => fieldLabel(String(check.field), lookup)).join(', ');
+		const fields = formatList(unsure.map((check) => fieldLabel(String(check.field), lookup)));
 		const unseen = list(checks.find((check) => check.field === 'space')?.unseen_by).map((id) =>
 			person(id, lookup)
 		);
@@ -262,7 +263,7 @@ function judged(output: Json, open: boolean, lookup: Lookup | null): string {
 			unseen.length === 1
 				? m.summary_unseen_one({ name: unseen[0] })
 				: unseen.length > 1
-					? m.summary_unseen({ names: unseen.join(', ') })
+					? m.summary_unseen({ names: formatList(unseen) })
 					: null
 		]
 			.filter(Boolean)
@@ -288,7 +289,7 @@ function read(output: Json): string {
 			? m.summary_fields_read_one()
 			: m.summary_fields_read({ count: formatNumber(found) });
 	}
-	return m.summary_fields_partly({ read: String(found), count: formatNumber(checks.length) });
+	return m.summary_fields_partly({ read: formatNumber(found), count: formatNumber(checks.length) });
 }
 
 /** How many relations the step set and suggested (#145). */
@@ -297,8 +298,8 @@ function related(output: Json): string {
 	if (found.length === 0) return m.summary_relations_none();
 	const set = found.filter((item) => item.state === 'set').length;
 	return m.summary_relations({
-		set: String(set),
-		suggested: String(found.length - set)
+		set: formatNumber(set),
+		suggested: formatNumber(found.length - set)
 	});
 }
 
@@ -327,6 +328,9 @@ function ruled(entry: LogEntry, lookup: Lookup | null): string {
 					: m.summary_rules_none({ count: formatNumber(looked) })
 				: matched === 1
 					? m.summary_rules_matched_one({ count: formatNumber(looked) })
-					: m.summary_rules_matched({ matched: String(matched), count: formatNumber(looked) });
+					: m.summary_rules_matched({
+							matched: formatNumber(matched),
+							count: formatNumber(looked)
+						});
 	return [where, took].filter(Boolean).join(SEPARATOR);
 }

@@ -9,14 +9,14 @@ from typing import Any
 from ruamel.yaml.comments import CommentedMap
 
 from lekto_migration import plan as plans
-from lekto_migration.config import Config, public
+from lekto_migration.config import Config, forms
 from lekto_migration.directory import Directory
 from lekto_migration.expect import Context, Expected, FieldInfo, expect, field_infos
 from lekto_migration.lekto import ApiError, Lekto, unfit
 from lekto_migration.masterdata import Action, needs
 from lekto_migration.paperless import Paperless, PaperlessError, Snapshot
 from lekto_migration.plan import Plan, PlanError
-from lekto_migration.select import Names, mismatches, names_of, selected
+from lekto_migration.select import mismatches, names_of, selected
 from lekto_migration.state import State
 from lekto_migration.survey import defaults
 
@@ -33,18 +33,13 @@ class MigrationError(Exception):
 class Loaded:
     snapshot: Snapshot
     plan: Plan
-    document: CommentedMap
     directory: Directory
-    names: Names
     selected: list[dict[str, Any]]  # the Paperless documents the plan takes over
     expected: dict[int, Expected]  # by Paperless id, for the selected ones
     fields: dict[str, FieldInfo]
     actions: list[Action]
     outdated: list[str] = field(default_factory=list)  # Paperless objects the plan lacks
     ours: set[str] = field(default_factory=set)  # Lekto users the migration created
-
-    def is_selected(self, id: int) -> bool:
-        return id in self.expected
 
 
 async def admin(target: Lekto, *, write: bool, progress: Progress) -> dict[str, Any]:
@@ -105,7 +100,7 @@ def bound(document: CommentedMap, config: Config) -> None:
     """A plan belongs to one Paperless and one Lekto: another one is refused."""
     for key, url in (("source", config.paperless_url), ("target", config.lekto_url)):
         written = str(document.get(key) or "").rstrip("/")
-        if url is not None and written and written != (public(url) or "").rstrip("/"):
+        if url is not None and written and all(written != form.rstrip("/") for form in forms(url)):
             raise MigrationError(
                 f"the plan {config.plan} is for another {key} ({written}); use another --plan"
             )
@@ -131,7 +126,7 @@ async def load(
     progress: Progress,
     now: datetime | None = None,
 ) -> Loaded:
-    plan, document = load_plan(config)
+    plan, _ = load_plan(config)
     snapshot, directory = await read(source, target, write=write, progress=progress)
     names = names_of(snapshot)
     if problems := mismatches(plan.selection, names):
@@ -170,9 +165,7 @@ async def load(
     return Loaded(
         snapshot=snapshot,
         plan=plan,
-        document=document,
         directory=directory,
-        names=names,
         selected=chosen,
         expected=expected,
         fields=fields,

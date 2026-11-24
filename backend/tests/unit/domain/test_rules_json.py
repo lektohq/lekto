@@ -93,7 +93,7 @@ def full_definition() -> RuleDefinition:
             SetSpace(SPACE),
             SetContact(CONTACT),
             SetDocumentType(TYPE),
-            SetTitle("{contact} {document_date}"),
+            SetTitle("{{ contact }} {{ document_date }}"),
             AddTags(frozenset({TAG, OTHER_TAG})),
             RemoveTags(frozenset({OTHER_TAG})),
             SetField(FIELD, {"amount": "12.50", "currency": "EUR"}),

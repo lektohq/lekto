@@ -38,6 +38,7 @@ from lekto.core.domain.errors import (
 )
 from lekto.core.domain.ids import ContactId
 from lekto.core.domain.jobs import Job, RetryPolicy
+from lekto.core.domain.json_value import JsonObject
 from lekto.core.domain.master_data import Contact
 from lekto.core.domain.reasons import Action, ReasonCode, because
 from lekto.core.domain.rights import Actor
@@ -270,18 +271,17 @@ class LogoService:
         return None
 
     async def _run(self, job: Job) -> None:
-        if self._fetcher is None:
+        if self._fetcher is None:  # switched off on purpose: no failure to tell the admins of
             log.info("logo not fetched: fetching is off", extra={"job_id": str(job.id)})
-            await self._jobs.end(job, error=FETCHING_OFF)
+            await self._jobs.end(job, result={"skipped": FETCHING_OFF})
             return
-        payload = job.payload
         try:
-            domain = payload.get("domain")
-            await self.fetch(
-                ContactId(UUID(str(payload["contact_id"]))),
-                domain=domain if isinstance(domain, str) else None,
-                asked=bool(payload.get("asked")),
-            )
+            contact, domain, asked = _payload_logo(job.payload)
+        except (KeyError, ValueError) as error:
+            await self._jobs.invalid(job, error)
+            return
+        try:
+            await self.fetch(contact, domain=domain, asked=asked)
         except Exception as error:
             await self._jobs.failed(job, error, _RETRY, "logo job failed")
             return
@@ -309,11 +309,27 @@ async def _enqueue(uow: UnitOfWork, contact: ContactId, domain: str | None, now:
     Whether it was queued now."""
     queued = await uow.jobs.enqueue(
         LOGO_JOB,
-        {"contact_id": str(contact), "domain": domain, "asked": domain is None},
+        _logo_payload(contact, domain),
         run_at=now,
         dedup_key=f"{LOGO_JOB}:{contact}:{domain or 'asked'}",
     )
     return queued is not None
+
+
+def _logo_payload(contact: ContactId, domain: str | None) -> JsonObject:
+    """The payload of a `LOGO_JOB`: a fetch from `domain`, or one an admin asked for (None)."""
+    return {"contact_id": str(contact), "domain": domain, "asked": domain is None}
+
+
+def _payload_logo(payload: JsonObject) -> tuple[ContactId, str | None, bool]:
+    """The contact, the domain and whether an admin asked, of a `_logo_payload`; KeyError or
+    ValueError for a payload that is none."""
+    domain = payload.get("domain")
+    return (
+        ContactId(UUID(str(payload["contact_id"]))),
+        domain if isinstance(domain, str) else None,
+        bool(payload.get("asked")),
+    )
 
 
 def _uploaded(contact: Contact) -> bool:

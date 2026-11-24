@@ -54,15 +54,13 @@
 	/* Notes and tips (alerts `note` and `tip`): blue, as GitHub and Docusaurus draw notes. */
 	--note: #e7f0fb;
 	--note-foreground: #1d4f91;
-	/* The "Beta" pill at an area that is new (Tobi, 26.10.2026): pale violet with dark writing,
-	   as the chips are drawn; not the petrol, not a lane. 8.2:1 here, 8.9:1 in the dark. */
 	/* Charts (the page "System"): the lanes as solid marks, a second line, the pale band of a
 	   90th percentile. */
 	--chart-1: #4a9f66;
 	--chart-2: #e0b02e;
 	--chart-3: #b83a32;
 	--chart-4: #b4560a;
-	--chart-5: #cfe4e1;
+	--chart-5: #7fb8af;
 }
 
 .dark {
@@ -105,7 +103,7 @@
 	--chart-2: #e3bb4d;
 	--chart-3: #d4554c;
 	--chart-4: #f2a65a;
-	--chart-5: #21403c;
+	--chart-5: #2f5f58;
 }
 
 /*
@@ -120,7 +118,7 @@
 
 /*
  * The type scale (web/DESIGN.md, "Typography"): Tailwind's steps plus the in-between ones the UI
- * uses. No other font size is allowed; `tests/design-tokens.test.ts` checks it.
+ * uses. No other font size is allowed; `tests/design-system.test.ts` checks it.
  */
 @theme {
 	--text-nano: 0.625rem;
@@ -211,6 +209,18 @@
 	color: var(--popover-foreground);
 	border: 1px solid var(--border);
 	border-radius: 0.5rem;
+}
+
+/* Sonner's toasts and their buttons: the focus ring every control has (`:focus-visible` in the
+   base layer) in place of the library's faint grey shadow, which it draws with `outline: none`
+   outside any layer; the extra attributes outweigh its selectors. */
+[data-sonner-toaster] [data-sonner-toast]:focus-visible,
+[data-sonner-toaster]
+	[data-sonner-toast][data-styled]
+	:is([data-button], [data-cancel], [data-close-button]):focus-visible {
+	outline: 2px solid var(--ring);
+	outline-offset: 2px;
+	box-shadow: none;
 }
 
 @layer base {

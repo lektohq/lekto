@@ -47,11 +47,12 @@
 	// the effect below must not read the state it sets.
 	async function loaded(wanted: MasterDataRequest) {
 		if (wanted.kind === 'fields') {
-			const kinds = await unwrap(api.GET('/api/v1/document-types'));
-			const definition =
+			const [kinds, definition] = await Promise.all([
+				unwrap(api.GET('/api/v1/document-types')),
 				typeof wanted.item === 'string'
-					? await unwrap(api.GET('/api/v1/fields/{id}', { params: { path: { id: wanted.item } } }))
-					: (wanted.item as FieldDefinition | null);
+					? unwrap(api.GET('/api/v1/fields/{id}', { params: { path: { id: wanted.item } } }))
+					: (wanted.item as FieldDefinition | null)
+			]);
 			return { kinds, definition, entry: null, rule: null, all: null, every: [] };
 		}
 		if (wanted.kind === 'any-tag') {
@@ -62,19 +63,22 @@
 			typeof wanted.item === 'string'
 				? await KINDS[wanted.kind].get(wanted.item)
 				: (wanted.item as Item | null);
-		let rule: string | null = null;
-		if (wanted.kind === 'document-types' && entry && !wanted.fromRule) {
-			const rules = await unwrap(
-				api.GET('/api/v1/rules', { params: { query: { scope: 'global' } } })
-			);
-			rule = rules.find((found) => found.managed_by_document_type_id === entry.id)?.id ?? null;
-		}
-		// A document type shows its fields.
-		const all = wanted.kind === 'document-types' ? await unwrap(api.GET('/api/v1/fields')) : null;
-		// A tag goes under another; contacts and types are in groups.
-		const every = await unwrap(api.GET('/api/v1/tags'));
-		// A contact's logo may be fetched from its website, if the server does that.
-		if (wanted.kind === 'contacts') fetching = await logoFetching();
+		// The rest side by side: they need no more than the entry's id.
+		const [rule, all, every, fetches] = await Promise.all([
+			wanted.kind === 'document-types' && entry && !wanted.fromRule
+				? unwrap(api.GET('/api/v1/rules', { params: { query: { scope: 'global' } } })).then(
+						(rules) =>
+							rules.find((found) => found.managed_by_document_type_id === entry.id)?.id ?? null
+					)
+				: null,
+			// A document type shows its fields.
+			wanted.kind === 'document-types' ? unwrap(api.GET('/api/v1/fields')) : null,
+			// A tag goes under another; contacts and types are in groups.
+			unwrap(api.GET('/api/v1/tags')),
+			// A contact's logo may be fetched from its website, if the server does that.
+			wanted.kind === 'contacts' ? logoFetching() : null
+		]);
+		if (fetches !== null) fetching = fetches;
 		return { kinds: null, definition: null, entry, rule, all, every };
 	}
 

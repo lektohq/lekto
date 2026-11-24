@@ -12,6 +12,7 @@ import { wordsState } from '#lib/words.ts';
 
 let documents = $state<string | null>(null);
 let words = $state('');
+let wordsOnly = $state(false);
 const places = $state<{ documents: Place | null; inbox: Place | null }>({
 	documents: null,
 	inbox: null
@@ -24,8 +25,8 @@ export const returnTo = {
 	},
 	/** The list as it was left, with its words; null before the list was shown in this tab
 	 * (after a reload): then a document knows no neighbours there (`lib/list-places.ts`). */
-	get list(): { url: string; words: string } | null {
-		return documents === null ? null : { url: documents, words };
+	get list(): { url: string; words: string; wordsOnly: boolean } | null {
+		return documents === null ? null : { url: documents, words, wordsOnly };
 	},
 	/** The history entry of the way back: the words the list searched for, and where one
 	 * stood in it. */
@@ -40,10 +41,16 @@ export const returnTo = {
 	rememberPlace(list: 'documents' | 'inbox', place: Place): void {
 		places[list] = place;
 	},
-	/** The list remembers its URL and words whenever they change. */
-	rememberDocuments(url: { pathname: string; search: string }, searched: string): void {
+	/** The list remembers its URL and words whenever they change, and whether it searched by
+	 * the words alone (`SearchNote.ratio`). */
+	rememberDocuments(
+		url: { pathname: string; search: string },
+		searched: string,
+		byWords = false
+	): void {
 		documents = url.pathname + url.search;
 		words = searched;
+		wordsOnly = byWords;
 	},
 	/** Back to the list as it was left. */
 	goDocuments(): Promise<void> {

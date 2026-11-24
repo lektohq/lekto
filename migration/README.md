@@ -174,7 +174,7 @@ takes the `LEKTO_MIGRATION_*` settings of the development instance from that fil
 
 Options (all commands): `--plan` (default `migration-plan.yaml`), `--state` (SQLite file,
 default `migration-state.sqlite`), `--report-dir` (default `migration-reports`), `--limit N`
-(the first N selected documents), `--concurrency` (documents at a time, default 4); `--yes`
+(the first N selected documents, N at least 1), `--concurrency` (documents at a time, default 4); `--yes`
 (`plan`, `prepare`, `run`: write without asking); `check --download` (download the originals:
 checksum, type by content, duplicates: a file that lies in Lekto already, wherever, since
 every file exists once per installation); `run --pipeline-timeout`, `run --reupload`. A
@@ -185,12 +185,13 @@ come from the environment (or a file) only and are never written to the plan, th
 reports.
 
 Server errors (500, 502, 503, 504) and dropped connections of either API are repeated after
-1, 3 and 10 seconds, Lekto's "too many requests" (429) after the seconds it names (at most 60,
-else 5); a document that fails still is `failed` in the state and the next `run` tries it
+1, 3 and 10 seconds, "too many requests" (429) of either after the seconds it names (at most
+60, else 5); a document that fails still is `failed` in the state and the next `run` tries it
 again.
 
 The plan and the state file belong to one Paperless and one Lekto (if Lekto is reset, delete
-the state file, too). The state maps every document to its Lekto document and records what the
+the state file, too); a `check` without Lekto reads the state a run made, and `plan` keeps
+no state. The state maps every document to its Lekto document and records what the
 migration set; an interrupted run continues where it stopped and a second run creates nothing
 twice. Reports (`plan`, `check`, `prepare`, `run`, each as `.md` and `.json`) list every object
 and document with what became of it, or why not. Exit codes: 0 fine, 1 problems or failures or

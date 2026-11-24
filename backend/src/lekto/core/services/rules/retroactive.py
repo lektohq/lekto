@@ -35,7 +35,7 @@ from lekto.core.domain.errors import (
 from lekto.core.domain.identity import ViaToken
 from lekto.core.domain.ids import DocumentId, RuleApplicationId, RuleId, SpaceId
 from lekto.core.domain.jobs import Job
-from lekto.core.domain.json_value import JsonValue
+from lekto.core.domain.json_value import JsonObject, JsonValue
 from lekto.core.domain.occurrences import Occurrence
 from lekto.core.domain.permissions import can_edit_document, can_file_into
 from lekto.core.domain.pipeline import (
@@ -74,7 +74,7 @@ from lekto.core.services._access import (
     load_actor,
     readable_document,
 )
-from lekto.core.services._jobs import LEASE, JobRunner, lost, reason_of
+from lekto.core.services._jobs import CONFLICT_ATTEMPTS, LEASE, JobRunner, reason_of
 from lekto.core.services._tags import tag_tree
 from lekto.core.services.objects import load_layout, load_text
 from lekto.core.services.rules.changes import ArrivalStep, ChangeRules
@@ -101,7 +101,8 @@ from lekto.core.services.rules.steps import run_rules
 log = logging.getLogger(__name__)
 
 APPLY_JOB = "rules.apply"
-"""Job kind of a rule application; payload: application id."""
+"""Job kind of a rule application; payload: application id (`_enqueue`, `_application_id`)."""
+_APPLICATION = "application_id"
 BATCH = 25
 """Documents per job; the next job continues."""
 SCAN = 200
@@ -411,7 +412,10 @@ class RuleApplicationService:
         async with self._uow() as uow:
             user = await load_actor(uow, actor)
             rule = await _applicable_rule(uow, user, id)
-            _not_asking((await uow.rules.get_version(rule.id, version)).definition)
+            # The version applied, which may be older than the one checked (XA-K02).
+            pinned = (await uow.rules.get_version(rule.id, version)).definition
+            _not_asking(pinned)
+            check_rule_facts(user, pinned)
             application = RuleApplication.create(
                 rule_id=rule.id,
                 rule_version=version,
@@ -447,9 +451,13 @@ class RuleApplicationService:
     async def _attempt(self, job: Job) -> None:
         try:
             await self._run(job)
-        except ConcurrencyError:
-            lost(job)
         except Exception as error:
+            if await self._jobs.claim_lost(job, error):
+                return
+            if isinstance(error, ConcurrencyError) and job.tries < CONFLICT_ATTEMPTS:
+                # Only this worker changes the application: a deadlock, gone the next time.
+                await self._jobs.again(job, reason_of(error), self._clock.now())
+                return
             log.exception("rule application failed", extra={"job_id": str(job.id)})
             await self._abort(job, error)
 
@@ -457,7 +465,7 @@ class RuleApplicationService:
         """An unexpected error: end the application, so it does not run again and again, and
         fail its job as every given up job fails, the admins told (`JobRunner.end`; SB-08). The
         payload was read before (`_run` ends an unreadable one as invalid)."""
-        id = RuleApplicationId(UUID(str(job.payload.get("application_id"))))
+        id = _application_id(job)
 
         async def stop(uow: UnitOfWork) -> None:
             application = await uow.rule_applications.find(id)
@@ -469,7 +477,7 @@ class RuleApplicationService:
 
     async def _run(self, job: Job) -> None:
         try:
-            id = RuleApplicationId(UUID(str(job.payload["application_id"])))
+            id = _application_id(job)
         except (KeyError, ValueError) as error:
             await self._jobs.invalid(job, error)
             return
@@ -699,8 +707,14 @@ async def _candidate(uow: UnitOfWork, user: User, rule: Rule, document: Document
     return can_edit_document(user, document, space)
 
 
+def _application_id(job: Job) -> RuleApplicationId:
+    """The application of an `APPLY_JOB`'s payload (`_enqueue`); KeyError or ValueError for a
+    payload that is none."""
+    return RuleApplicationId(UUID(str(job.payload[_APPLICATION])))
+
+
 async def _enqueue(uow: UnitOfWork, id: RuleApplicationId, now: datetime) -> None:
-    payload: dict[str, JsonValue] = {"application_id": str(id)}
+    payload: JsonObject = {_APPLICATION: str(id)}
     await uow.jobs.enqueue(APPLY_JOB, payload, run_at=now, dedup_key=f"{APPLY_JOB}:{id}")
 
 

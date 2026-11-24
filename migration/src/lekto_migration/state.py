@@ -5,6 +5,7 @@ stopped and a second run creates nothing twice. It holds no secrets."""
 
 import json
 import sqlite3
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -70,13 +71,16 @@ class State:
     def close(self) -> None:
         self._db.close()
 
-    def bind(self, **identity: str) -> None:
+    def bind(self, **identity: Sequence[str]) -> None:
         """Remember what the state belongs to; a different source or target is refused, so two
-        migrations never mix."""
-        for key, value in identity.items():
+        migrations never mix. Each value as its forms (`config.forms`): the one of now, then
+        those an earlier version wrote, which the state then holds as the one of now."""
+        for key, (value, *earlier) in identity.items():
             row = self._db.execute("SELECT value FROM meta WHERE key = ?", (key,)).fetchone()
             if row is None:
                 self._db.execute("INSERT INTO meta VALUES (?, ?)", (key, value))
+            elif row[0] in earlier:
+                self._db.execute("UPDATE meta SET value = ? WHERE key = ?", (value, key))
             elif row[0] != value:
                 raise StateError(
                     f"this state file belongs to another {key} ({row[0]}); use another --state"

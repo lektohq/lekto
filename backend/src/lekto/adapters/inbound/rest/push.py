@@ -4,7 +4,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Response
 
-from lekto.adapters.inbound.rest.auth import PROTECTED, CurrentUser, area
+from lekto.adapters.inbound.rest.auth import PROTECTED, CurrentUser, Via, area
 from lekto.adapters.inbound.rest.context import Context
 from lekto.adapters.inbound.rest.problems import problem_responses
 from lekto.adapters.inbound.rest.schemas.push import (
@@ -15,6 +15,7 @@ from lekto.adapters.inbound.rest.schemas.push import (
     PushTestOut,
 )
 from lekto.core.domain.ids import PushDeviceId
+from lekto.core.domain.push import MAX_DEVICES
 from lekto.core.domain.rights import TokenRight
 
 PUSH_AREA = area(TokenRight.PUSH_READ, TokenRight.PUSH_WRITE)
@@ -55,12 +56,14 @@ async def list_devices(user: CurrentUser, context: Context) -> list[PushDeviceOu
         "keys. The address must be one of a known push service (Apple, Google, Mozilla, "
         "Microsoft; 422 `push_endpoint_refused`), the keys valid (422 `push_keys_invalid`). The "
         "same address again replaces the device, also one another user subscribed in that "
-        "browser before. 409 `push_devices_limit`: the caller has 20 devices. " + OFF
+        f"browser before. 409 `push_devices_limit`: the caller has {MAX_DEVICES} devices. " + OFF
     ),
     response_model=PushDeviceOut,
     responses=problem_responses(401, 409, 422),
 )
-async def register_device(body: PushDeviceIn, user: CurrentUser, context: Context) -> PushDeviceOut:
+async def register_device(
+    body: PushDeviceIn, user: CurrentUser, via: Via, context: Context
+) -> PushDeviceOut:
     device = await context.push.register(
         user,
         endpoint=body.endpoint,
@@ -68,6 +71,7 @@ async def register_device(body: PushDeviceIn, user: CurrentUser, context: Contex
         auth=body.keys.auth,
         name=body.name,
         locale=body.locale,
+        via=via,
     )
     return PushDeviceOut.of(device)
 

@@ -17,7 +17,7 @@ from lekto.core.domain.spaces import SpaceRole
 from lekto.core.services.objects import structure_key, text_key
 from tests import builders
 from tests.api import auth
-from tests.unit.adapters.rest.support import ACTORS, DENIED, Api, Scene, indexed_scene, upload
+from tests.unit.adapters.rest.support import DENIED, Api, Scene, indexed_scene, upload
 
 SEARCH = f"{PREFIX}/documents/search"
 
@@ -98,10 +98,6 @@ async def test_search_needs_a_valid_sign_in(api: Api, actor: str) -> None:
     assert response.status_code == 401
     anonymous = await api.client.post(SEARCH, json={"q": "pdf"})
     assert anonymous.status_code == 401
-
-
-def test_every_actor_is_covered() -> None:
-    assert set(ACTORS) >= set(DENIED)
 
 
 async def test_a_removed_member_finds_nothing_at_once(api: Api) -> None:

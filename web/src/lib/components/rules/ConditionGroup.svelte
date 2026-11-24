@@ -84,7 +84,7 @@
 	data-key={group.key}
 	data-rule-row={own ? undefined : ''}
 	role="group"
-	aria-label={own ? m.rule_conditions() : m.rule_subgroup()}
+	aria-label={own ? m.rule_conditions() : (name ?? m.rule_subgroup())}
 >
 	<div class="flex flex-wrap items-center gap-2">
 		<ModeSelect value={group.mode} onchange={(mode) => (group.mode = mode)} />
@@ -124,7 +124,7 @@
 	{#each group.items as item, index (item.key)}
 		{#if item.kind === 'group'}
 			<ConditionGroup
-				group={item as TreeGroup<C>}
+				group={item}
 				{errors}
 				{row}
 				{newCondition}

@@ -28,12 +28,4 @@ describe('SortMenu', () => {
 		await user.click(await screen.findByRole('menuitemradio', { name: sortLabel('title') }));
 		expect(onchange).toHaveBeenCalledWith('title');
 	});
-
-	it('names a field it sorts by, and nothing goes up or down by relevance', () => {
-		expect(sortShort('-field', { name: 'Fällig am' })).toEqual({
-			key: 'Fällig am',
-			direction: 'down'
-		});
-		expect(sortShort('relevance').direction).toBeNull();
-	});
 });

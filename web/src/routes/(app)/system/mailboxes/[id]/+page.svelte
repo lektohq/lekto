@@ -5,6 +5,7 @@
 	import RefreshCw from '@lucide/svelte/icons/refresh-cw';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import { untrack } from 'svelte';
+	import { onChange } from '#lib/watch.svelte.ts';
 	import { toast } from 'svelte-sonner';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
@@ -156,14 +157,15 @@
 		});
 	});
 
-	$effect(() => {
-		if (events.generation === 0) return;
-		untrack(() => {
+	// Again after a break of the stream (a fetch may have been missed); not when the page opens,
+	// which loads by itself, though the stream broke before.
+	onChange(
+		() => events.generation,
+		() =>
 			void load(id).then((found) => {
 				if (found) void mails.refresh();
-			});
-		});
-	});
+			})
+	);
 
 	function show(next: string) {
 		view = next as MailView;

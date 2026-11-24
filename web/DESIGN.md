@@ -62,6 +62,11 @@ A new token needs a value for both modes and that contrast.
 | `tpl-*`                                                                   | Liquid template highlighting only                                                                                                    |
 | `mark-edge`, `mark-light`                                                 | The edge of a mark on a page image (`.mark-glass`)                                                                                   |
 
+**Charts** (`chart-*`): a mark stands at least 3:1 on the card, except the yellow `chart-2`, which
+keeps the lane's light tone (Tobi, 24.11.2026); the band of a 90th percentile (`chart-5`) about
+2:1 on its track and apart from the median. Stacked parts are kept apart by a gap or a line of the
+card. Every value a chart shows also stands as text.
+
 **Lane tones:** a mark of a lane (badge, chip, step of the processing band, counter) has the lane's
 ground, its text in the lane's foreground, and a border in the foreground at low opacity. In light
 mode there are no dark fills. One map, `tones.ts`, turns a lane or tone into these classes. Nobody
@@ -100,6 +105,11 @@ The scale is defined in `@theme`. Use these steps only:
 - **Headings in order:** one `<h1>` per page (`PageHeader`), then `<h2>`, then `<h3>`. Do not
   skip a level for the sake of looks: `SectionTitle` and `Card.Title` take a `level` apart from
   their size.
+- **Icons** (Lucide) take the steps of their place (Tobi, 23.11.2026): `size-3` and `size-3.5`
+  in chips and beside `text-xs`, `size-4` beside text and in buttons, `size-4.5` in the menu and
+  beside a section's words, `size-5` on their own (an icon button's, a lane's mark); never a
+  pixel size of their own. A stroke is Lucide's 2, or 2.2 where an icon stands for a state beside
+  words of the same weight.
 - **Numbers** in tables, counters and durations use `tabular-nums`. Durations do not wrap
   ("4,2s", "1m 3s").
 - **Long words** (German compounds) break with hyphens: titles use `hyphens-auto` and `<html lang>`
@@ -1010,6 +1020,11 @@ the phone a full-screen editor carries the same two actions in its top bar.
 
 - Forms save with "Speichern" or a verb that names the result ("Speichern und Probelauf",
   "Anlegen"). An action that takes effect at once (switch, chip) needs no save.
+- **Missing fields are marked when sent.** A form whose missing parts are not seen at a glance
+  (a rule, a webhook, a new API token) keeps its button active: sent with a field still to fill
+  or fix, it marks the field (`aria-invalid`, with words where the mark alone does not say
+  what), says "Bitte prüfe die markierten Felder." beside its buttons and gives the first
+  marked field the focus (`FormIncomplete` in `AsyncForm`).
 - **Unsaved changes are guarded.** A form with changes asks before the user leaves it: by a link,
   a tab, the back button, closing the dialog or closing the browser (`beforeNavigate`,
   `beforeunload`). The question is a `ConfirmDialog` with "Verwerfen" and "Weiter bearbeiten":
@@ -1472,7 +1487,9 @@ worker, and Lekto works as a website.
   of the person's own inbox, set by a notification and kept by the open app, also for an admin
   whose counter counts everyone's. Only the open app can lower it: a push has to show something,
   so none says that nothing waits any more. The app that finds nothing waiting closes the
-  notification that still says so.
+  notification that still says so. A notification that replaces one of its kind (the same tag:
+  "4 Dokumente warten" after "3 Dokumente warten") comes silently, without sound or vibration
+  (Tobi, 23.11.2026): its count changes often, and only the first of a while rings.
 - **Signing out gives the device up:** before the session ends, the app removes this browser's
   device at the server, ends its subscription, closes the notifications it still shows and
   clears the icon's number (`leaveDevice`), so that a device others use shows nothing of this
@@ -1639,9 +1656,16 @@ are short and do not wrap ("4,2s", "1m 3s"). Every format comes from `lib/i18n.t
 `formatMoment` (medium in lines, `short` in table rows; with seconds only in a log whose entries
 lie seconds apart: the start of a run, the attempts of a delivery), `formatTime` for a time alone in such a log, `formatPercent`, `formatList` for lists ("A, B und C"; never `join(', ')` or an `Intl.ListFormat` of one's own),
 `browserZone`, `quoted` for a quoted name („…“, “…”). A number a message counts with (`count`,
-`total`, `done`, `least`, `most`, `min`, `max`, `seconds`, `mails`) is written
+`total`, `done`, `least`, `most`, `min`, `max`, `seconds`, `mails`, `share`, `read`, `set`,
+`suggested`, `matched`, `minutes`) is written
 `formatNumber(…)` where the message is called ("12.345 Mails"), never raw or as `String(…)`; no component reads a locale or a time zone
 of its own, and no quotation mark stands in code.
+
+A number and its unit never break apart (Tobi, 23.11.2026): the messages join them with a
+no-break space (U+00A0): "12 MB", "300 dpi", "87 %", "5 Min.", "S. 3" (`messages.test.ts`).
+A number typed into a field is read and shown in the UI language (Tobi, 23.11.2026): the groups
+go and the decimal separator is the language's (`readNumber`, `shownNumber`); "1.234,5" in
+German is 1234.5.
 
 Identifiers stand as they are printed wherever they are shown: an IBAN in groups of four
 (`DE89 3704 0044 0532 0130 00`), whether the API sends it as kept or as written; other values as

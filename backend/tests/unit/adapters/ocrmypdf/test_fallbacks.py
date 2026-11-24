@@ -89,6 +89,7 @@ class Runs:
         self.timeouts: list[timedelta] = []  # the time each run was given
         self.took = timedelta(0)  # how long each run takes on the clock
         self.clock = 0.0  # seconds, as `monotonic` gives them
+        self.tesseract: Exception | None = None  # what asking for Tesseract's version raises
 
     async def __call__(
         self,
@@ -100,6 +101,8 @@ class Runs:
         memory: int | None = None,
     ) -> Completed:
         if args[0] == "tesseract":
+            if self.tesseract is not None:
+                raise self.tesseract
             return Completed(returncode=0, stdout="tesseract 5.5.0\n", stderr="")
         self.calls.append(list(args))
         self.tails.append(tail)
@@ -168,6 +171,18 @@ async def convert(runs: Runs, tmp_path: Path) -> tuple[OcrResult, Path]:
         tmp_path / "source.pdf", target, media_type=media_types.PDF
     )
     return result, target
+
+
+async def test_no_archive_stands_when_the_engine_cannot_be_named(
+    runs: Runs, tmp_path: Path
+) -> None:
+    """On error, the target is not created, as the port says: Tesseract is asked for its version
+    before the archive takes its place (AD-K05)."""
+    runs.outcomes = [(0, "")]
+    runs.tesseract = TimeoutError()
+    with pytest.raises(TimeoutError):
+        await convert(runs, tmp_path)
+    assert not (tmp_path / "archive.pdf").exists()
 
 
 async def test_a_clean_run_is_pdfa_without_a_note(runs: Runs, tmp_path: Path) -> None:

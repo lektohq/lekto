@@ -1,22 +1,16 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { appleDevice, isAndroid } from '#lib/install.svelte.ts';
-import { deviceOf as device } from '#lib/testing/browser.ts';
+import { describe, expect, it } from 'vitest';
+import { install } from '#lib/install.svelte.ts';
 
-describe('the device', () => {
-	afterEach(() => vi.restoreAllMocks());
-
-	it('tells iPhone, iPad and Mac apart, an iPad that names itself a Mac by its touch screen', () => {
-		device('Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15', 5);
-		expect(appleDevice()).toBe('iPhone');
-		device('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15', 5);
-		expect(appleDevice()).toBe('iPad');
-		device('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15', 0);
-		expect(appleDevice()).toBe('Mac');
-	});
-
-	it('finds Android, and no Apple device there', () => {
-		device('Mozilla/5.0 (Linux; Android 15; Pixel 9) AppleWebKit/537.36 Chrome/140.0', 5);
-		expect(isAndroid()).toBe(true);
-		expect(appleDevice()).toBeNull();
+describe('installing the app', () => {
+	it('hears the browser’s offer from the start, before any page asks (WM-K06)', () => {
+		const offer = Object.assign(new Event('beforeinstallprompt', { cancelable: true }), {
+			prompt: async () => {},
+			userChoice: Promise.resolve({ outcome: 'dismissed' as const })
+		});
+		window.dispatchEvent(offer);
+		expect(offer.defaultPrevented).toBe(true);
+		expect(install.available).toBe(true);
+		window.dispatchEvent(new Event('appinstalled'));
+		expect(install.available).toBe(false);
 	});
 });

@@ -19,7 +19,6 @@ let usedStep = 0;
 let userId = '';
 
 test.beforeAll(async ({ playwright, baseURL }) => {
-	test.skip(!ADMIN_PASSWORD, 'LEKTO_ADMIN_PASSWORD is not set');
 	const admin = await playwright.request.newContext({ baseURL });
 	const adminToken = await signIn(admin, ADMIN, ADMIN_PASSWORD);
 	const created = await admin.post('/api/v1/users', {
@@ -32,7 +31,10 @@ test.beforeAll(async ({ playwright, baseURL }) => {
 
 	const user = await playwright.request.newContext({ baseURL });
 	const token = await signIn(user, USERNAME, PASSWORD);
-	const setup = await user.post('/api/v1/auth/totp', { headers: { 'X-CSRF-Token': token } });
+	const setup = await user.post('/api/v1/auth/totp', {
+		headers: { 'X-CSRF-Token': token },
+		data: { password: PASSWORD }
+	});
 	expect(setup.ok(), await setup.text()).toBe(true);
 	secret = ((await setup.json()) as { secret: string }).secret;
 	usedStep = step();

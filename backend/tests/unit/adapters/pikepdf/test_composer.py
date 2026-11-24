@@ -66,6 +66,16 @@ async def test_pages_keep_their_rotation_and_turning_adds_to_it(
     assert widths(target) == [(300, 0), (200, 0), (100, 180)]
 
 
+async def test_a_page_taken_twice_is_turned_once(
+    page_composer: PikepdfPageComposer, tmp_path: Path
+) -> None:
+    """The second copy of a page does not inherit the turn of the first (AD-K04)."""
+    source = three_pages(tmp_path / "three.pdf")
+    target = tmp_path / "part.pdf"
+    await page_composer.compose([source], [PagePick(0, 1, rotate=90), PagePick(0, 1)], target)
+    assert widths(target) == [(100, 90), (100, 0)]
+
+
 async def test_a_rotation_the_page_tree_gives_stays(
     page_composer: PikepdfPageComposer, tmp_path: Path
 ) -> None:
@@ -147,11 +157,20 @@ async def test_other_images_are_embedded_without_loss_upright_on_white(
         assert [read.getpixel(spot) for spot in ((12, 6), (12, 5), (0, 6))] == [0, 255, 255]
 
 
+def _gif() -> bytes:
+    buffer = io.BytesIO()
+    Image.new("RGB", (20, 20), "white").save(buffer, "GIF")
+    return buffer.getvalue()
+
+
 @pytest.mark.parametrize(
     ("name", "data", "media_type"),
     [
         ("mail.eml", b"From: a@example.org\r\n\r\nHello\r\n", media_types.EML),
         ("broken.png", b"\x89PNG\r\n\x1a\nbroken", media_types.PNG),
+        # Another format said to be one Lekto takes: Pillow's other decoders are not asked
+        # (XB-K03).
+        ("picture.png", _gif(), media_types.PNG),
     ],
 )
 async def test_what_it_cannot_read_is_unprocessable(

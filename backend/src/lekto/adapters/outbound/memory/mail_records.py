@@ -37,11 +37,6 @@ class MemoryMailRecordRepository(MemoryRows[MailRecordId, MailRecord]):
             row.message_id == message_id and row.outcome in TAKEN_OUTCOMES for row in self._all()
         )
 
-    async def recent(self, mailbox: MailboxId, *, limit: int) -> list[MailRecord]:
-        rows = [row for row in self._all() if row.mailbox_id == mailbox]
-        rows.sort(key=lambda row: (row.fetched_at, row.id), reverse=True)
-        return [_copy(row) for row in rows[:limit]]
-
     async def page(
         self,
         mailbox: MailboxId,

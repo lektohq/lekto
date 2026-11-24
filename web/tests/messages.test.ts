@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import de from '../messages/de.json';
 import en from '../messages/en.json';
+import { m } from '#lib/paraglide/messages.js';
 
 const catalogues: Record<string, Record<string, string>> = { de, en };
 
@@ -117,6 +118,7 @@ const NO_SINGULAR: ReadonlySet<string> = new Set([
 	'prompt_requests',
 	'push_waiting_many',
 	'push_waiting_new',
+	'reason_mail_attachments_left',
 	'reason_recommend_confirm',
 	'reason_recommend_confirm_named',
 	'reason_recommend_reject_contacts',
@@ -213,5 +215,32 @@ describe('messages', () => {
 				placeholders(de[key as keyof typeof de]).join()
 		);
 		expect(differing).toEqual([]);
+	});
+});
+
+describe('the words of a hand-over', () => {
+	it('says the hand-over in the words of the move dialog, in both languages', () => {
+		for (const locale of ['de', 'en'] as const) {
+			const options = { locale };
+			expect(m.space_suggestion_hand_over({ name: 'Erika' }, options)).toContain(
+				m.move_hand_over({ name: 'Erika' }, options)
+			);
+			expect(m.move_handed_over({ name: 'Erika' }, options)).not.toMatch(/^An Erika/);
+		}
+	});
+});
+
+describe('a number and its unit', () => {
+	it('never break apart: a no-break space joins them (DESIGN.md, "Formats"; WY-K01)', () => {
+		const apart = /\} (?:MB|KB|GB|kB|ms|dpi|px|%|min|Min\.)(?![\w])|\b(?:S|p|pp)\. \{/;
+		const split = (catalog: Record<string, unknown>) =>
+			Object.entries(catalog)
+				.filter(([, text]) => typeof text === 'string' && apart.test(text))
+				.map(([key]) => key);
+		expect(split(de)).toEqual([]);
+		expect(split(en)).toEqual([]);
+		expect(apart.test('{size} MB')).toBe(true);
+		expect(apart.test('S. {page}')).toBe(true);
+		expect(apart.test('{size}\u00a0MB')).toBe(false);
 	});
 });

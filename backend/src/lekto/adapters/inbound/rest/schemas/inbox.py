@@ -212,8 +212,9 @@ class FieldCheckOut(BaseModel):
     confidence: float = Field(
         description=(
             "0 to 1, the rule's summary, not a probability: 1 for a value the judge or the "
-            "checks accept, at most 0.89 for an uncertain one. The measured values are in "
-            "`candidates` (their `sources`)."
+            "checks accept, just below the confidence threshold (`LEKTO_CONFIDENCE_THRESHOLD`) "
+            "at most for an uncertain one. The measured values are in `candidates` (their "
+            "`sources`)."
         )
     )
     reason: str | None = Field(

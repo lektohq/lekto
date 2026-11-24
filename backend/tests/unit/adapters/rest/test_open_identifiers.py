@@ -2,6 +2,8 @@
 
 import json
 
+import pytest
+
 from lekto.adapters.inbound.rest import PREFIX
 from lekto.core.domain.document_facts import DocumentFact, FactOrigin, role_of
 from lekto.core.domain.identifiers import Identifier, IdentifierKind, IdentifierSource
@@ -9,6 +11,7 @@ from lekto.core.domain.labels import grid_layout
 from lekto.core.domain.master_data import Contact
 from lekto.core.domain.users import User
 from lekto.core.ports.repository import DocumentFilter
+from lekto.core.services import open_identifiers
 from lekto.core.services.objects import structure_key, text_key
 from tests import builders
 from tests.api import auth
@@ -236,6 +239,22 @@ async def test_the_recommended_are_confirmed_at_once(api: Api) -> None:
     user = await api.user()
     refused = await api.client.post(f"{URL}/recommended", headers=auth(user))
     assert refused.status_code == 403
+
+
+async def test_more_recommended_than_a_request_may_name_are_confirmed_all(
+    api: Api, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The limit of a request's decisions does not hold back the button, which names none:
+    it refused every time once more than 200 were recommended."""
+    monkeypatch.setattr(open_identifiers, "MAX_DECISIONS", 1)
+    await seeded(api)
+    admin = await api.admin()
+    done = await api.client.post(f"{URL}/recommended", headers=auth(admin))
+    assert done.status_code == 200, done.text
+    assert [(item["value"], item["done"]) for item in done.json()] == [
+        (CUSTOMER[1], True),
+        (SITE[1], True),
+    ]
 
 
 async def test_where_an_identifier_stands_in_the_documents_the_caller_reads(api: Api) -> None:

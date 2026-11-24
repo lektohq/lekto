@@ -9,11 +9,12 @@ import { session } from '#lib/session.svelte.ts';
 import { fakeBack, goTo, testPage } from '#lib/testing/page-state.svelte.ts';
 import IdentifiersPanel from './IdentifiersPanel.svelte';
 import { type Routes, fakeApi, problem } from '#lib/testing/api.ts';
+import { settled } from '#lib/testing/time.ts';
 
 vi.mock('$app/navigation', () => import('#lib/testing/app-navigation.ts'));
 vi.mock('$app/state', () => import('#lib/testing/app-state.ts'));
 
-const UTILITY = { id: '0199a6c4-0000-7000-8000-0000000000c1', name: 'Stadtwerke Nord' };
+const UTILITY = { id: '0199a6c4-0000-7000-8000-0000000000c1', name: 'Stadtwerke Musterstadt' };
 const LOGO = `/api/v1/contacts/${UTILITY.id}/logo`;
 const BANK = { id: '0199a6c4-0000-7000-8000-0000000000c2', name: 'Bank' };
 
@@ -28,7 +29,7 @@ const CUSTOMER = {
 	last: '2026-10-12',
 	recommendation: {
 		action: 'confirm',
-		reason: { code: 'recommend_confirm', params: { count: 4, name: 'Stadtwerke Nord' } }
+		reason: { code: 'recommend_confirm', params: { count: 4, name: 'Stadtwerke Musterstadt' } }
 	}
 };
 const DOMAIN = {
@@ -217,7 +218,7 @@ describe('IdentifiersPanel', () => {
 		expect(customer.textContent).toContain(m.open_advise_confirm());
 		// The reason, for a screen reader beside the badge and on hover; the badge's trigger
 		// takes the focus.
-		expect(customer.textContent).toContain('Stadtwerke Nord');
+		expect(customer.textContent).toContain('Stadtwerke Musterstadt');
 		expect(
 			within(customer).getByRole('button', { name: new RegExp(m.open_advise_confirm()) }).tagName
 		).toBe('BUTTON');
@@ -400,7 +401,7 @@ describe('IdentifiersPanel', () => {
 		await user.click(screen.getByRole('button', { name: new RegExp(`^${m.open_suggested()}`) }));
 		await vi.waitFor(async () => expect(await rows()).toHaveLength(1));
 		late!();
-		await new Promise((resolve) => setTimeout(resolve, 30));
+		await settled();
 		// The late answer's 100 would stand beside the list of the suggestions.
 		expect(learned().textContent).not.toContain('100');
 		expect(learned().textContent).toContain('1');

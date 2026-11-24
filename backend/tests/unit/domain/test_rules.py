@@ -378,7 +378,7 @@ def test_action_values() -> None:
         SetContact(CONTACT),
         SetDocumentType(TYPE),
         SetTopic(TAG),
-        SetTitle("{contact}"),
+        SetTitle("{{ contact }}"),
     ],
 )
 def test_global_rules_may_do_everything(action: Action) -> None:
@@ -529,6 +529,27 @@ def test_set_field_value_must_fit(data_type: FieldType, value: JsonValue, fits: 
     else:
         with pytest.raises(ValidationError, match="does not accept"):
             check_fields(rule, {attr.id: attr}, WRITING)
+
+
+def test_an_amount_in_no_currency_is_refused_when_saved_and_kept_after() -> None:
+    """A rule saved now names an active currency (DA-K09); one saved before with three
+    capitals that are none still fits, so that it is not switched off when the field changes
+    (`references.misfits`)."""
+    attr = field(FieldType.AMOUNT)
+    given: JsonValue = {"amount": "10", "currency": "XYZ"}
+    for rule in (
+        field_rule(attr, Operator.IS, given),
+        definition(SetField(attr.id, given)),
+    ):
+        with pytest.raises(ValidationError, match="does not accept"):
+            check_fields(rule, {attr.id: attr}, WRITING, saved=True)
+        check_fields(rule, {attr.id: attr}, WRITING)
+    check_fields(
+        field_rule(attr, Operator.IS, {"amount": "10", "currency": "EUR"}),
+        {attr.id: attr},
+        WRITING,
+        saved=True,
+    )
 
 
 def test_missing_field_is_rejected() -> None:

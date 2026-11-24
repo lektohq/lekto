@@ -57,7 +57,6 @@ from lekto.core.domain.document_facts import (
 )
 from lekto.core.domain.documents import Document
 from lekto.core.domain.errors import (
-    ConcurrencyError,
     EmbeddingsError,
     NotFoundError,
     SearchIndexError,
@@ -90,7 +89,6 @@ from lekto.core.services._access import load_actor, require_admin
 from lekto.core.services._jobs import (
     JobRunner,
     document_payload,
-    lost,
     payload_document,
     reason_of,
 )
@@ -107,6 +105,8 @@ INDEX_JOB = "search.index"
 REFRESH_JOB = "search.refresh"
 """Payload (`refresh_payload`): `kind` (`RefreshKind`) and `id` of the changed item."""
 RECONCILE_JOB = "search.reconcile"
+_ONCE = "once"
+"""A reconcile job's payload key: true for one that queues no next one."""
 REBUILD_JOB = "search.rebuild"
 
 
@@ -157,8 +157,9 @@ class IndexingPolicy:
     job_lease: timedelta
     rebuild_lease: timedelta
     batch_size: int = 50  # documents per request in a rebuild
-    # How far back `status` reads the durations of the index jobs (the jobs' retention).
-    durations_window: timedelta = timedelta(days=7)
+    # How far back `status` reads the durations of the index jobs: the jobs' retention, from
+    # the settings as the rest (no default of its own, SA-K07).
+    durations_window: timedelta
 
     def __post_init__(self) -> None:
         if min(self.max_text, self.chunk_size, self.max_chunks, self.batch_size) < 1:
@@ -353,7 +354,13 @@ class IndexingService:
             await uow.jobs.enqueue(
                 RECONCILE_JOB, {}, run_at=self._clock.now(), dedup_key=RECONCILE_JOB
             )
-            await uow.jobs.enqueue(RECONCILE_JOB, {"once": True}, run_at=self._clock.now())
+            # One waits at most: a worker in a loop of restarts adds no more (SA-K02).
+            await uow.jobs.enqueue(
+                RECONCILE_JOB,
+                {_ONCE: True},
+                run_at=self._clock.now(),
+                coalesce_key=f"{RECONCILE_JOB}.once",
+            )
             await uow.commit()
 
     async def request_rebuild(self, actor: Actor) -> None:
@@ -380,18 +387,11 @@ class IndexingService:
             return
         try:
             outcome = await work()
-        except ConcurrencyError as error:
-            # A lost claim only if another worker owns the job now; else (a deadlock, a row
-            # changed meanwhile) it fails this attempt and runs again (SA-08).
-            if not await self._jobs.still_claimed(job):
-                lost(job)
-                return
-            await self._failed(job, error)
-            return
         except Exception as error:
-            await self._failed(job, error)
+            if not await self._jobs.claim_lost(job, error):
+                await self._failed(job, error)
             return
-        recurring = job.kind == RECONCILE_JOB and job.payload.get("once") is not True
+        recurring = job.kind == RECONCILE_JOB and job.payload.get(_ONCE) is not True
         result = outcome.to_json() if isinstance(outcome, Indexed) else None
         await self._jobs.end(job, also=self._next_reconcile if recurring else None, result=result)
 
@@ -919,7 +919,9 @@ def split_sections(text: str, size: int, limit: int) -> list[str]:
     for paragraph in (part.strip() for part in _PARAGRAPH_BREAK.split(text)):
         if not paragraph:
             continue
-        while len(paragraph) > size:
+        # Not past the limit: the rest of a long paragraph was cut up and copied to its end
+        # (SA-K06).
+        while len(paragraph) > size and len(sections) < limit:
             cut = paragraph.rfind(" ", size // 2, size)
             cut = size if cut == -1 else cut
             if current:

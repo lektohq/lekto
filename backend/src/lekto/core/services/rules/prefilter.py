@@ -15,19 +15,13 @@ from dataclasses import replace
 from uuid import UUID
 
 from lekto.core.domain.ids import ContactId, DocumentTypeId, FieldId, TagId
-from lekto.core.domain.rules import Condition, ConditionField, Group, Operator
+from lekto.core.domain.rules import TAG_FIELDS, Condition, ConditionField, Group, Operator
 from lekto.core.domain.tag_tree import TagTree
 from lekto.core.ports.repository import DocumentFilter
 
 _REFERENCES = frozenset({ConditionField.CONTACT, ConditionField.DOCUMENT_TYPE})
-_HELD = frozenset(
-    {
-        ConditionField.TAGS,
-        ConditionField.CONTACT_GROUP,
-        ConditionField.DOCUMENT_TYPE_GROUP,
-        ConditionField.TOPIC,
-    }
-)
+_HELD = frozenset(TAG_FIELDS)
+"""The conditions on tags: each narrows by the tags it names and those below them."""
 _ASKING = frozenset({Operator.IS, Operator.IN, Operator.CONTAINS})
 """Operators that ask for one of the values (for tags, groups and topics: or one below it)."""
 

@@ -101,7 +101,7 @@ class MailRecordRepositoryContract:
             assert await uow.mail_records.known_uids(mailbox.id, "INBOX", 8) == {1}
             assert await uow.mail_records.has_message("m3@example.test")
             assert not await uow.mail_records.has_message("m9@example.test")
-            recent = await uow.mail_records.recent(mailbox.id, limit=4)
+            recent = await uow.mail_records.page(mailbox.id, limit=4)
             assert [record.uid for record in recent[:2]] == [3, 2]
             # The two fetched at the same time stand by id, the later id first.
             assert [record.uid for record in recent[2:]] == [1, 1]
@@ -158,7 +158,7 @@ class MailRecordRepositoryContract:
             assert await uow.mail_records.forget_beyond(mailbox.id, keep=2, now=NOW + 6 * HOUR) == 0
             await uow.commit()
         async with uow_factory() as uow:
-            three, two, one = await uow.mail_records.recent(mailbox.id, limit=3)
+            three, two, one = await uow.mail_records.page(mailbox.id, limit=3)
             assert one.forgotten_at == NOW + 5 * HOUR
             assert (one.sender, one.subject, one.reason, one.importance, one.marks) == (
                 "",
@@ -230,7 +230,7 @@ class MailRecordRepositoryContract:
             await uow.commit()
         async with uow_factory() as uow:
             assert [r.uid for r in await uow.mail_records.waiting(mailbox.id)] == [1]
-            stored = {r.uid: r for r in await uow.mail_records.recent(mailbox.id, limit=9)}
+            stored = {r.uid: r for r in await uow.mail_records.page(mailbox.id, limit=9)}
             assert stored[2] == replace(settled, subject=later.subject)
             assert stored[2].later and stored[2].steps == steps
             assert stored[3].gone_at == NOW + 9 * HOUR and not stored[3].waiting
@@ -257,7 +257,7 @@ class MailRecordRepositoryContract:
             await uow.commit()
         async with uow_factory() as uow:
             assert [r.uid for r in await uow.mail_records.steps_due(mailbox.id)] == [2]
-            stored = {r.uid: r for r in await uow.mail_records.recent(mailbox.id, limit=9)}
+            stored = {r.uid: r for r in await uow.mail_records.page(mailbox.id, limit=9)}
             assert (stored[1].steps, stored[1].steps_due) == (done, ())
 
     async def test_a_page_of_the_log_and_its_counts(self, uow_factory: UnitOfWorkFactory) -> None:

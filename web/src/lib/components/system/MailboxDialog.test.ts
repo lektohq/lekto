@@ -75,6 +75,13 @@ async function fillConnection(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe('MailboxDialog', () => {
+	it('takes the user name as typed: no capital, no correction (WM-K04)', async () => {
+		render(MailboxDialog, { open: true, mailbox: null, onsaved: vi.fn() });
+		const name = await screen.findByLabelText(m.mail_username());
+		expect(name.getAttribute('autocapitalize')).toBe('none');
+		expect(name.getAttribute('autocorrect')).toBe('off');
+	});
+
 	it('tests a new mailbox once it knows where and as whom, then goes on to the folders', async () => {
 		const user = userEvent.setup();
 		render(MailboxDialog, { open: true, mailbox: null, onsaved: vi.fn() });

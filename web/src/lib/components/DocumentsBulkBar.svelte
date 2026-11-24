@@ -103,7 +103,7 @@
 	const shown = (which: NonNullable<typeof dialog>) => dialog === which;
 	const showing = (which: NonNullable<typeof dialog>) => (value: boolean) => {
 		if (value) dialog = which;
-		else if (dialog === which) dialog = null;
+		else if (dialog === which) close();
 	};
 
 	let adding = $state<string[]>([]);
@@ -142,7 +142,7 @@
 	/** Start `action` on the selection; the page follows it until it ends. */
 	async function start(action: BulkAction) {
 		await run.start(selection(), action);
-		dialog = null;
+		close();
 	}
 
 	async function confirmAll() {
@@ -153,7 +153,9 @@
 		}
 	}
 
-	function reset() {
+	/** No dialog open, and the next one starts empty. */
+	function close() {
+		dialog = null;
 		adding = [];
 		removing = [];
 		contact = '';
@@ -161,9 +163,6 @@
 		topic = '';
 		space = '';
 	}
-	$effect(() => {
-		if (dialog === null) reset();
-	});
 </script>
 
 <!-- Before the count: the X that ends the mode and, on a desktop, the chooser. -->

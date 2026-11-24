@@ -3,6 +3,7 @@ their times, and the verdicts of people per field and per signal."""
 
 from collections.abc import Mapping, Sequence
 from datetime import date, datetime, timedelta
+from typing import Any, Self
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -17,6 +18,8 @@ from lekto.core.domain.ids import ContactId
 from lekto.core.domain.pipeline import Lane, Node
 from lekto.core.ports.identity import RefCipher
 from lekto.core.services.automation import (
+    ALL_MONTHS,
+    MAX_CASES,
     AutomationReport,
     FieldVerdicts,
     Period,
@@ -55,8 +58,8 @@ class TimesOut(BaseModel):
     p90_ms: float | None = Field(description="90th percentile, by nearest rank.")
 
     @classmethod
-    def of(cls, times: Times) -> TimesOut:
-        return cls(count=times.count, median_ms=_ms(times.median), p90_ms=_ms(times.p90))
+    def of(cls, times: Times, **more: Any) -> Self:
+        return cls(count=times.count, median_ms=_ms(times.median), p90_ms=_ms(times.p90), **more)
 
 
 class StepTimesOut(TimesOut):
@@ -105,7 +108,7 @@ class AutomationOut(BaseModel):
     )
     months: list[MonthOut] = Field(
         description="By the month their first run stopped, oldest first: the last 12 months, for "
-        "all time from the first month with documents (at most 60)."
+        f"all time from the first month with documents (at most {ALL_MONTHS})."
     )
     duration: TimesOut = Field(
         description="From the start of receiving to the first stop, with the waits for a worker."
@@ -135,10 +138,7 @@ class AutomationOut(BaseModel):
             ],
             duration=TimesOut.of(report.duration),
             work=TimesOut.of(report.work),
-            steps=[
-                StepTimesOut(node=node, **TimesOut.of(times).model_dump())
-                for node, times in report.steps.items()
-            ],
+            steps=[StepTimesOut.of(times, node=node) for node, times in report.steps.items()],
             fields=[FieldVerdictsOut.of(item) for item in report.fields],
         )
 
@@ -203,13 +203,14 @@ class TallyOut(BaseModel):
     unread: int = Field(description="Read before its kind had a holder (`read-facts` sets it).")
 
     @classmethod
-    def of(cls, tally: Tally) -> TallyOut:
+    def of(cls, tally: Tally, **more: Any) -> Self:
         return cls(
             right=tally.right,
             learned_rejected=tally.learned_rejected,
             refused_confirmed=tally.refused_confirmed,
             unclear=tally.unclear,
             unread=tally.unread,
+            **more,
         )
 
 
@@ -218,7 +219,7 @@ class HolderKindOut(TallyOut):
 
     @classmethod
     def of_kind(cls, kind: IdentifierKind, tally: Tally) -> HolderKindOut:
-        return cls(kind=kind, **TallyOut.of(tally).model_dump())
+        return cls.of(tally, kind=kind)
 
 
 class HoldersOut(BaseModel):
@@ -248,7 +249,7 @@ class HolderCaseOut(BaseModel):
 
 
 class HolderCasesOut(BaseModel):
-    cases: list[HolderCaseOut] = Field(description="At most a hundred.")
+    cases: list[HolderCaseOut] = Field(description=f"At most {MAX_CASES}.")
 
     @classmethod
     def of(

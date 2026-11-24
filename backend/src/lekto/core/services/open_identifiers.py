@@ -196,16 +196,27 @@ class OpenIdentifierService:
         )
 
     async def decide(
-        self, actor: Actor, decisions: Sequence[OpenDecision], *, session: bool = True
+        self, actor: Actor, decisions: Sequence[OpenDecision], *, session: bool
     ) -> list[DecisionOutcome]:
         """Keep each of `decisions` (admins), each a change of its contact or profile on its
         own; one that cannot be done says why, and the others are done all the same. A
-        decision about a person's suggestion needs a `session`."""
+        decision about a person's suggestion needs a `session` (no default: who calls says
+        whether there is one, SA-K03)."""
         if len(decisions) > MAX_DECISIONS:
             raise ValidationError(because(ReasonCode.INPUT_TOO_MANY, max=MAX_DECISIONS))
         async with self._uow() as uow:
             await require_admin(uow, actor, Action.CHANGE_MASTER_DATA)
             found, _, _, learned = await _open(uow)
+        return await self._decide_all(actor, decisions, found, learned, session)
+
+    async def _decide_all(
+        self,
+        actor: Actor,
+        decisions: Sequence[OpenDecision],
+        found: Sequence[OpenIdentifier],
+        learned: dict[Key, Identifier],
+        session: bool,
+    ) -> list[DecisionOutcome]:
         open = {item.key: item for item in found}
         outcomes = []
         for decision in decisions:
@@ -223,16 +234,15 @@ class OpenIdentifierService:
                 outcomes.append(DecisionOutcome(kind, value))
         return outcomes
 
-    async def confirm_recommended(
-        self, actor: Actor, *, session: bool = True
-    ) -> list[DecisionOutcome]:
+    async def confirm_recommended(self, actor: Actor, *, session: bool) -> list[DecisionOutcome]:
         """Confirm every open identifier whose documents recommend it (admins, Tobi
         28.10.2026), each as `decide` confirms one: at its contact by hand, a suggested one at
         the contact or the person its documents name. One that cannot be done says why. Never
-        rejects: a rejected one is never learned again and leaves the list unseen."""
+        rejects: a rejected one is never learned again and leaves the list unseen. All of them,
+        however many: `MAX_DECISIONS` bounds what a request names, and this one names none."""
         async with self._uow() as uow:
             await require_admin(uow, actor, Action.CHANGE_MASTER_DATA)
-            found, _, _, _ = await _open(uow)
+            found, _, _, learned = await _open(uow)
         decisions = [
             OpenDecision(kind=item.kind, value=item.value, action=OpenAction.CONFIRM)
             for item in found
@@ -240,7 +250,8 @@ class OpenIdentifierService:
         ]
         if not decisions:
             return []
-        return await self.decide(actor, decisions, session=session)
+        # What was read once, not again through `decide` (SA-K03).
+        return await self._decide_all(actor, decisions, found, learned, session)
 
     async def _decide(
         self,

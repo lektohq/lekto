@@ -4,6 +4,7 @@ identifiers): an address names a value by its reference, never as written."""
 from pydantic import BaseModel, ConfigDict, Field
 
 from lekto.adapters.inbound.schemas import RequestBody
+from lekto.core.domain.document_facts import FactCriterion, FactRole
 from lekto.core.domain.errors import ValidationError
 from lekto.core.domain.identifiers import MAX_IDENTIFIER_VALUE, IdentifierKind
 from lekto.core.domain.reasons import ReasonCode, because
@@ -25,6 +26,17 @@ def opened(refs: RefCipher, kind: IdentifierKind, ref: str) -> str:
         return refs.open(ref, context=kind.value)
     except DecryptionError:
         raise ValidationError(because(ReasonCode.REF_UNKNOWN)) from None
+
+
+def fact_criterion(
+    refs: RefCipher, kind: IdentifierKind | None, ref: str | None, role: FactRole | None
+) -> FactCriterion:
+    """A fact the documents have: of `kind`, with the value `ref` names (it needs its kind), in
+    `role`; what is None is any. ValidationError (422) with the reason otherwise; the lens
+    body and the `fact` parameter both read it so (RA-K11)."""
+    if ref and kind is None:
+        raise ValidationError(because(ReasonCode.FACT_CRITERION_EMPTY))
+    return FactCriterion.written(kind, opened(refs, kind, ref) if ref and kind else None, role)
 
 
 class RefIn(RequestBody):

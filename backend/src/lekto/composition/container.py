@@ -65,6 +65,7 @@ from lekto.adapters.outbound.regex import RegexPatternMatcher
 from lekto.adapters.outbound.s3 import S3ObjectStore
 from lekto.adapters.outbound.sklearn import SklearnClassifier
 from lekto.adapters.outbound.sql import SqlEventBus, SqlUnitOfWorkFactory, SqlWakeup
+from lekto.adapters.outbound.sql.database import COMMAND_TIMEOUT
 from lekto.adapters.outbound.system import SystemClock
 from lekto.adapters.outbound.weasyprint import WeasyPrintMailRenderer
 from lekto.adapters.outbound.webhooks import HttpWebhookSender
@@ -204,7 +205,7 @@ class Persistence:
 
 def sql_persistence(settings: Settings) -> Persistence:
     """SQLite or Postgres, per `LEKTO_DB_TYPE`; the schema must be migrated."""
-    database = open_database(settings)
+    database = open_database(settings, command_timeout=COMMAND_TIMEOUT)
     wakeup = SqlWakeup(database)
 
     async def close() -> None:
@@ -396,8 +397,8 @@ def ref_cipher(settings: Settings) -> RefCipher:
 
 @dataclass(frozen=True)
 class Container:
-    """One adapter per port. Search, language model and embeddings are optional until the
-    milestones that need them (M6, M5).
+    """One adapter per port. Search, language model and embeddings are optional: None while
+    they are not configured.
 
     `aclose` releases what the adapters hold (database engine, S3 client); call it when the
     API or the worker stops.
@@ -895,7 +896,7 @@ def build_services(container: Container, settings: Settings | None = None) -> Se
         None
         if index is None
         else SearchService(
-            uow, index, search_policy_of(settings), embeddings=embeddings, clock=clock, store=store
+            uow, clock, index, search_policy_of(settings), embeddings=embeddings, store=store
         )
     )
     return Services(

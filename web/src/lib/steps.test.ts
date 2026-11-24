@@ -50,6 +50,9 @@ function confirmation(node: Node, run: number, before: LogEntry['outcome']): Log
 
 const judgeOf = (steps: ReturnType<typeof current>) => steps.find((step) => step.node === 'judge');
 
+/** A fixed moment: nothing here depends on the clock (WT3-K05). */
+const NOW = new Date('2026-10-13T10:00:00Z');
+
 describe('stepsOf and phasesOf', () => {
 	it('puts the steps of a run into the four phases, in graph order', () => {
 		const steps = current(NODES.map((node) => state(node, 'ok')));
@@ -99,11 +102,11 @@ describe('phaseSeconds', () => {
 		// Run 2 started at the OCR: the receiving is run 1's.
 		const steps = current([...states], [entry('receive', 1), entry('ocr', 2)], 2);
 		const read = steps.filter((step) => ['receive', 'ocr'].includes(step.node));
-		expect(phaseSeconds(read, new Date())).toBe(4.5);
+		expect(phaseSeconds(read, NOW)).toBe(4.5);
 		expect(
 			phaseSeconds(
 				steps.filter((step) => step.node === 'file'),
-				new Date()
+				NOW
 			)
 		).toBeNull();
 	});

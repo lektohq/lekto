@@ -6,6 +6,7 @@ import { m } from '#lib/paraglide/messages.js';
 import { TEMPLATES_GUIDE } from '#lib/templates/guide.ts';
 import TemplateInput from './TemplateInput.svelte';
 import { type Routes, fakeApi, json } from '#lib/testing/api.ts';
+import { settled } from '#lib/testing/time.ts';
 
 const PAYSLIP = '0199a6c4-0000-7000-8000-0000000000e1';
 let fetchMock: ReturnType<typeof fakeApi>;
@@ -122,7 +123,7 @@ describe('TemplateInput', () => {
 		await waitFor(() => expect(previews.at(-1)?.template).toBe('fast'));
 		// The newest template is fine; the verdict on the one before must not overwrite that.
 		answerSlow();
-		await new Promise((resolve) => setTimeout(resolve, 20));
+		await settled();
 		expect(screen.queryByText('late error')).toBeNull();
 		expect(screen.getByLabelText('Title').getAttribute('aria-invalid')).not.toBe('true');
 	});

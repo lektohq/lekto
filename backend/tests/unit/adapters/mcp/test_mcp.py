@@ -208,6 +208,23 @@ async def test_the_server_works_over_a_real_connection() -> None:
 # --- reading ------------------------------------------------------------------------------------
 
 
+async def test_documents_list_is_in_rest_s_order(api: Api, scene: Scene) -> None:
+    """Newest first by when they came in, as REST lists them without `sort`, not by arrival: a
+    corrected receipt moves a document (RA-K10)."""
+    owner = scene.headers["owner"]
+    changed = await api.client.patch(
+        f"/api/v1/documents/{scene.yellow}",
+        json={"created_at": "2020-01-01T00:00:00Z"},
+        headers=owner,
+    )
+    assert changed.status_code == 200, changed.text
+    rest = await api.client.get("/api/v1/documents", headers=owner)
+    by_rest = [item["id"] for item in rest.json()["items"]]
+    listed = data(await call(api, owner, "documents_list"))["items"]
+    assert [item["id"] for item in listed] == [short_id(UUID(id)) for id in by_rest]
+    assert by_rest[-1] == scene.yellow
+
+
 async def test_documents_list_lists_by_filters_and_counts_by_groups(api: Api, scene: Scene) -> None:
     owner = scene.headers["owner"]
     admin = await api.admin()
@@ -617,7 +634,7 @@ async def test_facts_decide_adds_and_rejects_a_fact(api: Api, scene: Scene) -> N
         kind="invoice_number",
         value="R-1001",
     )
-    assert error(reader)
+    assert "only editors and admins decide the facts" in error(reader)
 
 
 async def test_facts_show_an_identifiers_role_and_decision(api: Api, scene: Scene) -> None:
@@ -725,6 +742,17 @@ async def test_spaces_and_lenses_are_read_by_name(api: Api, scene: Scene) -> Non
     lenses = data(await call(api, owner, "lenses_list"))["lenses"]
     assert lenses == [{"name": "Neues", "query": "Rechnung"}]
 
+    # Every filter `documents_list lens=` applies, by name (CO-K08).
+    lens = {"space_ids": [str(scene.shared.id)], "facts": [{"kind": "iban", "role": "own"}]}
+    await post(api, "/lenses", {"name": "Geteilt", "filter": lens}, owner)
+    (shown,) = [
+        lens
+        for lens in data(await call(api, owner, "lenses_list"))["lenses"]
+        if lens["name"] == "Geteilt"
+    ]
+    assert shown["spaces"] == ["Shared"]
+    assert shown["facts"] == [{"kind": "iban", "role": "own"}]
+
 
 async def test_identifiers_find_says_where_a_number_stands(api: Api, scene: Scene) -> None:
     owner = scene.headers["owner"]
@@ -760,7 +788,7 @@ async def test_identifiers_find_says_where_a_number_stands(api: Api, scene: Scen
 
 async def test_identifiers_open_is_for_admins(api: Api, scene: Scene) -> None:
     listed = data(await call(api, scene.headers["admin"], "identifiers_open"))
-    assert listed["total"] >= 0
+    assert listed == {"total": 0}  # the scene shows no number no contact holds
     refused = await call(api, scene.headers["owner"], "identifiers_open")
     assert "only admins" in error(refused)
 
@@ -814,7 +842,8 @@ async def test_two_rules_of_one_name_are_told_apart_by_their_space(api: Api, sce
 
 async def test_system_status_names_what_is_running(api: Api, scene: Scene) -> None:
     status = data(await call(api, scene.headers["owner"], "system_status"))
-    assert isinstance(status.get("jobs", []), list)
+    jobs = {item["kind"]: item for item in status["jobs"]}
+    assert jobs["pipeline.node"]["due"] >= 1  # the scene's documents wait in the pipeline
 
 
 async def test_a_document_one_may_not_read_is_just_not_found(api: Api, scene: Scene) -> None:

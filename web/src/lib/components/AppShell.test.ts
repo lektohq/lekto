@@ -262,6 +262,9 @@ describe('AppShell', () => {
 		expect(screen.queryByRole('button', { name: m.account_menu({ username: 'john' }) })).toBeNull();
 		await fireEvent.click(screen.getByRole('button', { name: m.nav_open() }));
 		const sheet = await screen.findByRole('dialog');
+		// Named as what it is, not by the logo's words (WZ-K05).
+		expect(sheet.getAttribute('aria-labelledby')).toBeTruthy();
+		expect(screen.getByRole('dialog', { name: m.nav_main() })).toBe(sheet);
 		expect(within(sheet).getByText('john')).toBeTruthy();
 		expect(within(sheet).getByText(m.role_admin())).toBeTruthy();
 		expect(within(sheet).getByRole('switch', { name: new RegExp(m.all_users()) })).toBeTruthy();

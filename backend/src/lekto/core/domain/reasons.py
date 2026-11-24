@@ -275,6 +275,7 @@ class ReasonCode(StrEnum):
     TOKEN_INVALID = "token_invalid"
     WRONG_PASSWORD = "wrong_password"
     TOTP_ALREADY_ON = "totp_already_on"
+    TOTP_NEEDS_PASSWORD = "totp_needs_password"
     NO_TOTP_SETUP = "no_totp_setup"
     TOTP_OFF = "totp_off"
     CODE_INVALID = "code_invalid"
@@ -340,6 +341,7 @@ class ReasonCode(StrEnum):
     NOT_CUSTOMER_NUMBER = "not_customer_number"
     NOT_OF_KIND = "not_of_kind"
     FACT_KIND_UNKNOWN = "fact_kind_unknown"
+    FACT_ROLE_UNKNOWN = "fact_role_unknown"
     FACT_NOT_IN_TEXT = "fact_not_in_text"
     FACT_NOT_ASKED = "fact_not_asked"
     HOLDER_NOT_LISTED = "holder_not_listed"
@@ -458,6 +460,7 @@ class ReasonCode(StrEnum):
     MAIL_PASSWORD_AGAIN = "mail_password_again"
     MAILBOX_PAUSED = "mailbox_paused"
     MAIL_TOO_LARGE = "mail_too_large"
+    MAIL_ATTACHMENTS_LEFT = "mail_attachments_left"
     MAIL_STEP_FAILED = "mail_step_failed"
     MAIL_STEP_GONE = "mail_step_gone"
     MAIL_RULE_PERSON_GONE = "mail_rule_person_gone"
@@ -796,6 +799,9 @@ TEMPLATES: Mapping[ReasonCode, str] = {
     ReasonCode.TOKEN_INVALID: "the token is invalid or has expired",
     ReasonCode.WRONG_PASSWORD: "the current password is wrong",
     ReasonCode.TOTP_ALREADY_ON: "TOTP is already on; turn it off first",
+    ReasonCode.TOTP_NEEDS_PASSWORD: (
+        "the second factor guards the sign-in with a password, which the account has not"
+    ),
     ReasonCode.NO_TOTP_SETUP: "no TOTP setup to confirm",
     ReasonCode.TOTP_OFF: "TOTP is off",
     ReasonCode.CODE_INVALID: "the code is not valid",
@@ -878,6 +884,7 @@ TEMPLATES: Mapping[ReasonCode, str] = {
     ReasonCode.NOT_IBAN: "'{value}' is not a valid IBAN",
     ReasonCode.NOT_VAT_ID: "'{value}' is not a VAT number",
     ReasonCode.FACT_KIND_UNKNOWN: "'{kind}' is no kind of fact Lekto knows",
+    ReasonCode.FACT_ROLE_UNKNOWN: "'{role}' is no role of a fact Lekto knows",
     ReasonCode.FACT_NOT_IN_TEXT: "'{value}' does not appear in the text",
     ReasonCode.FACT_NOT_ASKED: "a fact '{kind}' in the role '{role}' was not asked for",
     ReasonCode.HOLDER_NOT_LISTED: "'{value}' was not among the numbers asked about",
@@ -1065,6 +1072,10 @@ TEMPLATES: Mapping[ReasonCode, str] = {
     ReasonCode.MAIL_TOO_LARGE: (
         "the mail '{subject}' has {size:number} MB; Lekto fetches mails of up to {max:number} MB "
         "(LEKTO_UPLOAD_MAX_SIZE)"
+    ),
+    ReasonCode.MAIL_ATTACHMENTS_LEFT: (
+        "only the first {max:number} attachments were taken; not taken: {count:number} (the "
+        "cover letter names them)"
     ),
     ReasonCode.MAIL_STEP_FAILED: (
         "on the server, '{step:thing}' failed for the mail '{subject}': {detail}"

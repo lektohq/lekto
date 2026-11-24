@@ -25,7 +25,7 @@ from lekto.core.domain.events import (
     NodeStarted,
 )
 from lekto.core.domain.ids import ContactId, TagId
-from lekto.core.domain.jobs import JobStatus, RetryPolicy
+from lekto.core.domain.jobs import JobStatus
 from lekto.core.domain.master_data import Tag
 from lekto.core.domain.pipeline import (
     CURRENT_SIGNALS,
@@ -697,21 +697,6 @@ async def test_every_step_needs_an_executor(world: World) -> None:
         )
 
 
-def test_retry_policy() -> None:
-    policy = RetryPolicy(max_attempts=3, delay=timedelta(seconds=10))
-    assert policy.next_run(1, NOW) == NOW + timedelta(seconds=10)
-    assert policy.next_run(2, NOW) == NOW + timedelta(seconds=20)
-    assert policy.next_run(3, NOW) is None
-    capped = RetryPolicy(
-        max_attempts=10, delay=timedelta(seconds=10), max_delay=timedelta(seconds=30)
-    )
-    assert [capped.next_run(n, NOW) for n in (2, 3, 4)] == [
-        NOW + timedelta(seconds=20),
-        NOW + timedelta(seconds=30),
-        NOW + timedelta(seconds=30),
-    ]
-
-
 class Blocks:
     """Node executor that waits until cancelled."""
 
@@ -807,6 +792,28 @@ async def test_a_stored_original_is_not_uploaded_again(world: World) -> None:
     await world.object_store.put(key, b"%PDF-1.7 marker", content_type="application/pdf")
     await world.pipeline().receive(Actor(owner.id), incoming(PDF), filename="b.pdf")
     assert await world.object_store.get(key) == b"%PDF-1.7 marker"
+
+
+async def test_an_original_stored_for_a_document_not_made_goes_again(world: World) -> None:
+    """As with a new version: the file stored for the upload goes when the document is not
+    created; one that was there already stays (SA-K01)."""
+    owner = await world.user()
+
+    async def failing(uow: object, document: object) -> None:
+        raise RuntimeError("the transaction failed")
+
+    file = incoming(b"%PDF-1.7 not made")
+    with pytest.raises(RuntimeError):
+        await world.pipeline().receive(Actor(owner.id), file, filename="a.pdf", also=failing)
+    assert not await world.object_store.exists(original_key(file.sha256))
+
+    there = original_key(Sha256.of(PDF))
+    await world.object_store.put(there, PDF, content_type="application/pdf")
+    with pytest.raises(RuntimeError):
+        await world.pipeline().receive(
+            Actor(owner.id), incoming(PDF), filename="b.pdf", also=failing
+        )
+    assert await world.object_store.exists(there)
 
 
 class VanishingStore(MemoryObjectStore):

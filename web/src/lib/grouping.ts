@@ -45,6 +45,13 @@ function monthLabel(month: string | null): string | null {
 	return formatDate(new Date(year, number - 1, 1), { month: 'long', year: 'numeric' });
 }
 
+/** The name of `key` in `list`; `…` while the list loads (not its id); null for none. */
+function named(key: string, list: readonly { id: string; name: string }[] | undefined) {
+	if (!key) return null;
+	if (!list) return '…';
+	return list.find((entry) => entry.id === key)?.name ?? key;
+}
+
 /** Buckets of `items` by `keyOf`, in the order of `order` (keys not in it by label), `''`
  * (none) last. */
 function buckets<T>(
@@ -101,17 +108,13 @@ export function groupDocuments<T>(
 			return buckets(
 				items,
 				(item) => documentOf(item).document_type_id ?? '',
-				(key) =>
-					context.lookup?.documentTypes.find((entry) => entry.id === key)?.name ??
-					(key ? key : m.lens_group_no_type())
+				(key) => named(key, context.lookup?.documentTypes) ?? m.lens_group_no_type()
 			);
 		case 'contact':
 			return buckets(
 				items,
 				(item) => documentOf(item).contact_id ?? '',
-				(key) =>
-					context.lookup?.contacts.find((entry) => entry.id === key)?.name ??
-					(key ? key : m.lens_group_no_contact())
+				(key) => named(key, context.lookup?.contacts) ?? m.lens_group_no_contact()
 			);
 		case 'month': {
 			const monthOf = (item: T) => documentOf(item).document_date?.slice(0, 7) ?? '';

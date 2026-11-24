@@ -12,6 +12,7 @@ import asyncio
 import io
 import itertools
 import re
+import zipfile
 from collections import Counter, OrderedDict
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -266,7 +267,8 @@ class _Model:
                 )
         except ClassifierError:
             raise
-        except (ValueError, KeyError, OSError, EOFError) as error:
+        # A single array (`.npy`) is no archive (TypeError), a cut one no zip (BadZipFile).
+        except (ValueError, KeyError, OSError, EOFError, TypeError, zipfile.BadZipFile) as error:
             raise ClassifierError(f"the model cannot be read: {error}") from None
 
     def predict(self, text: str) -> Prediction:

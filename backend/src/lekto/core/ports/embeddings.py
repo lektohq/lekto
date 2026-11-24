@@ -1,4 +1,4 @@
-"""Embeddings: text to vector, for semantic search (indexing follows in M6).
+"""Embeddings: text to vector, for semantic search.
 
 First adapter: OpenAI-compatible API.
 """

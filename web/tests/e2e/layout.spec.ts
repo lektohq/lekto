@@ -200,7 +200,6 @@ const frameOf = (page: Page) =>
 	page.locator('[role="dialog"], [role="alertdialog"], [role="menu"]').last();
 
 test.beforeAll(async ({ playwright, baseURL }) => {
-	test.skip(!ADMIN_PASSWORD, 'LEKTO_ADMIN_PASSWORD is not set');
 	// Without OCR programs the document turns red only after the node's retries.
 	test.setTimeout(240_000);
 	api = await playwright.request.newContext({ baseURL });

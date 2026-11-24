@@ -12,6 +12,7 @@ from typing import Any
 import pytest
 
 from lekto.adapters.inbound.rest.schemas.outgoing import EventBody
+from lekto.core.domain.codes import Code, codes_to_json
 from lekto.core.domain.documents import Document
 from lekto.core.domain.errors import (
     ConcurrencyError,
@@ -20,6 +21,7 @@ from lekto.core.domain.errors import (
     TooManyAttemptsError,
 )
 from lekto.core.domain.events import (
+    ClassifierTrained,
     DocumentDeleted,
     DocumentFiled,
     DocumentReceived,
@@ -30,6 +32,7 @@ from lekto.core.domain.fields import FieldDefinition, FieldType, Money
 from lekto.core.domain.ids import DocumentId, WebhookId, new_id
 from lekto.core.domain.jobs import Job, JobStatus
 from lekto.core.domain.json_value import JsonObject
+from lekto.core.domain.locations import Box
 from lekto.core.domain.master_data import Contact, DocumentType
 from lekto.core.domain.pipeline import Lane
 from lekto.core.domain.reasons import ReasonCode, because
@@ -47,9 +50,10 @@ from lekto.core.domain.webhooks import (
     Webhook,
     WebhookDelivery,
 )
-from lekto.core.ports.webhook_sender import WebhookRequest
+from lekto.core.ports.webhook_sender import REFUSED, WebhookRequest
 from lekto.core.services import _jobs
 from lekto.core.services._push_queue import PUSH_JOB
+from lekto.core.services.objects import codes_key
 from lekto.core.services.webhooks import DELIVER_JOB, WebhookDeliveryService, delivery
 from lekto.core.services.webhooks.delivery import queue_rule_send
 from lekto.core.services.webhooks.management import serving_model_call
@@ -276,9 +280,10 @@ async def test_events_without_a_document_or_for_a_vanished_one_queue_nothing(
 ) -> None:
     user = await world.user()
     await hook(world, user)
-    await world.webhook_delivery().on_event(
-        DocumentReceived(occurred_at=NOW, document_id=DocumentId(new_id()))
-    )
+    service = world.webhook_delivery()
+    await service.on_event(DocumentReceived(occurred_at=NOW, document_id=DocumentId(new_id())))
+    # An event of no document (for the admins' streams) is none for webhooks (TD-K02).
+    await service.on_event(ClassifierTrained(occurred_at=NOW, number=1, examples=3))
     assert deliveries(world) == []
 
 
@@ -296,6 +301,27 @@ async def queue(world: World, document: Document, service: WebhookDeliveryServic
     event = lane_changed(document)
     await service.on_event(event)
     return event
+
+
+async def test_a_concurrent_change_while_the_job_is_held_runs_it_again_later(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A deadlock fails the attempt like any error: the delivery runs again by the retry, not
+    left running until its lease runs out (SC-K10)."""
+    user = await world.user()
+    document = await seed(world, user)
+    await hook(world, user)
+    service = world.webhook_delivery()
+    await queue(world, document, service)
+
+    async def deadlock(*args: object) -> None:
+        raise ConcurrencyError("deadlock")
+
+    monkeypatch.setattr(service, "_attempt", deadlock)
+    assert await service.run_next_job()
+    (job,) = [job for job in world.database.jobs.values() if job.kind == DELIVER_JOB]
+    assert job.status is JobStatus.QUEUED and "deadlock" in (job.last_error or "")
+    assert job.run_at > world.clock.now()
 
 
 async def test_a_delivery_is_signed_sent_and_logged(world: World) -> None:
@@ -639,6 +665,37 @@ async def test_a_template_body_is_what_the_template_makes(world: World) -> None:
     }
 
 
+async def test_a_template_body_writes_the_codes_on_the_pages(world: World) -> None:
+    """`facts.girocode` in a webhook's template, read from the store before the delivery's
+    transaction, not within it (SC-K07)."""
+    user = await world.user()
+    document = await described(world, user)
+    giro = Code(
+        page=1,
+        format="QR Code",
+        text="BCD\n002\n1\nSCT\n\nStadtwerke\nDE89370400440532013000\nEUR84.20\n\n\nStrom",
+        box=Box(0.1, 0.1, 0.1, 0.1),
+    )
+    await world.object_store.put(
+        codes_key(document.id),
+        json.dumps(codes_to_json([giro])).encode(),
+        content_type="application/json",
+    )
+    await world.webhooks.create(
+        Actor(user.id),
+        name="HA",
+        url=URL,
+        event_types=["*"],
+        signed=False,
+        body=BodyFormat.TEMPLATE,
+        body_template='{"iban": {{ facts.girocode.iban | json }}}',
+    )
+    service = world.webhook_delivery()
+    await queue(world, document, service)
+    await service.run_next_job()
+    assert json.loads(world.sender.requests[0].body) == {"iban": "DE89370400440532013000"}
+
+
 async def test_a_field_renamed_is_renamed_in_the_template_and_not_deleted_while_used(
     world: World,
 ) -> None:
@@ -895,7 +952,7 @@ async def test_a_target_in_the_own_network_is_dropped_once_its_owner_is_no_admin
         None,
         None,
     )
-    assert row.error and "own network" in row.error
+    assert row.error == REFUSED
     assert world.sender.requests == []
     assert all(job.status is JobStatus.DONE for job in deliveries(world))
     # Not a failure of the receiver: it does not count towards switching the webhook off.

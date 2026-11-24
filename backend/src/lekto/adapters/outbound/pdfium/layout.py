@@ -170,6 +170,8 @@ def _page(
 ) -> tuple[str, list[dict[str, Any]]]:
     text: list[str] = []
     structure: list[dict[str, Any]] = []
+    # A box is a fraction of the page: a page without area keeps its text, but no lines (AD-K03).
+    measured = width > 0 and height > 0
     if chars:
         lines = page_lines(chars)
         blocks = blocks_of(lines)
@@ -180,7 +182,8 @@ def _page(
         written: set[FixedPitchBlock] = set()
         for index, line in enumerate(lines):
             words = _words(line.chars, lambda char: (char.left, char.right), _height)
-            structure.append(_line(words, width, height))
+            if measured:
+                structure.append(_line(words, width, height))
             block = _block(line.chars, blocks)
             if block is not None and block in written:
                 continue
@@ -195,7 +198,8 @@ def _page(
         if not text or text[-1]:
             text.append("")
         text.append(" ".join(_spelt(word) for word in words))
-        structure.append(_line(words, width, height))
+        if measured:
+            structure.append(_line(words, width, height))
     return "\n".join(text).strip("\n"), structure
 
 

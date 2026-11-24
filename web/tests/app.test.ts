@@ -266,18 +266,25 @@ describe('the safe areas of the installed app', () => {
 		expect(html).toContain('viewport-fit=cover');
 	});
 
+	it('shrinks with the keyboard of Android rather than standing under it (WM-K03)', () => {
+		expect(html).toContain('interactive-widget=resizes-content');
+	});
+
 	// A surface that covers the whole phone screen or stands at its bottom edge keeps the insets
 	// free: full-screen editors, bars stuck to the bottom, sheets from below, fixed buttons, and
 	// a sheet from the right, which is the whole screen on a phone (the Beam, the template editor).
 	const EDGE =
 		/\bh-dvh max-h-dvh\b|\bsticky bottom-0\b|\bfixed\b[^'"]*\bbottom-|data-\[side=bottom\]:inset-x-0|data-\[side=right\]:w-full/;
 
-	it.each(Object.entries(sources).filter(([, source]) => EDGE.test(source)))(
-		'%s keeps the safe area free',
-		(_, source) => {
-			expect(source).toContain('env(safe-area-inset-');
-		}
-	);
+	const atEdge = Object.entries(sources).filter(([, source]) => EDGE.test(source));
+
+	it('finds the surfaces at the edge at all: an each over none would test nothing', () => {
+		expect(atEdge.length).toBeGreaterThan(5);
+	});
+
+	it.each(atEdge)('%s keeps the safe area free', (_, source) => {
+		expect(source).toContain('env(safe-area-inset-');
+	});
 });
 
 describe('the safe areas beside the notch, a phone held sideways (WM-07)', () => {

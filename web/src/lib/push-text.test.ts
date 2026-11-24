@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { m } from '#lib/paraglide/messages.js';
-import { type PushPayload, pushText } from '#lib/push-text.ts';
+import { type PushPayload, pushPayload, pushText } from '#lib/push-text.ts';
 
 function payload(kind: string, params: Record<string, unknown>, locale = 'de'): PushPayload {
 	return { kind, params, url: '/ui/inbox', badge: null, tag: null, locale };
@@ -39,5 +39,33 @@ describe('the words of a notification', () => {
 		expect(pushText(payload('job_failed', {})).title).toBe('Ein Job hat aufgegeben');
 		expect(pushText(payload('test', {})).title).toBe('Benachrichtigungen funktionieren');
 		expect(pushText(payload('something new', {})).title).toBe('Benachrichtigungen funktionieren');
+	});
+});
+
+describe('the data of a push', () => {
+	const json = (value: unknown) => ({ json: () => value });
+
+	it('is read as sent', () => {
+		const sent = {
+			kind: 'waiting',
+			params: {},
+			url: '/ui/inbox',
+			badge: 2,
+			tag: 't',
+			locale: 'de'
+		};
+		expect(pushPayload(json(sent), '/ui')).toEqual(sent);
+	});
+
+	it('is the test notification without data or with data that is no JSON (WF-K08)', () => {
+		const test = { kind: 'test', params: {}, url: '/ui/', badge: null, tag: null, locale: 'en' };
+		expect(pushPayload(null, '/ui')).toEqual(test);
+		expect(pushPayload(json(undefined), '/ui')).toEqual(test);
+		const broken = {
+			json: () => {
+				throw new SyntaxError('no JSON');
+			}
+		};
+		expect(pushPayload(broken, '/ui')).toEqual(test);
 	});
 });

@@ -14,6 +14,8 @@
 
 <script lang="ts">
 	import Chip from '#lib/components/Chip.svelte';
+	import * as Card from '#lib/components/ui/card/index.ts';
+	import { cn } from '#lib/utils.ts';
 	import ArrowDown from '@lucide/svelte/icons/arrow-down';
 	import ArrowUp from '@lucide/svelte/icons/arrow-up';
 	import GripVertical from '@lucide/svelte/icons/grip-vertical';
@@ -144,10 +146,11 @@
 			: []
 	);
 
-	$effect(() => {
-		// No grouping by deadline without one.
-		if (grouping === 'due' && !dueId) grouping = 'none';
-	});
+	/** The deadline field chosen; without one, no grouping by the deadline. */
+	function chooseDue(next: string) {
+		dueId = next;
+		if (!next && grouping === 'due') grouping = 'none';
+	}
 
 	function move(from: number, to: number) {
 		if (to < 0 || to >= cardIds.length || from === to) return;
@@ -235,7 +238,7 @@
 				</Field.Field>
 				<Field.Field>
 					<HintLabel for="lens-due" label={m.lens_due()} hint={m.lens_due_hint()} />
-					<Select id="lens-due" bind:value={dueId} options={dueOptions} />
+					<Select id="lens-due" bind:value={() => dueId, chooseDue} options={dueOptions} />
 				</Field.Field>
 			</div>
 
@@ -274,7 +277,14 @@
 
 			<div class="flex flex-col gap-2">
 				<span id="lens-fields" class="text-sm font-medium">{m.lens_fields()}</span>
-				<ol class="flex flex-col gap-1.5" aria-labelledby="lens-fields">
+				<!-- One card, a row per field (web/DESIGN.md, "Cards"). -->
+				<Card.Root
+					as="ol"
+					size="flush"
+					tone="inset"
+					class={cn('flex flex-col divide-y overflow-hidden', cardIds.length === 0 && 'hidden')}
+					aria-labelledby="lens-fields"
+				>
 					{#each cardIds as id, index (id)}
 						{@const field = named(id)}
 						<li
@@ -286,7 +296,7 @@
 								if (dragged !== null) move(dragged, index);
 								dragged = null;
 							}}
-							class="flex h-10 items-center gap-2 rounded-lg border bg-background pr-1 pl-2 text-sm"
+							class="flex h-10 items-center gap-2 pr-1 pl-2 text-sm"
 						>
 							<GripVertical class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
 							<span class="min-w-0 flex-1 truncate">{field?.name ?? id}</span>
@@ -320,7 +330,7 @@
 							</IconButton>
 						</li>
 					{/each}
-				</ol>
+				</Card.Root>
 				{#if cardIds.length < LENS_LIMITS.cardFields}
 					<Select
 						aria-label={m.lens_field_add()}

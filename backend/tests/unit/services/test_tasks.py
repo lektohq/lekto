@@ -135,7 +135,7 @@ async def flow(
         body_template=body_template,
     )
     asking = Asking(world.desk(links), created.webhook.id)
-    pipeline = builders.skip_classification(world.pipeline({Node.APPLY_RULES: asking}))
+    pipeline = world.pipeline({Node.APPLY_RULES: asking})
     return Flow(world, owner, created.webhook, pipeline)
 
 

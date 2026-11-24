@@ -25,6 +25,7 @@ from lekto.core.domain.users import (
 from lekto.core.services.users import UserService
 from tests import builders
 from tests.builders import NOW, PASSWORD, incoming
+from tests.contracts.push import a_device
 from tests.unit.services.support import World
 
 NEW_PASSWORD = "another long passphrase"
@@ -205,9 +206,17 @@ async def test_password_reset_by_an_admin(world: World) -> None:
     await world.auth.authenticate_token(token)
     await world.auth.login("alice", NEW_PASSWORD)
 
+    # What a token made goes with it, also here (XA-K04): its push devices and webhooks.
+    issued = (await world.auth.list_api_tokens(Actor(user.id)))[0]
+    async with world.uow() as uow:
+        device = a_device(user.id, api_token_id=issued.id)
+        await uow.push_devices.add(device)
+        await uow.commit()
     await world.users.reset_password(Actor(admin.id), user.id, PASSWORD, revoke_tokens=True)
     with pytest.raises(AuthenticationError):
         await world.auth.authenticate_token(token)
+    async with world.uow() as uow:
+        assert await uow.push_devices.find(device.id) is None
     with pytest.raises(ValidationError):
         await world.users.reset_password(Actor(admin.id), user.id, "short")
 
@@ -215,7 +224,7 @@ async def test_password_reset_by_an_admin(world: World) -> None:
 async def test_admins_turn_totp_off(world: World) -> None:
     admin = await world.account("root", Role.ADMIN)
     user = await world.account("alice")
-    setup = await world.auth.begin_totp(Actor(user.id))
+    setup = await world.auth.begin_totp(Actor(user.id), PASSWORD)
     await world.auth.confirm_totp(Actor(user.id), world.totp.code(setup.secret, world.clock.now()))
     with pytest.raises(SecondFactorRequiredError):
         await world.auth.login("alice", PASSWORD)

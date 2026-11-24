@@ -785,7 +785,13 @@ describe('the design system (web/DESIGN.md)', () => {
 			'min',
 			'max',
 			'seconds',
-			'mails'
+			'mails',
+			'share',
+			'read',
+			'set',
+			'suggested',
+			'matched',
+			'minutes'
 		]);
 		/** The end of the bracket that opens before `from`, and the commas at its top level. */
 		const walk = (source: string, from: number) => {
@@ -1435,7 +1441,6 @@ describe('the design system (web/DESIGN.md)', () => {
 		expect(
 			offenders((source, path) => {
 				if (!path.startsWith('/src/routes/(app)/') || !path.endsWith('/+page.svelte')) return null;
-				if (path === '/src/routes/(app)/dev/components/+page.svelte') return null;
 				const gap = frame.exec(source)?.[1];
 				if (gap === undefined) return null;
 				const wanted = path === '/src/routes/(app)/documents/[id]/+page.svelte' ? 'gap-4' : 'gap-6';
@@ -1481,7 +1486,10 @@ describe('the design system (web/DESIGN.md)', () => {
 			offenders((source, path) =>
 				path.endsWith('/AlertDot.svelte')
 					? null
-					: line(source, /size-\[7px\]|size-2 (?:shrink-0 )?rounded-full bg-destructive/)
+					: line(
+							source,
+							/size-\[7px\]|size-2 (?:shrink-0 )?rounded-full bg-(?:destructive|lane-yellow)/
+						)
 			)
 		).toEqual([]);
 	});
@@ -1509,6 +1517,24 @@ describe('the design system (web/DESIGN.md)', () => {
 					? null
 					: (/<\/SectionTitle>\s*<InfoTip\b/.exec(source)?.[0] ?? null)
 			)
+		).toEqual([]);
+	});
+
+	it('waits in tests for a signal or on fake time, never a fixed while (WT1-K16)', () => {
+		// `lib/testing/time.ts`: a wait too short passes a check that proves nothing, one long
+		// enough slows every run. A turn of the event loop (`setTimeout(…, 0)`) is no while.
+		const fixed = /setTimeout\([^,()]+,\s*[1-9]/;
+		expect(fixed.test('await new Promise((resolve) => setTimeout(resolve, 20));')).toBe(true);
+		expect(fixed.test('await new Promise((resolve) => setTimeout(resolve, 0));')).toBe(false);
+		const tests = import.meta.glob<string>('/src/**/*.test.ts', {
+			query: '?raw',
+			import: 'default',
+			eager: true
+		});
+		expect(
+			Object.entries(tests)
+				.filter(([, source]) => fixed.test(source))
+				.map(([path]) => path)
 		).toEqual([]);
 	});
 

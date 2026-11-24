@@ -15,7 +15,7 @@ from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
-from lekto.core.domain.documents import UNSET, Unset
+from lekto.core.domain.changes import UNSET, Unset
 from lekto.core.domain.errors import (
     ConflictError,
     NotFoundError,
@@ -423,6 +423,16 @@ async def disable_sending_rules(
             because(ReasonCode.RULE_DISABLED_DELETED, kind="webhook", name=webhook.name),
             refers_to(lambda references: references.webhooks, webhook.id),
         )
+
+
+async def remove_made_through(
+    uow: UnitOfWork, tokens: Collection[ApiTokenId], now: datetime
+) -> None:
+    """What `tokens` made, in `uow`, before they are revoked: their webhooks and their push
+    devices (XA-K04); a service such as Home Assistant leaves nothing behind that nobody
+    removes."""
+    await remove_webhooks_of(uow, tokens, now)
+    await uow.push_devices.remove_for_tokens(tokens)
 
 
 async def remove_webhooks_of(

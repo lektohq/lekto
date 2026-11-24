@@ -91,13 +91,9 @@
 			: null
 	);
 
-	// A field's value as a template or a fixed value: decided once by the value when the action
-	// is shown or gets another field, then as the person switches (not anew with every key).
-	$effect(() => {
-		if (action.type === 'set_field' && action.templated === undefined && field) {
-			action.templated = isTemplated(field, action.value);
-		}
-	});
+	// A field's value as a template or a fixed value: by the value as the action is shown or gets
+	// another field, held from the first key typed on, then as the person switches (not anew
+	// with every key).
 	const templated = $derived(
 		action.type === 'set_field' && (action.templated ?? isTemplated(field, action.value))
 	);
@@ -206,7 +202,7 @@
 					const chosen = lookup.fields.find((entry) => entry.id === id) ?? null;
 					action.field_id = id;
 					action.value = (defaultValue('field', 'is', chosen) ?? '') as typeof action.value;
-					action.templated = undefined;
+					action.templated = chosen ? isTemplated(chosen, action.value) : undefined;
 				}}
 			/>
 			{#if action.field_id}
@@ -222,7 +218,11 @@
 					label={m.rule_condition_value()}
 					value={action.value}
 					onchange={(next) => {
-						if (action.type === 'set_field') action.value = next as typeof action.value;
+						if (action.type !== 'set_field') return;
+						if (action.templated === undefined && field) {
+							action.templated = isTemplated(field, action.value);
+						}
+						action.value = next as typeof action.value;
 					}}
 					{onunreadable}
 				/>

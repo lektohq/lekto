@@ -15,6 +15,18 @@ export interface PushPayload {
 	locale: string;
 }
 
+/** The data of a push (`event.data`), or the test notification's words where it has none or
+ * none that is JSON: every push must show a notification (iPhone and iPad). */
+export function pushPayload(data: { json(): unknown } | null, base: string): PushPayload {
+	try {
+		const payload = data?.json();
+		if (payload && typeof payload === 'object') return payload as PushPayload;
+	} catch {
+		// no JSON: the test notification below
+	}
+	return { kind: 'test', params: {}, url: `${base}/`, badge: null, tag: null, locale: 'en' };
+}
+
 export interface PushText {
 	title: string;
 	body: string;

@@ -92,7 +92,7 @@ from lekto.core.domain.documents import (
 )
 from lekto.core.domain.editing import MAX_ADDED, MAX_MERGED, MAX_PREVIEW_PAGES
 from lekto.core.domain.errors import PermissionDeniedError, ValidationError
-from lekto.core.domain.fields import FieldDefinition, field_from_json
+from lekto.core.domain.fields import FieldDefinition, field_from_input
 from lekto.core.domain.identifiers import IdentifierKind
 from lekto.core.domain.ids import (
     ContactId,
@@ -114,6 +114,7 @@ from lekto.core.ports.pages import PAGE_MEDIA_TYPE
 from lekto.core.ports.repository import PAGE_LIMIT, PAGE_SIZE, DocumentOrder, SortKey
 from lekto.core.services.documents import DocumentFile, DocumentView, FileInfo, MetadataChange
 from lekto.core.services.editing import AddedFile
+from lekto.core.services.rules.running import RuleRun
 
 DOCUMENTS_AREA = area(TokenRight.DOCUMENTS_READ, TokenRight.DOCUMENTS_WRITE)
 router = APIRouter(
@@ -207,12 +208,12 @@ async def upload(
     )
     try:
         try:
-            form = UploadFields.model_validate(received.fields)
+            # A field the form does not know is refused as `extra="forbid"` says (RA-K05).
+            form = UploadFields.model_validate(
+                {**received.fields, **dict.fromkeys(received.skipped, "")}
+            )
         except PydanticValidationError as error:
-            # The form is the body: its errors read as those of a JSON body.
-            raise RequestValidationError(
-                [{**item, "loc": ("body", *item["loc"])} for item in error.errors()]
-            ) from None
+            raise _as_body(error) from None
         # An upload token (a shortcut on a phone) uploads for its own user, as a user does:
         # an admin's, lost with the phone, would put documents in anyone's name (XA-07).
         if principal.only_uploads:
@@ -434,9 +435,14 @@ def _form_field[T](fields: Mapping[str, str], name: str, read: Callable[[str], T
     try:
         return read(fields[name])
     except PydanticValidationError as error:
-        raise RequestValidationError(
-            [{**item, "loc": ("body", name, *item["loc"])} for item in error.errors()]
-        ) from None
+        raise _as_body(error, name) from None
+
+
+def _as_body(error: PydanticValidationError, *where: str) -> RequestValidationError:
+    """A form's errors (at `where` in it) as those of a JSON body: the form is the body."""
+    return RequestValidationError(
+        [{**item, "loc": ("body", *where, *item["loc"])} for item in error.errors()]
+    )
 
 
 @router.get(
@@ -623,11 +629,10 @@ async def update_document(
 async def preview_change(
     id: UUID,
     body: DocumentPatch,
-    principal: Authenticated,
+    user: CurrentUser,
     context: Context,
     confirm: Confirm = True,
 ) -> DocumentPreviewOut:
-    user = principal.actor
     changes = await _changes(body, user, context)
     change = await context.documents.change_metadata(
         user, DocumentId(id), changes, dry_run=True, confirm=confirm
@@ -636,14 +641,8 @@ async def preview_change(
     return DocumentPreviewOut(
         document=DocumentDetails.of(change.document, change.access) if change.access else None,
         changed=changed_fields(change.before, change.document) if change.before else [],
-        rules=(
-            None
-            if change.rules is None
-            else [
-                RuleReportOut.of(report, change.rules.sends) for report in change.rules.plan.reports
-            ]
-        ),
-        visibility=(VisibilityOut.of(change.document, change.space) if readable else None),
+        rules=_rule_reports(change.rules),
+        visibility=(VisibilityOut.of(change.space) if readable else None),
     )
 
 
@@ -1196,13 +1195,14 @@ async def mark_all_seen(
 def _changed(change: MetadataChange) -> DocumentChanged | DocumentOutOfReach:
     if change.access is None:
         return DocumentOutOfReach(id=change.document.id)
-    details = DocumentDetails.of(change.document, change.access)
-    rules = None
-    if change.rules is not None:
-        rules = [
-            RuleReportOut.of(report, change.rules.sends) for report in change.rules.plan.reports
-        ]
-    return DocumentChanged(**details.model_dump(), rules=rules)
+    return DocumentChanged.of(change.document, change.access, rules=_rule_reports(change.rules))
+
+
+def _rule_reports(rules: RuleRun | None) -> list[RuleReportOut] | None:
+    """What the rules a change ran did, by rule; None where none ran."""
+    if rules is None:
+        return None
+    return [RuleReportOut.of(report, rules.sends) for report in rules.plan.reports]
 
 
 def _details(view: DocumentView) -> DocumentDetails:
@@ -1216,9 +1216,9 @@ async def _changes(body: DocumentPatch, user: Actor, context: Context) -> Docume
         definitions = {a.id: a for a in await context.master_data.list_fields(user)}
         for field_id, value in body.fields.items():
             definition = definitions.get(FieldId(field_id))
-            fields[FieldId(field_id)] = (
-                value if definition is None or value is None else field_from_json(definition, value)
-            )
+            if definition is not None and value is not None:
+                value = field_from_input(definition, value)
+            fields[FieldId(field_id)] = value
     if "title" in given and body.title is None:
         raise ValidationError("title: must not be null")
     if "created_at" in given and body.created_at is None:
@@ -1268,7 +1268,7 @@ async def _imported_metadata(
             ),
             tag_ids=frozenset(TagId(tag) for tag in body.tag_ids),
             document_date=body.document_date,
-            fields={key: field_from_json(definitions[key], raw) for key, raw in fields.items()},
+            fields={key: field_from_input(definitions[key], raw) for key, raw in fields.items()},
             created_at=None if body.created_at is None else to_utc(body.created_at, "created_at"),
             review=tuple(_review(item, definitions) for item in body.review),
         )

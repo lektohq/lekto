@@ -83,7 +83,7 @@ describe('a proxy answering for a Lekto that is not there', () => {
 		await session.load();
 		fetchMock.mockResolvedValueOnce(problem(401));
 
-		expect(await session.load()).toBe(false);
+		expect(await session.load()).toBeNull(); // no account: nothing to show (WF-K05)
 
 		expect(session.user).toBeNull();
 		expect(session.csrfToken).toBeNull();

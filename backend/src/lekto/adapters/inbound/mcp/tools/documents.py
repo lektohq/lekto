@@ -29,7 +29,7 @@ from lekto.core.domain.documents import (
     Unset,
     changed_fields,
 )
-from lekto.core.domain.fields import FieldValue, field_from_json, field_to_json
+from lekto.core.domain.fields import FieldValue, field_from_input, field_to_json
 from lekto.core.domain.ids import DocumentId, FieldId, SpaceId, UserId, short_id
 from lekto.core.domain.json_value import JsonValue
 from lekto.core.domain.lenses import MAX_FILTER_VALUES, MAX_QUERY_LENGTH
@@ -532,7 +532,7 @@ def _fields(given: dict[str, Any] | Unset, names: Names) -> dict[FieldId, object
     changes: dict[FieldId, object] = {}
     for name, value in given.items():
         definition = names.find_field(name)
-        changes[definition.id] = None if value is None else field_from_json(definition, value)
+        changes[definition.id] = None if value is None else field_from_input(definition, value)
     return changes
 
 

@@ -11,6 +11,7 @@ import WithDialogs from '#lib/testing/WithDialogs.svelte';
 import FieldsPanel from './FieldsPanel.svelte';
 import { type Routes, fakeApi, json, noContent } from '#lib/testing/api.ts';
 import { fieldOf } from '#lib/testing/master-data.ts';
+import { settled } from '#lib/testing/time.ts';
 
 const INVOICE = '0199a6c4-0000-7000-8000-0000000000e1';
 const REMINDER = '0199a6c4-0000-7000-8000-0000000000e2';
@@ -203,7 +204,7 @@ describe('FieldsPanel', () => {
 		scope.set(true);
 		expect(await screen.findByText('Betrag')).toBeTruthy();
 		slow(json([field('Rechnungsnummer')]));
-		await new Promise((resolve) => setTimeout(resolve, 20));
+		await settled();
 		expect(screen.queryByText('Rechnungsnummer')).toBeNull();
 		expect(screen.getByText('Betrag')).toBeTruthy();
 	});

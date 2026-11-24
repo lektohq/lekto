@@ -57,6 +57,15 @@ describe('grouping the documents', () => {
 		]);
 	});
 
+	it('shows no id while the names load (WG-K07)', () => {
+		const items = [doc('x', { document_type_id: 't1' }), doc('y', { contact_id: 'c1' })];
+		const context = { sort: '-document_date' as never, dueField: null, today: TODAY, lookup: null };
+		const labels = (grouping: Parameters<typeof groupDocuments>[1]) =>
+			groupDocuments(items, grouping, (item) => item, context).map((group) => group.label);
+		expect(labels('document_type')).toEqual(['…', m.lens_group_no_type()]);
+		expect(labels('contact')).toEqual(['…', m.lens_group_no_contact()]);
+	});
+
 	it('by type or contact by name, those without one last, in the order of the list', () => {
 		const items = [
 			doc('x', { document_type_id: 't1' }),

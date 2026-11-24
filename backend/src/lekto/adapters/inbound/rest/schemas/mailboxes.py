@@ -64,6 +64,13 @@ def _minutes(value: timedelta) -> int:
 type FolderName = Annotated[str, Field(min_length=1, max_length=MAX_FOLDER)]
 
 
+# What signs in to a mail server, alike in creating, changing and testing a mailbox (RB-K11).
+Host = Annotated[str, Field(min_length=1, max_length=MAX_HOST)]
+Port = Annotated[int, Field(ge=MIN_PORT, le=MAX_PORT)]
+Username = Annotated[str, Field(min_length=1, max_length=MAX_USERNAME)]
+MailPassword = Annotated[SecretStr, Field(min_length=1, max_length=MAX_PASSWORD)]
+
+
 class _Settings(RequestBody):
     """What a mailbox does, beside where it signs in."""
 
@@ -132,13 +139,11 @@ class MailboxCreate(_Settings):
     )
 
     name: str = Field(min_length=1, max_length=MAX_NAME)
-    host: str = Field(min_length=1, max_length=MAX_HOST)
-    port: int = Field(ge=MIN_PORT, le=MAX_PORT)
+    host: Host
+    port: Port
     security: MailSecurity = Field(description=SECURITY_HELP)
-    username: str = Field(min_length=1, max_length=MAX_USERNAME)
-    password: SecretStr = Field(
-        min_length=1, max_length=MAX_PASSWORD, description="Stored encrypted, never shown again."
-    )
+    username: Username
+    password: MailPassword = Field(description="Stored encrypted, never shown again.")
 
 
 class MailboxPatch(_Settings):
@@ -148,15 +153,12 @@ class MailboxPatch(_Settings):
     model_config = ConfigDict(json_schema_extra={"examples": [{"enabled": False}]})
 
     name: str | None = Field(default=None, min_length=1, max_length=MAX_NAME)
-    host: str | None = Field(default=None, min_length=1, max_length=MAX_HOST)
-    port: int | None = Field(default=None, ge=MIN_PORT, le=MAX_PORT)
+    host: Host | None = None
+    port: Port | None = None
     security: MailSecurity | None = Field(default=None, description=SECURITY_HELP)
-    username: str | None = Field(default=None, min_length=1, max_length=MAX_USERNAME)
-    password: SecretStr | None = Field(
-        default=None,
-        min_length=1,
-        max_length=MAX_PASSWORD,
-        description="A new password; left out, the stored one stays.",
+    username: Username | None = None
+    password: MailPassword | None = Field(
+        default=None, description="A new password; left out, the stored one stays."
     )
 
     def changes(self) -> MailboxChanges:
@@ -274,11 +276,11 @@ class ConnectionTestBody(RequestBody):
         },
     )
 
-    host: str = Field(min_length=1, max_length=MAX_HOST)
-    port: int = Field(ge=MIN_PORT, le=MAX_PORT)
+    host: Host
+    port: Port
     security: MailSecurity = Field(description=SECURITY_HELP)
-    username: str = Field(min_length=1, max_length=MAX_USERNAME)
-    password: SecretStr | None = Field(default=None, min_length=1, max_length=MAX_PASSWORD)
+    username: Username
+    password: MailPassword | None = None
     mailbox_id: UUID | None = Field(
         default=None, description="The mailbox being changed, for its stored password."
     )

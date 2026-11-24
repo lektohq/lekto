@@ -7,6 +7,7 @@ import { unwrap } from '#lib/api/call.ts';
 import { reportError } from '#lib/errors.ts';
 import { WEBHOOK_EVENT_TYPES, type WebhookEventType } from '#lib/events.svelte.ts';
 import { m } from '#lib/paraglide/messages.js';
+import { reasonText } from '#lib/reasons.ts';
 import type { components } from '#lib/api/schema.ts';
 import { own } from '#lib/utils.ts';
 
@@ -30,8 +31,14 @@ export async function sendTest(id: string): Promise<void> {
 		if (delivery.outcome === 'delivered')
 			toast.success(m.webhook_test_ok({ status: delivery.status_code ?? 0 }));
 		else
+			// Why Lekto did not send it in the words of the UI, as the log says it; else the
+			// answer's error or status.
 			toast.error(
-				m.webhook_test_failed({ reason: delivery.error ?? String(delivery.status_code ?? '') })
+				m.webhook_test_failed({
+					reason: delivery.reason
+						? reasonText(delivery.reason)
+						: (delivery.error ?? String(delivery.status_code ?? ''))
+				})
 			);
 	} catch (error) {
 		reportError(error);

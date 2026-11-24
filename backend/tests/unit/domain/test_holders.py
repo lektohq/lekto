@@ -1,5 +1,6 @@
-"""Whose an IBAN, a creditor ID or a VAT ID is where it stands, and whose an e-mail domain is by
-its name (`domain.holders`), on invented documents."""
+"""Whose an IBAN is where it stands, whose an e-mail domain is by its name and whose a customer
+number is in bookings (`domain.holders`; creditor IDs and VAT IDs have none since #215), on
+invented documents."""
 
 import pytest
 
@@ -27,7 +28,7 @@ from lekto.core.domain.holders import (
 from lekto.core.domain.identifiers import IdentifierKind, Key, identifiers_in
 from lekto.core.domain.reasons import Reason, ReasonCode
 
-IBAN, CREDITOR = IdentifierKind.IBAN, IdentifierKind.CREDITOR_ID
+IBAN = IdentifierKind.IBAN
 OWN = "DE02120300000000202051"  # Max Nord's
 UTILITY = "DE89370400440532013000"  # Stadtwerke Musterstadt
 LANDLORD = "DE17100500000123456789"  # Hausverwaltung Ost

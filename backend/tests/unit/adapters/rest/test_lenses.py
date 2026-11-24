@@ -98,6 +98,15 @@ async def test_lenses_that_do_not_fit_are_refused(api: Api) -> None:
         assert response.status_code == status, (body, response.text)
     order = await api.client.put(f"{PREFIX}/lenses/order", json={"ids": []}, headers=auth(user))
     assert order.status_code == 422
+    # A null for what a lens always has is refused, not taken as "unchanged" (RA-K06).
+    taken = await api.client.get(f"{PREFIX}/lenses", headers=auth(user))
+    lens = taken.json()[0]["id"]
+    for name in ("name", "filter", "grouping", "layout", "card_field_ids"):
+        changed = await api.client.patch(
+            f"{PREFIX}/lenses/{lens}", json={name: None}, headers=auth(user)
+        )
+        assert changed.status_code == 422, (name, changed.text)
+        assert f"{name}: must not be null" in changed.json()["detail"]
 
 
 async def test_a_lens_holds_no_more_values_than_the_list_takes(api: Api) -> None:

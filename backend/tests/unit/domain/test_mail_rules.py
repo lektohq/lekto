@@ -142,8 +142,15 @@ def test_the_tree_in_json() -> None:
     assert conditions_to_json(None) is None and conditions_from_json(None) is None
     with pytest.raises(ValidationError, match="unknown key"):
         conditions_from_json({"all": [{"field": "subject", "op": "is", "value": "x", "y": 1}]})
-    with pytest.raises(ValidationError):
+    # Every refusal names where it is, in Lekto's words, not Python's (DB-K05).
+    with pytest.raises(ValidationError, match=r"^conditions\.all\[0\]\.field: no field 'nope'"):
         conditions_from_json({"all": [{"field": "nope", "op": "is", "value": "x"}]})
+    with pytest.raises(ValidationError, match=r"^conditions\.all\[0\]\.op: no operator 'has'"):
+        conditions_from_json({"all": [{"field": "subject", "op": "has", "value": "x"}]})
+    with pytest.raises(
+        ValidationError, match=r"^conditions\.all\[0\]: operator 'present' does not apply"
+    ):
+        conditions_from_json({"all": [{"field": "subject", "op": "present", "value": "x"}]})
 
 
 def test_the_first_by_priority_then_name_decides() -> None:

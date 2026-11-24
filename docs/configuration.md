@@ -182,8 +182,8 @@ Background jobs, the delivery of events and the cleanup.
 | `LEKTO_WORKER_SHUTDOWN_TIMEOUT` | Worker | `30` | duration | Time running jobs get to finish on SIGTERM; raise the image's grace times with it ([deploy/README.md](../deploy/README.md#stopping)) |
 | `LEKTO_NODE_MAX_ATTEMPTS` | Worker | `3` | 1–20 | Attempts of a processing step that fails |
 | `LEKTO_NODE_RETRY_DELAY` | Worker | `30` | duration | Before its second attempt, doubling after |
-| `LEKTO_EVENTS_POLL_INTERVAL` | Worker | `1` | duration | How often the outbox is dispatched while no signal comes |
-| `LEKTO_EVENTS_MAX_ATTEMPTS` | Worker | `10` | 1–100 | Delivery attempts of an event per subscriber |
+| `LEKTO_EVENTS_POLL_INTERVAL` | both | `1` | duration | How often the outbox is dispatched while no signal comes |
+| `LEKTO_EVENTS_MAX_ATTEMPTS` | both | `10` | 1–100 | Delivery attempts of an event per subscriber |
 | `LEKTO_CLEANUP_INTERVAL` | Worker | `3600` | duration | Time between cleanups |
 | `LEKTO_RETENTION` | Worker | `P7D` | duration | Age from which finished jobs, delivered events and webhook log rows are removed |
 

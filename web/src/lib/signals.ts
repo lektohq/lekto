@@ -311,7 +311,7 @@ export function signalSummary(entry: LogEntry, lookup: Lookup | null): SummaryRo
 				row(m.field_document_type(), [
 					...value('document_type'),
 					...value('new_document_type').map((item) => ({
-						text: `${item.text} (${m.candidate_new()})`
+						text: m.candidate_new_named({ name: item.text })
 					}))
 				]),
 				...('topic' in proposal ? [row(m.field_topic(), value('topic'))] : []),
@@ -333,10 +333,17 @@ export function signalSummary(entry: LogEntry, lookup: Lookup | null): SummaryRo
 					m.signal_identifiers(),
 					list(output.identifiers).map((item) => {
 						const found = object(item);
-						const topic =
-							typeof found.topic_id === 'string' ? ` · ${named(found.topic_id, lookup)}` : '';
+						const identifier = identifierText(found);
+						const contact = named(found.contact_id, lookup);
 						return {
-							text: `${identifierText(found)}: ${named(found.contact_id, lookup)}${topic}`
+							text:
+								typeof found.topic_id === 'string'
+									? m.signal_identifier_at_topic({
+											identifier,
+											contact,
+											topic: named(found.topic_id, lookup)
+										})
+									: m.signal_identifier_at({ identifier, contact })
 						};
 					})
 				),

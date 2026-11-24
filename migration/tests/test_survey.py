@@ -1,5 +1,6 @@
 """The first plan from what Paperless and Lekto hold, and adding to it what changed."""
 
+import io
 from datetime import date
 from pathlib import Path
 
@@ -61,7 +62,9 @@ def test_the_first_plan_takes_everything_over_by_name() -> None:
 
 
 def test_the_first_plan_explains_itself() -> None:
-    text = plans.text(draft(snapshot(), lekto(), source="http://p", target="http://l"))
+    out = io.StringIO()
+    plans.yaml().dump(draft(snapshot(), lekto(), source="http://p", target="http://l"), out)
+    text = out.getvalue()
     assert text.startswith("# Lekto migration plan")
     assert "# data type 'documentlink' has no counterpart in Lekto" in text
     assert "Lekto has no storage paths" in text
@@ -102,6 +105,26 @@ def test_adding_what_is_new_keeps_what_a_person_wrote(tmp_path: Path) -> None:
 
     _, document = plans.load(path)
     assert not merge(document, source, lekto(), date(2026, 10, 22))  # nothing new
+
+
+def test_an_object_that_comes_back_loses_its_mark(tmp_path: Path) -> None:
+    """Paperless has it again: the entry no longer says it is gone (MI-K08)."""
+    source = snapshot()
+    document = draft(source, lekto(), source="http://p", target="http://l")
+    types = list(source.document_types)
+    source.document_types.clear()
+    assert merge(document, source, lekto(), TODAY).gone == ["document_types.Invoice"]
+    path = tmp_path / "migration-plan.yaml"
+    plans.dump(document, path)
+    _, document = plans.load(path)
+
+    source.document_types.extend(types)
+    changes = merge(document, source, lekto(), date(2026, 10, 22))
+    assert (changes.back, bool(changes)) == (["document_types.Invoice"], True)
+    plans.dump(document, path)
+    text = path.read_text()
+    assert "not in Paperless" not in text
+    assert "Invoice, create: true}\n\ntags:" in text  # the blank line before the next stays
 
 
 def test_a_section_the_person_removed_comes_back() -> None:

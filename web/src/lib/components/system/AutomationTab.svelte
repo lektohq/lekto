@@ -446,7 +446,8 @@
 							color: chartConfig[lane].color
 						}))}
 						props={{
-							bars: { stroke: 'none' },
+							// A line of the card between the lanes: green and yellow are about as light.
+							bars: { stroke: 'var(--card)', strokeWidth: 1 },
 							xAxis: { format: labelOf },
 							yAxis: { ticks: 4, format: formatNumber },
 							// Its sum is labelled in English only.
@@ -524,11 +525,13 @@
 					<div class="mt-[22px] flex flex-col gap-3.5 border-t pt-[18px]">
 						<div class="flex flex-col gap-1.5">
 							<div class="flex items-center justify-between gap-3">
+								<!-- 24 px to hit with a mouse, 44 px on a phone (web/DESIGN.md, "Touch targets"). -->
 								<button
 									type="button"
 									aria-expanded={openCustom}
+									aria-controls={openCustom ? 'automation-custom-fields' : undefined}
 									onclick={() => (openCustom = !openCustom)}
-									class="inline-flex min-h-11 items-center gap-1.5 text-left font-medium sm:min-h-0"
+									class="relative inline-flex min-h-11 items-center gap-1.5 text-left font-medium after:absolute after:inset-x-0 after:-inset-y-0.5 sm:min-h-0"
 								>
 									<ChevronDown
 										class={cn(
@@ -562,6 +565,7 @@
 						</div>
 						{#if openCustom}
 							<div
+								id="automation-custom-fields"
 								class="grid grid-cols-[repeat(auto-fit,minmax(min(280px,100%),1fr))] gap-x-8 gap-y-4 pl-[22px]"
 							>
 								{#each allCustom ? custom : custom.slice(0, SHOWN_CUSTOM) as field (field.field)}
@@ -585,7 +589,7 @@
 								<Button
 									variant="link"
 									size="inline"
-									class="min-h-11 self-start pl-[22px] text-meta font-normal sm:min-h-0"
+									class="relative min-h-11 self-start pl-[22px] text-meta font-normal after:absolute after:inset-x-0 after:-inset-y-0.5 sm:min-h-0"
 									onclick={() => (allCustom = !allCustom)}
 								>
 									{allCustom

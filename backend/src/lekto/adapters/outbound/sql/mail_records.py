@@ -12,7 +12,7 @@ from lekto.adapters.outbound.sql.transaction import Transaction
 from lekto.core.domain.errors import NotFoundError
 from lekto.core.domain.ids import DocumentId, DocumentTypeId, MailboxId, MailRecordId, MailRuleId
 from lekto.core.domain.json_value import JsonValue
-from lekto.core.domain.mail import MailAction, MailStep, StepOutcome
+from lekto.core.domain.mail import StepOutcome, step_from_json, step_to_json
 from lekto.core.domain.mail_intake import (
     TAKEN_OUTCOMES,
     MailOrigin,
@@ -137,15 +137,6 @@ class SqlMailRecordRepository:
         )
         return found.first() is not None
 
-    async def recent(self, mailbox: MailboxId, *, limit: int) -> list[MailRecord]:
-        rows = await self._tx.read(
-            select(_records)
-            .where(_records.c.mailbox_id == mailbox)
-            .order_by(_records.c.fetched_at.desc(), _records.c.id.desc())
-            .limit(limit)
-        )
-        return [_record(row) for row in rows]
-
     async def forget_beyond(self, mailbox: MailboxId, *, keep: int, now: datetime) -> int:
         latest = (
             select(_records.c.id)
@@ -208,22 +199,14 @@ def _record(row: Row[Any]) -> MailRecord:
         decided_at=row.decided_at,
         steps=tuple(
             StepOutcome(
-                _step_of(item),
+                step_from_json(item),
                 None if item.get("failed") is None else Reason.from_json(item["failed"]),
             )
             for item in row.steps or ()
         ),
         gone_at=row.gone_at,
-        steps_due=tuple(_step_of(item) for item in row.steps_due or ()),
+        steps_due=tuple(step_from_json(item) for item in row.steps_due or ()),
     )
-
-
-def _step_of(item: Any) -> MailStep:
-    return MailStep(MailAction(item["action"]), item.get("value"))
-
-
-def _step_json(step: MailStep) -> dict[str, Any]:
-    return {"action": step.action.value} | ({} if step.value is None else {"value": step.value})
 
 
 def _chosen(mailbox: MailboxId, rule: MailRuleId | None) -> list[Any]:
@@ -244,13 +227,13 @@ def _settled(record: MailRecord) -> dict[str, Any]:
         "documents": record.documents,
         "decided_at": record.decided_at,
         "steps": [
-            _step_json(item.step)
+            step_to_json(item.step)
             | ({} if item.failed is None else {"failed": item.failed.to_json()})
             for item in record.steps
         ]
         or None,
         "gone_at": record.gone_at,
-        "steps_due": [_step_json(step) for step in record.steps_due] or None,
+        "steps_due": [step_to_json(step) for step in record.steps_due] or None,
     }
 
 

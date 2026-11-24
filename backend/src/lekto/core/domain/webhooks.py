@@ -49,7 +49,7 @@ from lekto.core.domain.ids import (
 )
 from lekto.core.domain.json_value import JsonObject, loads
 from lekto.core.domain.reasons import Reason, ReasonCode, because
-from lekto.core.domain.tasks import DEFAULT_TIMEOUT, validate_timeout
+from lekto.core.domain.tasks import DEFAULT_TIMEOUT, TaskKind, validate_timeout
 from lekto.core.domain.validation import (
     MAX_URL_LENGTH,
     has_control_characters,
@@ -63,7 +63,7 @@ TEST_EVENT = "webhook.test"
 """The event type of the test request; it has no document."""
 RULE_SEND = "rule.send"
 """The type of a request a rule sends (`rules.SendWebhook`); its body names the rule too."""
-RULE_ASK = "rule.ask"
+RULE_ASK = TaskKind.ASK.value
 """The type of a request a rule step asks with (a task, `domain.tasks`)."""
 DEFAULT_OPEN_TASKS = 4
 MAX_OPEN_TASKS = 64
@@ -131,8 +131,9 @@ def event_type_names() -> list[str]:
 
 
 def validate_url(url: str) -> str:
-    """The target URL: `http` or `https` with a host, no credentials, no fragment. Targets in
-    the own network are fine. ValidationError otherwise."""
+    """The target URL: `http` or `https` with a host, no credentials, no fragment.
+    ValidationError otherwise. Whether one in the own network is reached, `PrivateTargets`
+    decides when saving and sending."""
     url = url.strip()
     if not url or len(url) > MAX_URL_LENGTH:
         raise ValidationError(because(ReasonCode.URL_LENGTH, max=MAX_URL_LENGTH))

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { components } from '#lib/api/schema.ts';
+import { formatList } from '#lib/i18n.ts';
 import { m } from '#lib/paraglide/messages.js';
 import type { Node, NodeState } from '#lib/pipeline.ts';
 import { actorOf, byPerson, confirmationOf, stepSummary } from './step-summary.ts';
@@ -141,7 +142,7 @@ describe('stepSummary', () => {
 			{ outcome: 'uncertain' }
 		);
 		expect(stepSummary('judge', unsure, both, 'review', lookup)).toContain(
-			m.summary_unseen({ names: `Jane Doe, ${m.space_named_someone()}` })
+			m.summary_unseen({ names: formatList(['Jane Doe', m.space_named_someone()]) })
 		);
 		expect(
 			summary('judge', {

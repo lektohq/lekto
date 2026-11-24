@@ -10,6 +10,7 @@ from fastapi.routing import APIRoute, iter_route_contexts
 
 from lekto import __version__
 from lekto.adapters.inbound.rest import PREFIX
+from lekto.adapters.inbound.rest.app import DOCS_PATH
 from lekto.adapters.inbound.rest.auth import CSRF_HEADER, READS_KEY
 from lekto.adapters.inbound.rest.version import API_VERSION
 from lekto.core.domain.errors import AuthenticationError
@@ -26,6 +27,8 @@ PUBLIC = {
     ("GET", f"{PREFIX}/auth/oidc/callback"),
     ("GET", f"{PREFIX}/health"),
 }
+BESIDE = {DOCS_PATH, f"{PREFIX}/openapi.json"}
+"""The public routes beside the API's own (`add_route`, FastAPI's OpenAPI document)."""
 NEW_PASSWORD = "another long passphrase"
 PROBLEM = "application/problem+json"
 
@@ -71,6 +74,22 @@ async def test_every_other_route_needs_authentication(api: Api) -> None:
         assert response.status_code == 401, (method, path)
         checked += 1
     assert checked >= 50
+
+
+async def test_a_route_beside_the_api_is_known_or_needs_authentication(api: Api) -> None:
+    """A route added with `add_route` below the prefix is no `APIRoute` and no part of the
+    OpenAPI document: it is one of the known public ones, or it asks for authentication too
+    (TC-K01)."""
+    beside = {
+        context.path_format or ""
+        for context in iter_route_contexts(api.app.routes)
+        if not isinstance(context.original_route, APIRoute)
+        and (context.path_format or "").startswith(PREFIX)
+    }
+    assert beside >= BESIDE
+    for path in sorted(beside - BESIDE):
+        response = await api.client.get(re.sub(r"\{[^}]+\}", str(UUID(int=1)), path))
+        assert response.status_code == 401, path
 
 
 # --- sessions -----------------------------------------------------------------------------------
@@ -225,7 +244,9 @@ async def test_second_factor_over_http(api: Api) -> None:
     user = await api.user("alice")
     async with api.sign_in(user) as session:
         client = session.client
-        setup = await client.post(f"{PREFIX}/auth/totp", headers=session.headers)
+        setup = await client.post(
+            f"{PREFIX}/auth/totp", json={"password": PASSWORD}, headers=session.headers
+        )
         assert setup.status_code == 201
         secret = setup.json()["secret"]
         code = api.container.totp.code(secret, api.clock.now())
@@ -330,7 +351,7 @@ async def test_expired_tokens_are_refused(api: Api) -> None:
         ("POST", "/auth/logout", None),
         ("POST", "/auth/password", {"current_password": PASSWORD, "new_password": NEW_PASSWORD}),
         ("DELETE", "/auth/sessions", None),
-        ("POST", "/auth/totp", None),
+        ("POST", "/auth/totp", {"password": PASSWORD}),
         ("POST", "/auth/totp/confirm", {"code": "123456"}),
         ("POST", "/auth/totp/disable", {"code": "123456"}),
         ("POST", "/auth/totp/recovery-codes", {"code": "123456"}),
@@ -455,6 +476,8 @@ async def test_auth_answers_are_not_stored(api: Api) -> None:
         public = await api.client.get(PREFIX + path)
         assert public.status_code == 200
         assert "cache-control" not in public.headers, path
+        # Not personal, but not sniffed either (RB-K09).
+        assert public.headers["x-content-type-options"] == "nosniff", path
 
 
 async def test_token_expiry_may_have_any_offset(api: Api) -> None:

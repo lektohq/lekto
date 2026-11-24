@@ -149,14 +149,13 @@ const exchange = {
 	]
 };
 
-/** The log of doc-1, the exchanges with a model of every node (none where not given), its
- * files and how it was read. */
+/** The log of doc-1, the exchanges with a model of every node (none where not given) and its
+ * files; how it was read comes with the page, never asked for here (WA-K02). */
 function serve(log: unknown[], exchanges: Record<string, unknown[]> = {}) {
 	const nodes = Object.keys(NODE_LABELS);
 	fetchMock = fakeApi({
 		'GET /api/v1/documents/doc-1/log': () => log,
 		'GET /api/v1/documents/doc-1/files': () => filesOf(),
-		'GET /api/v1/documents/doc-1/reading': () => ({ vision: false, pages: [], advice: null }),
 		...Object.fromEntries(
 			nodes.map((node) => [
 				`GET /api/v1/documents/doc-1/exchanges/${node}`,
@@ -194,7 +193,6 @@ async function openTip(button: HTMLElement): Promise<HTMLElement> {
 
 beforeEach(() => {
 	serve([proposed, judged], { signal_llm: [exchange] });
-	vi.mocked(goto).mockClear();
 	goTo('/ui/documents/doc-1?tab=processing', { id: 'doc-1' });
 	desktop.override(true);
 });
@@ -443,6 +441,20 @@ describe('DocumentProcessing', () => {
 		expect(read.textContent).not.toMatch(/\d+(h|m|s)/);
 		const band = screen.getByRole('group', { name: new RegExp(m.run_band({ run: 2 })) });
 		expect(band.getAttribute('aria-label')).not.toMatch(/\d+h/);
+	});
+
+	it('ticks its clock only while a step is at work', async () => {
+		const ticking = vi.spyOn(globalThis, 'setInterval');
+		const clocks = () => ticking.mock.calls.filter(([, delay]) => delay === 1000).length;
+		const finished = show();
+		await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+		expect(clocks()).toBe(0); // nothing runs: no clock (WA-K01)
+		finished.unmount();
+		show({
+			document: documentAt(1, 'processing', [state('receive', 'ok'), state('ocr', null, 'running')])
+		});
+		await waitFor(() => expect(clocks()).toBe(1));
+		ticking.mockRestore();
 	});
 
 	it('shows only the states to someone who may not read the log', async () => {

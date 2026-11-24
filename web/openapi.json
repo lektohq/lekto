@@ -3,7 +3,7 @@
   "info": {
     "title": "Lekto DMS API",
     "description": "Lekto is a headless document management system; this API is the only way in.\n\nErrors are problem details (RFC 9457, `application/problem+json`).\n\nAuthentication: a session cookie from `POST /auth/login` (web UI; changing requests also send\nthe header `X-CSRF-Token`) or a personal API token as `Authorization: Bearer lekto_…`. Every\nendpoint needs one of them (401 without), except health, the sign-in endpoints (`POST\n/auth/login` and, below `/auth/oidc`, information, start and callback) and the answer to a task\n(`/external/tasks/{id}/result`, with the task's own token).\n\nAn API token carries rights: the read and write right of each area (`documents`,\n`master_data`, `rules`, `spaces`, `webhooks`, `lenses`, `push`, `system`), `documents:upload`,\n`documents:count` (the numbers alone), and for an admin's token the admin rights one by one\n(`admin:count_all`, `admin:documents_all`, `admin:mailboxes`, `admin:private_webhooks`,\n`admin:manage`), which count only while the user is an active admin. Each operation names the\nright it needs as `x-right` (`any`: every token; `session`: no token); without it a token gets\n403 (`token_lacks_right`). The presets `read`, `read_write` and `upload` give a token the rights\nit had as a scope (`POST /auth/tokens`).\n\nA session is needed, and a token gets 403, for the own account (profile, password, sessions,\nTOTP, API tokens, provider links) and, for admins, for creating a user with a password or the\nrole admin, resetting a user's sign-in and deleting a user. Documents and spaces the caller may\nnot see are \"not found\" (404), the same as ones that do not exist.\n\nThe same services are available to AI clients over MCP (Streamable HTTP, stateless) at\n`/api/v1/mcp`, with the same API tokens as bearer; it is not part of this OpenAPI document.\nTools are named `<area>_<verb>` (such as `documents_search` or `inbox_confirm`); each needs the\nright of its area, a tool for admins also an admin right. `tools/list` names the tools the\ncaller may use.\n",
-    "version": "0.7",
+    "version": "0.8",
     "x-lekto-version": "0.0.0.dev0"
   },
   "paths": {
@@ -970,8 +970,18 @@
           "auth"
         ],
         "summary": "Start setting up TOTP",
-        "description": "A new secret for the authenticator app, shown only now. TOTP is on once a code confirms it (`POST /auth/totp/confirm`). Needs a session; API tokens are refused (403).",
+        "description": "A new secret for the authenticator app, shown only now. TOTP is on once a code confirms it (`POST /auth/totp/confirm`). Needs the caller's password (403 `wrong_password`, counted as a failed sign-in); 409 `totp_needs_password` for an account without one, whose sign-in through the provider asks for no code of Lekto's. Needs a session; API tokens are refused (403).",
         "operationId": "begin_totp_api_v1_auth_totp_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TotpBegin"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "201": {
             "description": "Successful Response",
@@ -1031,6 +1041,38 @@
               }
             }
           },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unprocessable Content",
+                  "status": 422,
+                  "detail": "from_node: Input should be 'ocr', 'parse', ..."
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Too Many Requests",
+                  "status": 429,
+                  "detail": "too many failed attempts; try again later"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Internal Server Error",
             "content": {
@@ -1043,6 +1085,22 @@
                   "title": "Internal Server Error",
                   "status": 500,
                   "detail": "an unexpected error occurred"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Content Too Large",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Content Too Large",
+                  "status": 413,
+                  "detail": "the request body is larger than 1048576 bytes"
                 }
               }
             }
@@ -7174,7 +7232,7 @@
           "identifiers"
         ],
         "summary": "The open identifiers",
-        "description": "Admins only. Open are the identifiers no person has confirmed: those training learned at a contact (`learned`), and suggestions (`suggested`): an e-mail domain whose name fits the contact of its documents while it has none, an IBAN its documents give to a person. A person's value (a user's profile) is never open. The most documents first, then the newest. `recommended` keeps those whose documents recommend confirming or rejecting them (`recommendation`). To find words: `POST /search`.",
+        "description": "Admins only. Open are the identifiers no person has confirmed: those training learned at a contact (`learned`), and suggestions (`suggested`): an e-mail domain whose name fits the contact of its documents while it has none, an IBAN its documents give to a person. A person's value (a user's profile) is never open. The most documents first, then the newest. `recommended` keeps those whose documents recommend confirming or rejecting them (`recommendation`). To find words: `POST /identifiers/open/search`.",
         "operationId": "open_identifiers_api_v1_identifiers_open_get",
         "parameters": [
           {
@@ -26130,7 +26188,7 @@
           "automation"
         ],
         "summary": "The decisions behind a number of the holders",
-        "description": "Admins only. The decisions behind one number of `GET /holders`: measured by the holders of `measure` (a kind with a holder) or by the `recommendation`, with `outcome` (a column), at most a hundred, each with the confirmed documents of its contact that show it.",
+        "description": "Admins only. The decisions behind one number of `GET /holders`: measured by the holders of `measure` (a kind with a holder) or by the `recommendation`, with `outcome` (a column), at most 100, each with the confirmed documents of its contact that show it.",
         "operationId": "holder_cases_api_v1_automation_holders_cases_get",
         "parameters": [
           {
@@ -30707,7 +30765,7 @@
             ],
             "title": "Title Pattern",
             "examples": [
-              "Lohn {document_date:YYYY-MM}"
+              "Lohn {{ document_date | date: '%Y-%m' }}"
             ]
           },
           "group_ids": {
@@ -31555,7 +31613,7 @@
           "person"
         ],
         "title": "FactRole",
-        "description": "What a fact is to the document that shows it (`fakten.md`, Rollen)."
+        "description": "What a fact is to the document that shows it (`.knowledge/architecture/fact-roles.md`)."
       },
       "FactState": {
         "type": "string",
@@ -31788,7 +31846,7 @@
           "confidence": {
             "type": "number",
             "title": "Confidence",
-            "description": "0 to 1, the rule's summary, not a probability: 1 for a value the judge or the checks accept, at most 0.89 for an uncertain one. The measured values are in `candidates` (their `sources`)."
+            "description": "0 to 1, the rule's summary, not a probability: 1 for a value the judge or the checks accept, just below the confidence threshold (`LEKTO_CONFIDENCE_THRESHOLD`) at most for an uncertain one. The measured values are in `candidates` (their `sources`)."
           },
           "reason": {
             "anyOf": [
@@ -33045,7 +33103,7 @@
             },
             "type": "array",
             "title": "Cases",
-            "description": "At most a hundred."
+            "description": "At most 100."
           }
         },
         "type": "object",
@@ -39856,6 +39914,7 @@
           "token_invalid",
           "wrong_password",
           "totp_already_on",
+          "totp_needs_password",
           "no_totp_setup",
           "totp_off",
           "code_invalid",
@@ -39919,6 +39978,7 @@
           "not_customer_number",
           "not_of_kind",
           "fact_kind_unknown",
+          "fact_role_unknown",
           "fact_not_in_text",
           "fact_not_asked",
           "holder_not_listed",
@@ -40035,6 +40095,7 @@
           "mail_password_again",
           "mailbox_paused",
           "mail_too_large",
+          "mail_attachments_left",
           "mail_step_failed",
           "mail_step_gone",
           "mail_rule_person_gone",
@@ -44024,6 +44085,30 @@
         "title": "TokenScope",
         "description": "A preset of rights for an API token (`rights`): read, read and write, or only upload\ndocuments (a shortcut on a phone that sends shared files; it reads nothing, not even what it\nuploaded). What a token may is its rights; the scope is how they were chosen, or the preset\nthey match."
       },
+      "TotpBegin": {
+        "properties": {
+          "password": {
+            "type": "string",
+            "maxLength": 1024,
+            "minLength": 1,
+            "format": "password",
+            "title": "Password",
+            "description": "The caller's password: a session alone sets up no second factor.",
+            "writeOnly": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "password"
+        ],
+        "title": "TotpBegin",
+        "examples": [
+          {
+            "password": "********"
+          }
+        ]
+      },
       "TotpSetupOut": {
         "properties": {
           "secret": {
@@ -45935,6 +46020,7 @@
     "token_invalid": {},
     "wrong_password": {},
     "totp_already_on": {},
+    "totp_needs_password": {},
     "no_totp_setup": {},
     "totp_off": {},
     "code_invalid": {},
@@ -46087,6 +46173,9 @@
     },
     "fact_kind_unknown": {
       "kind": "text"
+    },
+    "fact_role_unknown": {
+      "role": "text"
     },
     "fact_not_in_text": {
       "value": "text"
@@ -46362,6 +46451,10 @@
       "subject": "text",
       "size": "number",
       "max": "number"
+    },
+    "mail_attachments_left": {
+      "max": "number",
+      "count": "number"
     },
     "mail_step_failed": {
       "step": "thing",

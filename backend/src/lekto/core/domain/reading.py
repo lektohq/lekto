@@ -146,7 +146,7 @@ def is_noise(word: ReadWord, typical_size: float | None = None) -> bool:
         return True
     if len(text) <= 2 and not any(char.isdigit() for char in text):
         return True
-    if word.box is not None and word.size and word.box.height < FLAT_WORD * word.size:
+    if _is_flat(word):
         return True
     return (
         typical_size is not None and word.size is not None and word.size < SMALL_LINE * typical_size
@@ -202,8 +202,11 @@ def beside_leaders(words: Sequence[ReadWord]) -> set[int]:
 
 
 def _is_leader(word: ReadWord) -> bool:
-    if _LEADER.search(word.text.strip()) or read_from_dots(word):
-        return True
+    return bool(_LEADER.search(word.text.strip())) or read_from_dots(word) or _is_flat(word)
+
+
+def _is_flat(word: ReadWord) -> bool:
+    """Whether a word's box is lower than `FLAT_WORD` of its characters' size: dots, a rule."""
     return (
         word.box is not None and word.size is not None and word.box.height < FLAT_WORD * word.size
     )

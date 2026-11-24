@@ -10,6 +10,7 @@ import { choose, optionsOf, selectedValue } from '#lib/testing/select.ts';
 import { session } from '#lib/session.svelte.ts';
 import WithDialogs from '#lib/testing/WithDialogs.svelte';
 import { fakeApi, json, masterData, noContent, problem, type Routes } from '#lib/testing/api.ts';
+import { settled } from '#lib/testing/time.ts';
 
 const PAYSLIP = '0199a6c4-0000-7000-8000-0000000000e1';
 const RULE = '0199a6c4-0000-7000-8000-0000000000f1';
@@ -112,9 +113,6 @@ afterEach(() => {
 	phone.override(null);
 	session.clear();
 });
-
-// The icon picker's panel is loaded when it opens; under a full parallel run that can take a
-// while.
 
 /** The choice of a tag field, wider than a phone a popover: placed by measuring, which jsdom
  * does not, it counts as hidden and has no computed name; its title names it. */
@@ -254,7 +252,7 @@ describe('tabs', () => {
 		const users = () =>
 			fetchMock.mock.calls.filter((call) => new URL(call[0].url).pathname === '/api/v1/users');
 		await waitFor(() => expect(users()).toHaveLength(1));
-		await new Promise((resolve) => setTimeout(resolve, 20));
+		await settled();
 		expect(users()).toHaveLength(1);
 	});
 

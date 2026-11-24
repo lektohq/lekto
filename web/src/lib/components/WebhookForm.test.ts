@@ -76,9 +76,16 @@ describe('WebhookForm', () => {
 		await userEvent.click(screen.getByRole('button', { name: m.webhook_header_add() }));
 		await userEvent.type(screen.getByLabelText(m.webhook_header_name()), 'Authorization');
 		const create = screen.getByRole('button', { name: m.create() });
-		// A new header needs a value.
-		expect((create as HTMLButtonElement).disabled).toBe(true);
-		await userEvent.type(screen.getByLabelText(m.webhook_header_value()), 'Bearer t0ken');
+		// A new header needs a value: the button stays, sending marks the field (WZ-K09).
+		expect((create as HTMLButtonElement).disabled).toBe(false);
+		await userEvent.click(create);
+		expect(sent).toEqual([]);
+		expect(await screen.findByText(m.form_invalid())).toBeTruthy();
+		const value = screen.getByLabelText(m.webhook_header_value());
+		expect(value.getAttribute('aria-invalid')).toBe('true');
+		expect(document.activeElement).toBe(value);
+		await userEvent.type(value, 'Bearer t0ken');
+		expect(value.hasAttribute('aria-invalid')).toBe(false);
 		await userEvent.click(screen.getByLabelText(m.webhook_signed()));
 		await userEvent.click(create);
 		expect(sent).toEqual([
@@ -118,6 +125,10 @@ describe('WebhookForm', () => {
 		render(WebhookForm, { webhook: stored, cancelHref: '/ui/webhooks/hook', ondone: () => {} });
 		const value = await screen.findByLabelText(m.webhook_header_value());
 		expect((value as HTMLInputElement).placeholder).toBe(m.webhook_header_kept());
+		// No password manager offers to make or keep a header's value (WC-K08).
+		expect(value.getAttribute('autocomplete')).toBe('off');
+		expect(value.hasAttribute('data-1p-ignore')).toBe(true);
+		expect(value.getAttribute('data-lpignore')).toBe('true');
 		await userEvent.click(screen.getByLabelText(m.webhook_signed()));
 		await userEvent.click(screen.getByRole('button', { name: m.save() }));
 		expect(sent.map((item) => [item.method, item.path])).toEqual([
@@ -125,6 +136,25 @@ describe('WebhookForm', () => {
 			['DELETE', '/api/v1/webhooks/hook/secret']
 		]);
 		expect(sent[0].body).not.toHaveProperty('headers');
+	});
+
+	it('asks a value of a kept header renamed, not of one only spelt otherwise (WC-K09)', async () => {
+		const user = userEvent.setup();
+		render(WebhookForm, { webhook: stored, cancelHref: '/ui/webhooks/hook', ondone: () => {} });
+		const name = await screen.findByLabelText(m.webhook_header_name());
+		const save = () => screen.getByRole('button', { name: m.save() });
+		const value = () => screen.getByLabelText(m.webhook_header_value()) as HTMLInputElement;
+		await user.clear(name);
+		await user.type(name, 'X-Token');
+		expect(value().placeholder).toBe('');
+		await user.click(save()); // another header: no stored value to keep
+		expect(sent).toEqual([]);
+		expect(value().getAttribute('aria-invalid')).toBe('true');
+		await user.clear(name);
+		await user.type(name, 'authorization');
+		expect(value().placeholder).toBe(m.webhook_header_kept());
+		await user.click(save()); // the same header for HTTP
+		expect(sent.map((item) => item.method)).toEqual(['PATCH']);
 	});
 
 	it('sends all headers when one changes, an empty value keeping the stored one', async () => {
@@ -147,8 +177,9 @@ describe('WebhookForm', () => {
 		await screen.findByLabelText(m.webhook_header_value());
 		await userEvent.click(screen.getByRole('button', { name: m.webhook_body_template() }));
 		expect(screen.getByText(m.webhook_body_template_hint())).toBeTruthy();
-		const save = screen.getByRole('button', { name: m.save() });
-		expect((save as HTMLButtonElement).disabled).toBe(true);
+		await userEvent.click(screen.getByRole('button', { name: m.save() }));
+		expect(sent.filter((item) => item.method !== 'GET')).toEqual([]); // no template yet
+		expect(await screen.findByText(m.form_invalid())).toBeTruthy();
 	});
 
 	it('changes how many tasks the webhook takes at a time', async () => {
@@ -156,8 +187,10 @@ describe('WebhookForm', () => {
 		const field = await screen.findByLabelText(m.webhook_open_tasks());
 		await userEvent.clear(field);
 		await userEvent.type(field, '65');
+		expect(field.getAttribute('aria-invalid')).toBe('true');
 		const save = screen.getByRole('button', { name: m.save() });
-		expect((save as HTMLButtonElement).disabled).toBe(true);
+		await userEvent.click(save);
+		expect(sent).toEqual([]);
 		await userEvent.clear(field);
 		await userEvent.type(field, '8');
 		await userEvent.click(save);
@@ -226,11 +259,12 @@ describe('WebhookForm', () => {
 	it('asks for at least one event while not all are chosen', async () => {
 		render(WebhookForm, { webhook: stored, cancelHref: '/ui/webhooks/hook', ondone: () => {} });
 		await userEvent.click(screen.getByLabelText(m.webhook_events_all()));
-		const save = screen.getByRole('button', { name: m.save() }) as HTMLButtonElement;
-		expect(save.disabled).toBe(true);
+		const save = screen.getByRole('button', { name: m.save() });
 		expect(screen.getByText(m.webhook_events_missing())).toBeTruthy();
+		await userEvent.click(save);
+		expect(sent).toEqual([]);
+		expect(screen.getByText(m.webhook_events_missing()).classList).toContain('text-destructive');
 		await userEvent.click(screen.getByLabelText(m.event_filed()));
-		expect(save.disabled).toBe(false);
 		await userEvent.click(save);
 		expect(sent.at(-1)?.body).toMatchObject({ event_types: ['document.filed'] });
 	});

@@ -22,9 +22,12 @@
 
 	type Brief = { title: string; lane: Lane | null };
 	const splitOff = $derived(separation.kind === 'looked' ? separation.splitOff : []);
+	// The parts by their ids: the log read anew gives the same parts in a new list, which asks
+	// nothing again.
+	const partIds = $derived(splitOff.join(' '));
 	let briefs = $state<Record<string, Brief | null>>({});
 	$effect(() => {
-		const ids = splitOff;
+		const ids = partIds ? partIds.split(' ') : [];
 		briefs = {};
 		if (ids.length === 0) return;
 		let stale = false;

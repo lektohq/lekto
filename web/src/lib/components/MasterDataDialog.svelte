@@ -329,9 +329,14 @@
 		{/if}
 		{#if extra === 'aliases' && !phone.current}
 			<Field.Field>
-				<Field.Label>{m.logo_title()}</Field.Label>
+				<Field.Label id="{uid}-logo-label">{m.logo_title()}</Field.Label>
 				{#if initial}
-					<ContactLogoEditor contact={initial as Contact} {fetching} onchanged={onlogo} />
+					<ContactLogoEditor
+						contact={initial as Contact}
+						{fetching}
+						onchanged={onlogo}
+						labelledby="{uid}-logo-label"
+					/>
 				{:else}
 					<Field.Description>{m.logo_after_create()}</Field.Description>
 				{/if}

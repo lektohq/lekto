@@ -36,7 +36,7 @@ from lekto.adapters.inbound.rest.schemas.master_data import (
 )
 from lekto.adapters.inbound.rest.schemas.pipeline import QueuedOut
 from lekto.adapters.inbound.rest.upload import read_upload, upload_body
-from lekto.core.domain.documents import UNSET, Unset
+from lekto.core.domain.changes import UNSET, Unset
 from lekto.core.domain.identifiers import Identifier
 from lekto.core.domain.ids import ContactId, DocumentTypeId, FieldId, TagId, UserId
 from lekto.core.domain.master_data import MasterData, TagScope

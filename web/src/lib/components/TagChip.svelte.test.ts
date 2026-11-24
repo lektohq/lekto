@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/svelte';
+import { render, screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import TagChip from './TagChip.svelte';
@@ -37,5 +37,40 @@ describe('TagChip that is removed (WB-09)', () => {
 		picked.unmount();
 		render(TagChip, { ...props, interactive: true });
 		expect(remove()).not.toContain('max-sm:after:-left-2.5');
+	});
+});
+
+describe('TagChip in its colours', () => {
+	it('draws a tag in its colour with its icon', async () => {
+		const { container } = render(TagChip, {
+			tag: { id: 'x', name: 'Health', path: ['Health'], icon: 'heart-pulse', color: 'pink' }
+		});
+		const chip = container.querySelector('[title="Health"]') as HTMLElement;
+		expect(chip.getAttribute('style')).toContain(
+			'--chip-bg: var(--tag-pink); --chip-fg: var(--tag-pink-foreground)'
+		);
+		expect(chip.className).toContain('bg-(--chip-bg)');
+		await waitFor(() => expect(chip.querySelector('svg.lucide-heart-pulse')).not.toBeNull());
+	});
+
+	it('mixes an own colour so that the writing stays readable in each theme', () => {
+		const { container } = render(TagChip, {
+			tag: { id: 'x', name: 'Weiß', path: ['Weiß'], color: '#FFFFFF' },
+			topic: true
+		});
+		const chip = container.querySelector('[title="Weiß"]') as HTMLElement;
+		expect(chip.className).toContain('chip-own');
+		expect(chip.className).toContain('rounded-full');
+		const style = chip.getAttribute('style') ?? '';
+		expect(style).toContain('--chip-own: #ffffff');
+		const light = Number(/--chip-light: (\d+)%/.exec(style)?.[1]);
+		expect(light).toBeLessThan(70);
+	});
+
+	it('keeps an uncoloured tag as it was', () => {
+		const { container } = render(TagChip, { tag: { id: 'x', name: 'Plain', path: ['Plain'] } });
+		const chip = container.querySelector('[title="Plain"]') as HTMLElement;
+		expect(chip.getAttribute('style')).toBeNull();
+		expect(chip.className).toContain('bg-secondary');
 	});
 });

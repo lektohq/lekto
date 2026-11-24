@@ -1,12 +1,13 @@
 // The settings: the account and its tabs; what the page loads first.
-import { render, screen } from '@testing-library/svelte';
+import { render, screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { m } from '#lib/paraglide/messages.js';
 import { session } from '#lib/session.svelte.ts';
-import { fakeApi, masterData, problem } from '#lib/testing/api.ts';
+import { calls, fakeApi, masterData, problem } from '#lib/testing/api.ts';
 import { goTo } from '#lib/testing/page-state.svelte.ts';
 import Page from './+page.svelte';
+import { settled } from '#lib/testing/time.ts';
 
 vi.mock('$app/navigation', () => import('#lib/testing/navigation.ts'));
 vi.mock('$app/state', () => import('#lib/testing/app-state.ts'));
@@ -63,5 +64,54 @@ describe('the settings', () => {
 		expect(await screen.findByRole('navigation', { name: m.settings_tabs() })).toBeTruthy();
 		expect(screen.queryByRole('alert')).toBeNull();
 		expect(screen.queryByText('boom')).toBeNull();
+	});
+
+	it('reads the account once after the profile was saved (WF-K05)', async () => {
+		const api = fakeApi({
+			...masterData(),
+			'GET /api/v1/auth/me': () => ME,
+			'GET /api/v1/auth/me/profile': () => PROFILE,
+			'PATCH /api/v1/auth/me/profile': async (request) => ({
+				...PROFILE,
+				...((await request.json()) as object)
+			}),
+			'GET /api/v1/auth/oidc': () => ({ enabled: false, display_name: null })
+		});
+		vi.stubGlobal('fetch', api);
+		const user = userEvent.setup();
+		render(Page);
+		const name = await screen.findByLabelText(m.profile_display_name());
+		await user.clear(name);
+		await user.type(name, 'Jane M. Doe');
+		const before = api.mock.calls.length;
+		await user.click(screen.getByRole('button', { name: m.save() }));
+		await waitFor(() => expect(session.user?.display_name).toBe('Jane Doe'));
+		await settled();
+		expect(
+			calls(api)
+				.slice(before)
+				.filter((call) => call === 'GET /api/v1/auth/me')
+		).toHaveLength(1);
+	});
+
+	it('names the profile’s heading by its words alone, the hint beside it (WZ-K04)', async () => {
+		vi.stubGlobal(
+			'fetch',
+			fakeApi({
+				...masterData(),
+				'GET /api/v1/auth/me': () => ME,
+				'GET /api/v1/auth/me/profile': () => PROFILE,
+				'GET /api/v1/auth/oidc': () => ({ enabled: false, display_name: null })
+			})
+		);
+		goTo('/ui/settings?tab=profile');
+		render(Page);
+		const heading = await screen.findByRole('heading', { name: m.profile_title() });
+		// The hint's button beside the heading: inside, a screen reader reads its name as part of
+		// the heading ("Profil Hinweis zu Profil").
+		expect(heading.querySelector('button')).toBeNull();
+		expect(
+			screen.getByRole('button', { name: m.hint_about({ name: m.profile_title() }) })
+		).toBeTruthy();
 	});
 });

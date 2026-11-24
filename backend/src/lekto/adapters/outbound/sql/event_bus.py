@@ -38,6 +38,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 
 from lekto.adapters.outbound.sql import events, tables
 from lekto.adapters.outbound.sql.database import Database
+from lekto.adapters.outbound.sql.purging import delete_in_batches
 from lekto.core.domain.jobs import RetryPolicy
 from lekto.core.ports.clock import Clock
 from lekto.core.ports.event_bus import DISPATCH_BATCH, EventHandler
@@ -126,14 +127,13 @@ class SqlEventBus:
         everything = select(func.coalesce(func.max(_outbox.c.seq), 0)).scalar_subquery()
         async with self._db.writing() as connection:
             await self._remove_orphans(connection, before)
-            result = await connection.execute(
-                delete(_outbox).where(
-                    _outbox.c.seq <= func.coalesce(lowest, everything),
-                    _outbox.c.recorded_at < before,
-                    ~exists().where(_retries.c.seq == _outbox.c.seq),
-                )
+            purged = await delete_in_batches(
+                connection.execute,
+                _outbox,
+                _outbox.c.seq <= func.coalesce(lowest, everything),
+                _outbox.c.recorded_at < before,
+                ~exists().where(_retries.c.seq == _outbox.c.seq),
             )
-        purged = int(result.rowcount)
         if purged:
             log.info("delivered events purged", extra={"count": purged})
         return purged

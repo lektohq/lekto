@@ -401,7 +401,7 @@
 							     while some are chosen it chooses, as the documents in their mode. -->
 							<button
 								type="button"
-								class="flex min-h-14 min-w-0 flex-1 items-center gap-3 py-2.5 pr-3 pl-3 text-left transition-colors hover:bg-panel focus-visible:bg-panel focus-visible:outline-none"
+								class="flex min-h-14 min-w-0 flex-1 items-center gap-3 py-2.5 pr-3 pl-3 text-left transition-colors hover:bg-panel focus-visible:bg-panel focus-visible:-outline-offset-2"
 								aria-label={choosing ? m.open_select({ value }) : m.open_open({ value })}
 								aria-pressed={choosing ? key in chosen : undefined}
 								onclick={() => (choosing ? toggle(item, !(key in chosen)) : openItem(item))}

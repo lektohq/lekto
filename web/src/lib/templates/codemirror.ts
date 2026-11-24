@@ -17,7 +17,15 @@ import {
 	type CompletionResult
 } from '@codemirror/autocomplete';
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
-import { Compartment, EditorState, RangeSetBuilder } from '@codemirror/state';
+import {
+	ChangeSet,
+	Compartment,
+	EditorSelection,
+	EditorState,
+	RangeSetBuilder,
+	type Transaction,
+	type TransactionSpec
+} from '@codemirror/state';
 import {
 	Decoration,
 	EditorView,
@@ -273,6 +281,33 @@ function attributes(
 	return result;
 }
 
+/** A change that makes the text longer than `max` keeps what fits of what it inserts, cut from
+ * its end, as a field with a `maxlength` does with a paste; the cursor after what it kept. */
+function withinLength(
+	transaction: Transaction,
+	max: number
+): Transaction | TransactionSpec | readonly TransactionSpec[] {
+	let over = transaction.newDoc.length - max;
+	if (!transaction.docChanged || over <= 0) return transaction;
+	const parts: { from: number; to: number; insert: string }[] = [];
+	transaction.changes.iterChanges((from, to, _fromB, _toB, inserted) =>
+		parts.push({ from, to, insert: inserted.toString() })
+	);
+	for (let index = parts.length - 1; index >= 0 && over > 0; index--) {
+		const cut = Math.min(over, parts[index].insert.length);
+		parts[index].insert = parts[index].insert.slice(0, parts[index].insert.length - cut);
+		over -= cut;
+	}
+	if (over > 0) return []; // it would not fit even without what it inserts
+	const changes = ChangeSet.of(parts, transaction.startState.doc.length);
+	const last = parts.at(-1)!;
+	return {
+		changes,
+		selection: EditorSelection.cursor(changes.mapPos(last.to, 1)),
+		scrollIntoView: true
+	};
+}
+
 export function mountTemplateEditor(options: EditorOptions): EditorHandle {
 	const content = new Compartment();
 	const max = options.maxlength;
@@ -292,7 +327,7 @@ export function mountTemplateEditor(options: EditorOptions): EditorHandle {
 				autocompletion({ override: [completionSource(options.completions)], icons: false }),
 				tooltips({ tooltipSpace: () => tooltipSpace(host) }),
 				EditorView.lineWrapping,
-				EditorState.changeFilter.of((transaction) => transaction.newDoc.length <= max),
+				EditorState.transactionFilter.of((transaction) => withinLength(transaction, max)),
 				content.of(
 					EditorView.contentAttributes.of(
 						attributes(options, Boolean(options.invalid), options.reason ?? null)

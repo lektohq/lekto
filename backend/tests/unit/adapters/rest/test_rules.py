@@ -716,6 +716,17 @@ async def test_the_preview_shows_where_text_conditions_hit(api: Api) -> None:
     assert contains["value"] == "stadtwerke süd"
     assert [len(item["locations"]) for item in contains["occurrences"]] == [1]
     assert len(matches["occurrences"]) == 2
-    # Who does not read the document learns nothing of it.
-    stranger = await api.user()
-    assert (await api.client.get(url, headers=auth(stranger))).status_code in (403, 404)
+    # Who does not read the document learns nothing of it, also with a rule of their own.
+    stranger = auth(await api.user())
+    theirs = await post(
+        api,
+        "/rules",
+        {
+            "name": "Fremd",
+            "conditions": {"all": [{"field": "text", "op": "contains", "value": "strom"}]},
+            "actions": [{"type": "set_title", "template": "Strom"}],
+        },
+        stranger,
+    )
+    hidden = f"{PREFIX}/rules/{theirs['id']}/apply/hits/{document}"
+    assert (await api.client.get(hidden, headers=stranger)).status_code == 404

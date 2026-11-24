@@ -19,7 +19,6 @@ const USER = 'u1';
 const searching = (words: string) => ({ state: { words, by: USER }, persistState: true });
 
 beforeEach(() => {
-	vi.mocked(goto).mockClear();
 	testPage.url = new URL('http://lekto/ui/inbox');
 	testPage.state = {};
 	signIn('user', { id: USER });
