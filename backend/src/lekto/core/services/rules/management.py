@@ -412,7 +412,7 @@ async def check_references(
         for field_id in references.fields:
             if field_id not in fields:
                 raise NotFoundError("field", field_id)
-        check_fields(definition, fields, writing)
+        check_fields(definition, fields, writing, saved=True)
     for space_id in references.spaces:
         space = await uow.spaces.find(space_id)
         if (

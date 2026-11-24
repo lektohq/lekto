@@ -11,6 +11,7 @@ from lekto.core.domain.fields import (
     Money,
     Url,
     Writing,
+    field_from_input,
     field_from_json,
     field_to_json,
     read_written,
@@ -78,6 +79,20 @@ def test_every_data_type_is_covered() -> None:
     assert {row[0] for row in REJECTED} == set(FieldType)
 
 
+def test_a_currency_given_now_is_an_active_code_and_one_stored_still_loads() -> None:
+    """Three capitals that are no currency (`PCS`) are refused where a value comes in, as
+    reading a text refuses them; stored before, in a suggestion, a rule or imported metadata,
+    such a value still loads (DA-K09)."""
+    amount = definition(FieldType.AMOUNT)
+    given = {"amount": "7", "currency": "PCS"}
+    with pytest.raises(ValidationError, match="does not accept"):
+        field_from_input(amount, given)
+    assert field_from_json(amount, given) == Money(Decimal("7"), "PCS")
+    assert field_from_input(amount, {"amount": "7", "currency": "CHF"}) == Money(
+        Decimal("7"), "CHF"
+    )
+
+
 def test_one_json_form_for_api_rules_and_the_log() -> None:
     # Numbers in plain notation, whatever exponent the value arrived with.
     assert field_to_json(Decimal("5.335E+7")) == "53350000"
@@ -95,13 +110,9 @@ def test_one_json_form_for_api_rules_and_the_log() -> None:
         {"amount": "7"},
         {"amount": True, "currency": "EUR"},
         {"amount": "7", "currency": "eu"},
-        # Three capitals that are no currency (DA-K09), as reading the text refuses them too.
-        {"amount": "7", "currency": "PCS"},
     ):
         with pytest.raises(ValidationError, match="does not accept"):
             field_from_json(definition(FieldType.AMOUNT), refused)
-    # A value stored before still loads.
-    assert Money(Decimal("7"), "PCS").currency == "PCS"
     with pytest.raises(ValidationError, match="does not accept"):
         field_from_json(definition(FieldType.NUMBER), True)
     # What comes from anyone is shortened in the message.

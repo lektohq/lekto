@@ -53,8 +53,10 @@ from lekto.core.domain.fields import (
     FieldType,
     FieldValue,
     Writing,
+    field_from_input,
     field_from_json,
     read_written,
+    require_known_currency,
 )
 from lekto.core.domain.identifiers import IdentifierKind, normalise_identifier
 from lekto.core.domain.identity import ViaToken
@@ -778,11 +780,17 @@ def title_rule(document_type: DocumentType) -> RuleDefinition:
 
 
 def check_fields(
-    definition: RuleDefinition, definitions: Mapping[FieldId, FieldDefinition], writing: Writing
+    definition: RuleDefinition,
+    definitions: Mapping[FieldId, FieldDefinition],
+    writing: Writing,
+    *,
+    saved: bool = False,
 ) -> None:
     """Conditions and actions on fields fit the field's data type. ValidationError
     otherwise, naming the place; a missing field is a ValidationError too. `writing`: how the
-    templates write values (`TemplateRenderer.writing`), by which text without markup is read."""
+    templates write values (`TemplateRenderer.writing`), by which text without markup is read.
+    `saved`: the rule is saved now, its values are given now (`field_from_input`); a rule saved
+    before keeps fitting with an amount in a currency the check of today refuses."""
     places = [
         *condition_places(definition.conditions),
         *(
@@ -806,13 +814,15 @@ def check_fields(
             if condition.op in (Operator.CONTAINS, Operator.MATCHES):
                 continue
             for value in condition.values:
-                condition_value(field, condition.op, value)
+                compared = condition_value(field, condition.op, value)
+                if saved:
+                    require_known_currency(field, compared, value)
     for index, action in enumerate(definition.actions):
         if isinstance(action, SetField):
             with _at(f"actions[{index}]"):
                 field = _field(definitions, action.field_id)
                 if not is_template(field, action.value):
-                    field_from_json(field, action.value)
+                    (field_from_input if saved else field_from_json)(field, action.value)
                 elif (
                     # Text without markup writes itself: it must be readable now. A template's
                     # syntax and values are checked where the rule is saved (a port renders it).

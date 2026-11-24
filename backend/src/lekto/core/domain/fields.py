@@ -341,9 +341,7 @@ def field_from_json(definition: FieldDefinition, data: object) -> FieldValue:
             case FieldType.NUMBER if _numeric(data):
                 value = Decimal(str(data))
             case FieldType.AMOUNT if isinstance(data, dict) and set(data) == _AMOUNT_KEYS:
-                # An active ISO 4217 code as the text's reading takes it, not any three
-                # capitals (`PCS`); `Money` itself takes those, so a stored value still loads.
-                if _numeric(data["amount"]) and is_currency_code(str(data["currency"])):
+                if _numeric(data["amount"]):
                     value = Money(Decimal(str(data["amount"])), data["currency"])
             case FieldType.DATE if isinstance(data, str):
                 value = date.fromisoformat(data)
@@ -356,6 +354,22 @@ def field_from_json(definition: FieldDefinition, data: object) -> FieldValue:
     except InvalidOperation, ValueError, ValidationError:
         raise definition.refusal(data) from None
     return definition.validate(value)
+
+
+def field_from_input(definition: FieldDefinition, data: object) -> FieldValue:
+    """`field_from_json` for a value given now (the API, MCP, a rule saved): an amount's
+    currency is an active ISO 4217 code, as reading a text takes it, not any three capitals
+    (`PCS`, DA-K09). What is stored is read with `field_from_json`, which takes those as `Money`
+    does: a value saved before still loads, in a suggestion, a rule and imported metadata."""
+    value = field_from_json(definition, data)
+    require_known_currency(definition, value, data)
+    return value
+
+
+def require_known_currency(definition: FieldDefinition, value: FieldValue, data: object) -> None:
+    """ValidationError if `value` (read from `data`) is an amount in no active currency."""
+    if isinstance(value, Money) and not is_currency_code(value.currency):
+        raise definition.refusal(data)
 
 
 _AMOUNT_KEYS = {"amount", "currency"}

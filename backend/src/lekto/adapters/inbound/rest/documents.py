@@ -92,7 +92,7 @@ from lekto.core.domain.documents import (
 )
 from lekto.core.domain.editing import MAX_ADDED, MAX_MERGED, MAX_PREVIEW_PAGES
 from lekto.core.domain.errors import PermissionDeniedError, ValidationError
-from lekto.core.domain.fields import FieldDefinition, field_from_json
+from lekto.core.domain.fields import FieldDefinition, field_from_input
 from lekto.core.domain.identifiers import IdentifierKind
 from lekto.core.domain.ids import (
     ContactId,
@@ -1216,9 +1216,9 @@ async def _changes(body: DocumentPatch, user: Actor, context: Context) -> Docume
         definitions = {a.id: a for a in await context.master_data.list_fields(user)}
         for field_id, value in body.fields.items():
             definition = definitions.get(FieldId(field_id))
-            fields[FieldId(field_id)] = (
-                value if definition is None or value is None else field_from_json(definition, value)
-            )
+            if definition is not None and value is not None:
+                value = field_from_input(definition, value)
+            fields[FieldId(field_id)] = value
     if "title" in given and body.title is None:
         raise ValidationError("title: must not be null")
     if "created_at" in given and body.created_at is None:
@@ -1268,7 +1268,7 @@ async def _imported_metadata(
             ),
             tag_ids=frozenset(TagId(tag) for tag in body.tag_ids),
             document_date=body.document_date,
-            fields={key: field_from_json(definitions[key], raw) for key, raw in fields.items()},
+            fields={key: field_from_input(definitions[key], raw) for key, raw in fields.items()},
             created_at=None if body.created_at is None else to_utc(body.created_at, "created_at"),
             review=tuple(_review(item, definitions) for item in body.review),
         )

@@ -19,6 +19,34 @@ from tests.builders import PASSWORD, SAMPLES
 from tests.unit.adapters.rest.support import Api, post, unique_pdf, upload
 
 
+async def test_an_amount_given_names_an_active_currency(api: Api) -> None:
+    """Three capitals that are no currency are refused where they come in: a document's field
+    and a rule saved (DA-K09)."""
+    admin, owner = await api.admin(), await api.user()
+    a, o = auth(admin), auth(owner)
+    amount = await post(api, "/fields", {"name": "Amount", "data_type": "amount"}, a)
+    document = await upload(api, o)
+    given = {"amount": "7", "currency": "PCS"}
+
+    response = await api.client.patch(
+        f"{PREFIX}/documents/{document}", json={"fields": {amount["id"]: given}}, headers=o
+    )
+    assert response.status_code == 422, response.text
+    tag = await post(api, "/tags", {"name": "pieces"}, a)
+    condition = {"field": "field", "field_id": amount["id"], "op": "is", "value": given}
+    rule = {
+        "name": "Pieces",
+        "conditions": {"all": [condition]},
+        "actions": [{"type": "add_tags", "tag_ids": [tag["id"]]}],
+    }
+    response = await api.client.post(f"{PREFIX}/rules", json=rule, headers=o)
+    assert response.status_code == 422, response.text
+    assert "does not accept" in response.text
+    condition["value"] = {"amount": "7", "currency": "EUR"}
+    response = await api.client.post(f"{PREFIX}/rules", json=rule, headers=o)
+    assert response.status_code == 201, response.text
+
+
 async def test_metadata_with_master_data_and_fields(api: Api) -> None:
     admin, owner = await api.admin(), await api.user()
     a, o = auth(admin), auth(owner)
