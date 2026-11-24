@@ -16,7 +16,7 @@ import httpx2
 from lekto_migration import plan as plans
 from lekto_migration import report as reports
 from lekto_migration.check import check
-from lekto_migration.config import Config, ConfigError, env_file, public
+from lekto_migration.config import Config, ConfigError, env_file, forms, public
 from lekto_migration.expect import Context, expect, field_infos
 from lekto_migration.lekto import DELAYS, ApiError, Lekto
 from lekto_migration.masterdata import (
@@ -192,8 +192,8 @@ async def execute(
         state = State(config.state if existed or writes else Path(":memory:"))
         if existed or writes:
             # Only the addresses given: a check without Lekto reads a state a run made.
-            given = {"paperless": public(config.paperless_url), "lekto": public(config.lekto_url)}
-            state.bind(**{key: value for key, value in given.items() if value})
+            given = {"paperless": config.paperless_url, "lekto": config.lekto_url}
+            state.bind(**{key: forms(url) for key, url in given.items() if url})
         loaded = await load(
             config, source, target, state, write=command != "check", progress=progress
         )

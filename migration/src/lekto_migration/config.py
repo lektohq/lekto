@@ -92,6 +92,20 @@ def public(url: str | None) -> str | None:
     return urlunsplit((parts.scheme, host, parts.path, "", ""))
 
 
+def forms(url: str) -> tuple[str, ...]:
+    """The forms of `url` a state file or a plan may hold: `public`'s first, then the one
+    before an IPv6 address kept its brackets (MI-K05, `http://::1:8000`) where it differs. A
+    migration begun before goes on with the same files."""
+    now = public(url) or ""
+    parts = urlsplit(url)
+    try:
+        host = (parts.hostname or "") + (f":{parts.port}" if parts.port else "")
+    except ValueError:  # no port as a number: the earlier form refused it
+        return (now,)
+    before = urlunsplit((parts.scheme, host, parts.path, "", ""))
+    return (now,) if before == now else (now, before)
+
+
 @dataclass(frozen=True)
 class Config:
     """How a command runs; what is taken over and how is the plan's (`plan`)."""

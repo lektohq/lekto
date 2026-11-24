@@ -9,7 +9,7 @@ from typing import Any
 from ruamel.yaml.comments import CommentedMap
 
 from lekto_migration import plan as plans
-from lekto_migration.config import Config, public
+from lekto_migration.config import Config, forms
 from lekto_migration.directory import Directory
 from lekto_migration.expect import Context, Expected, FieldInfo, expect, field_infos
 from lekto_migration.lekto import ApiError, Lekto, unfit
@@ -100,7 +100,7 @@ def bound(document: CommentedMap, config: Config) -> None:
     """A plan belongs to one Paperless and one Lekto: another one is refused."""
     for key, url in (("source", config.paperless_url), ("target", config.lekto_url)):
         written = str(document.get(key) or "").rstrip("/")
-        if url is not None and written and written != (public(url) or "").rstrip("/"):
+        if url is not None and written and all(written != form.rstrip("/") for form in forms(url)):
             raise MigrationError(
                 f"the plan {config.plan} is for another {key} ({written}); use another --plan"
             )
