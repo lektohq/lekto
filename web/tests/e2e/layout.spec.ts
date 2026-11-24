@@ -1,5 +1,6 @@
 // The layout rules of web/DESIGN.md in a browser, for every area at the narrowest width a page
-// must reflow to, a phone's, a laptop's and a desktop's: nothing scrolls sideways, every control is a finger's size on the phone (44
+// must reflow to, a phone's, a laptop's and a desktop's: nothing scrolls sideways, no step of a
+// run breaks its name letter by letter, every control is a finger's size on the phone (44
 // pixels, a larger invisible hit area counts) and at least 24 pixels wider, and no page logs an
 // error. Every area, with something in it: the spec creates what the pages show (a contact, a
 // type with a title pattern, a tag, a rule, a webhook, a paused mailbox, a document) and
@@ -83,6 +84,31 @@ const WIDTHS = [
 	{ name: 'laptop', width: 1024, height: 768, target: 24, phone: false },
 	{ name: 'desktop', width: 1440, height: 900, target: 24, phone: false }
 ];
+
+/** The names of the steps of a run that break so narrow that a line holds fewer than three
+ * characters: a card that leaves its name a few pixels breaks it letter by letter. */
+async function squeezed(page: Page) {
+	return page.locator('html').evaluate(() => {
+		const found: string[] = [];
+		for (const name of document.querySelectorAll<HTMLElement>('[data-node] .font-semibold')) {
+			const text = name.firstChild;
+			if (!(text instanceof Text) || name.getClientRects().length === 0) continue;
+			const lines = new Map<number, number>();
+			for (let at = 0; at < text.length; at++) {
+				if (/\s/.test(text.data[at])) continue;
+				const range = document.createRange();
+				range.setStart(text, at);
+				range.setEnd(text, at + 1);
+				const top = Math.round(range.getBoundingClientRect().top);
+				lines.set(top, (lines.get(top) ?? 0) + 1);
+			}
+			if (lines.size > 1 && [...lines.values()].some((count) => count < 3)) {
+				found.push(`the step "${text.data.trim()}" breaks letter by letter`);
+			}
+		}
+		return found;
+	});
+}
 
 /** What sticks out of `root` sideways (the page, or a frame open above it), and its controls
  * smaller than `target` (with their hit area). */
@@ -299,6 +325,7 @@ for (const size of WIDTHS) {
 			const { overflow, small } = await measure(page.locator('html'), size.target);
 			if (overflow > 1) findings.push(`${path}: ${overflow} px wider than the window`);
 			for (const control of small) findings.push(`${path}: ${control}`);
+			for (const step of await squeezed(page)) findings.push(`${path}: ${step}`);
 		}
 		// What a page opens above itself: the frame alone, the page behind it was measured.
 		for (const frame of FRAMES) {
