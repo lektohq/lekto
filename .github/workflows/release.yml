@@ -10,6 +10,8 @@ name: Release
 # `lekto-migration` is built only when something in `migration/` (its code, its locked
 # dependencies, its Dockerfile) changed since the previous published release; otherwise that
 # release's image gets this release's tags, without a new image.
+# First it warns when the pylekto of `migration/` speaks another API than the release
+# (`.github/scripts/pylekto_api.py`); pylekto is released before Lekto.
 # By hand (`workflow_dispatch`) the images of a published release are built again, both.
 # Last, a published release whose `lekto` image got `latest` tells the homelab its version: it
 # starts the homelab's workflow `lekto-release.yml` (`workflow_dispatch`, repository in the secret
@@ -68,6 +70,10 @@ jobs:
       - name: 🔖 Revision
         id: revision
         run: echo "revision=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - name: 🐍 Whether pylekto speaks this release's API
+        # A warning only: pylekto is released before Lekto (CLAUDE.md), and a stop would leave the
+        # published release without images.
+        run: python3 .github/scripts/pylekto_api.py
       - name: 🏷️ Which tags the images get
         id: tags
         env:
