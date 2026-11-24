@@ -1097,6 +1097,15 @@ was published and when Lekto last looked, and "Release Notes" (`outline`, `sm`, 
 that opens the release's page in a new tab. It cannot be closed: it goes once the new version
 runs. Other users see nothing of it (Tobi, 19.11.2026, after a mock).
 
+### Processing tab
+
+From `lg` on the steps of a run stand as four columns, one per phase; the box of the runs stands
+beside them from `xl` on and above them between `lg` and `xl`, so that the columns keep the width
+(Tobi, 24.11.2026). A step card narrower than 15.5rem inside (`@container`) puts its state and
+time below its name: the name keeps the width and breaks only between words or with a hyphen,
+never letter by letter (`tests/e2e/layout.spec.ts` checks it). Below `lg` the steps run down a
+line.
+
 ### Intake channels
 
 The page "System" has a tab "Eingangskanäle" for admins only (Tobi, 04.11.2026); other users do
