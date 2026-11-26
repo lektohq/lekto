@@ -21,7 +21,7 @@ from botocore.exceptions import ClientError
 
 from lekto.adapters.outbound.http_client import CONNECT_TIMEOUT
 from lekto.core.domain.errors import NotFoundError
-from lekto.core.ports.object_store import check_key, check_readable
+from lekto.core.ports.object_store import ObjectStore, check_key, check_readable
 
 ATTEMPTS = 3
 READ_TIMEOUT = 30.0
@@ -32,7 +32,7 @@ READ_TIMEOUT = 30.0
 _NOT_FOUND = {"404", "NoSuchKey", "NotFound"}
 
 
-class S3ObjectStore:
+class S3ObjectStore(ObjectStore):
     def __init__(
         self,
         *,

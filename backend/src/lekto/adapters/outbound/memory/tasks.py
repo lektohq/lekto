@@ -7,9 +7,10 @@ from lekto.adapters.outbound.memory.rows import MemoryRepository, _copy
 from lekto.core.domain.ids import DocumentId, TaskId, WebhookId
 from lekto.core.domain.pipeline import Node
 from lekto.core.domain.tasks import Task, TaskStatus
+from lekto.core.ports.repository import TaskRepository
 
 
-class MemoryTaskRepository(MemoryRepository[TaskId, Task]):
+class MemoryTaskRepository(MemoryRepository[TaskId, Task], TaskRepository):
     async def list_for_run(self, document: DocumentId, node: Node, run: int) -> list[Task]:
         return _oldest_first(
             row

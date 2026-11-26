@@ -11,9 +11,10 @@ from lekto.core.domain.ids import DocumentTypeId, MailboxId, UserId
 from lekto.core.domain.mail import Fallback, FetchStart, Mailbox, MailboxStatus, MailSecurity
 from lekto.core.domain.reasons import Reason
 from lekto.core.domain.validation import name_key
+from lekto.core.ports.repository import MailboxRepository
 
 
-class SqlMailboxRepository(SqlRepository[MailboxId, Mailbox]):
+class SqlMailboxRepository(SqlRepository[MailboxId, Mailbox], MailboxRepository):
     kind = "mailbox"
     table = t.mailboxes
 

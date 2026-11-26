@@ -13,7 +13,7 @@ import httpx2
 
 from lekto.adapters.outbound.http_client import CONNECT_TIMEOUT, describe_failure
 from lekto.core.domain.releases import Release
-from lekto.core.ports.releases import ReleaseFeedError
+from lekto.core.ports.releases import ReleaseFeed, ReleaseFeedError
 
 URL = "https://api.github.com/repos/lektohq/lekto/releases?per_page=30"
 TIMEOUT = 15.0
@@ -22,7 +22,7 @@ MAX_BYTES = 2_000_000
 """The largest answer read (a page of releases with their notes is far below)."""
 
 
-class GitHubReleaseFeed:
+class GitHubReleaseFeed(ReleaseFeed):
     def __init__(
         self, *, user_agent: str, url: str = URL, transport: httpx2.AsyncBaseTransport | None = None
     ) -> None:

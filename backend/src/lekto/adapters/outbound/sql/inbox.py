@@ -31,12 +31,12 @@ from lekto.core.domain.ids import DocumentId, UserId
 from lekto.core.domain.inbox import OPEN_TABS, Confirmation, InboxTab
 from lekto.core.domain.pipeline import Lane
 from lekto.core.domain.spaces import SpaceRole
-from lekto.core.ports.repository import InboxEntry, InboxPosition
+from lekto.core.ports.repository import InboxEntry, InboxPosition, InboxRepository
 
 _documents, _seen, _confirmations = t.documents, t.inbox_seen, t.inbox_confirmations
 
 
-class SqlInboxRepository:
+class SqlInboxRepository(InboxRepository):
     def __init__(self, transaction: Transaction, documents: SqlDocumentRepository) -> None:
         self._tx = transaction
         self._documents = documents  # reads the documents of the rows

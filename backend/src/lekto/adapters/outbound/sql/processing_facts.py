@@ -16,7 +16,14 @@ from lekto.core.domain.identity import ViaToken
 from lekto.core.domain.ids import DocumentId
 from lekto.core.domain.pipeline import Lane, Node
 from lekto.core.domain.validation import require_utc
-from lekto.core.ports.repository import MICROSECOND, FactsScope, LaneCount, RunTimes, SignalCount
+from lekto.core.ports.repository import (
+    MICROSECOND,
+    FactsScope,
+    LaneCount,
+    ProcessingFacts,
+    RunTimes,
+    SignalCount,
+)
 
 _runs, _verdicts, _documents = t.first_runs, t.field_verdicts, t.documents
 _SIGNALS: dict[Node, Any] = {
@@ -30,7 +37,7 @@ _SIGNALS: dict[Node, Any] = {
 _NODES = {node.value: node for node in Node}
 
 
-class SqlProcessingFacts:
+class SqlProcessingFacts(ProcessingFacts):
     def __init__(self, transaction: Transaction) -> None:
         self._tx = transaction
 

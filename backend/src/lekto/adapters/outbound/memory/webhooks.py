@@ -13,7 +13,7 @@ from lekto.adapters.outbound.memory.rows import _REMOVED, MemoryRepository, _cop
 from lekto.core.domain.errors import NotFoundError
 from lekto.core.domain.ids import ApiTokenId, UserId, WebhookId
 from lekto.core.domain.webhooks import DeliveryOutcome, Webhook, WebhookDelivery
-from lekto.core.ports.repository import PAGE_SIZE
+from lekto.core.ports.repository import PAGE_SIZE, WebhookRepository
 
 if TYPE_CHECKING:
     from lekto.adapters.outbound.memory.unit_of_work import MemoryUnitOfWork
@@ -28,7 +28,7 @@ class DeliveryRow:
     version: int = 1
 
 
-class MemoryWebhookRepository(MemoryRepository[WebhookId, Webhook]):
+class MemoryWebhookRepository(MemoryRepository[WebhookId, Webhook], WebhookRepository):
     def __init__(self, uow: MemoryUnitOfWork, table: Table[Webhook]) -> None:
         super().__init__(uow, table)
         self._deliveries = MemoryRepository[UUID, DeliveryRow](uow, WEBHOOK_DELIVERIES)

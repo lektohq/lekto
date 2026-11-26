@@ -10,13 +10,13 @@ from uuid import UUID
 from lekto.core.domain.errors import ClassifierError
 from lekto.core.domain.ids import ContactId, DocumentTypeId, TagId
 from lekto.core.domain.json_value import JsonObject
-from lekto.core.ports.classifier import Prediction, TrainedModel, TrainingExample
+from lekto.core.ports.classifier import Classifier, Prediction, TrainedModel, TrainingExample
 
 _WORD = re.compile(r"[^\W\d_]{3,}")
 _FORMAT = "fake-words/1"
 
 
-class FakeClassifier:
+class FakeClassifier(Classifier):
     name = "fake classifier"
 
     async def train(self, examples: Sequence[TrainingExample]) -> TrainedModel:

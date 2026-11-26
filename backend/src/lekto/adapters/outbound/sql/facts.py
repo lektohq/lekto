@@ -26,11 +26,12 @@ from lekto.core.domain.document_facts import (
 from lekto.core.domain.identifiers import IdentifierKind
 from lekto.core.domain.ids import ContactId, DocumentId, UserId
 from lekto.core.domain.open_identifiers import Sighting
+from lekto.core.ports.repository import DocumentFactRepository
 
 type Key = tuple[IdentifierKind, str]
 
 
-class SqlDocumentFactRepository:
+class SqlDocumentFactRepository(DocumentFactRepository):
     def __init__(self, transaction: Transaction) -> None:
         self._tx = transaction
 

@@ -34,7 +34,7 @@ from lekto.core.domain import media_types
 from lekto.core.domain.editing import PagePick
 from lekto.core.domain.errors import UnprocessableDocumentError
 from lekto.core.domain.reasons import ReasonCode, because
-from lekto.core.ports.composer import PageSource
+from lekto.core.ports.composer import PageComposer, PageSource
 
 _IMAGES = (media_types.JPEG, media_types.PNG, media_types.TIFF)
 # How a page shows an EXIF orientation, turned clockwise; the others mirror the picture.
@@ -42,7 +42,7 @@ _TURNS = {1: 0, 3: 180, 6: 90, 8: 270}
 _POINTS_PER_INCH = 72
 
 
-class PikepdfPageComposer:
+class PikepdfPageComposer(PageComposer):
     async def count_pages(self, source: PageSource) -> int:
         return await asyncio.to_thread(_count, source)
 

@@ -11,6 +11,7 @@ import regex
 from lekto.adapters.outbound.regex.size import MAX_SPELLED_OUT, spelled_out
 from lekto.core.domain.errors import PatternTimeoutError, ValidationError
 from lekto.core.domain.reasons import ReasonCode, because
+from lekto.core.ports.patterns import PatternMatcher
 
 _NO_V1 = "the flag V1 is not supported: patterns follow the syntax of V0"
 
@@ -35,7 +36,7 @@ def _compile(pattern: str, case_sensitive: bool) -> regex.Pattern[str]:
     ) from None
 
 
-class RegexPatternMatcher:
+class RegexPatternMatcher(PatternMatcher):
     def __init__(self, timeout: float) -> None:
         if timeout <= 0:
             raise ValueError("timeout must be positive")

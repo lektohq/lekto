@@ -3,9 +3,10 @@
 from lekto.adapters.outbound.memory.rows import MemoryRepository, _copy
 from lekto.core.domain.ids import LensId, UserId
 from lekto.core.domain.lenses import Lens
+from lekto.core.ports.repository import LensRepository
 
 
-class MemoryLensRepository(MemoryRepository[LensId, Lens]):
+class MemoryLensRepository(MemoryRepository[LensId, Lens], LensRepository):
     async def remove_for_owner(self, owner: UserId) -> int:
         return self._remove_rows([row for row in self._all() if row.owner_id == owner])
 

@@ -96,7 +96,7 @@ def load_queries(path: Path, known: frozenset[str]) -> QuerySet:
     return QuerySet(description if isinstance(description, str) else "", tuple(cases))
 
 
-class TimedEmbeddings:
+class TimedEmbeddings(Embeddings):
     """Embeddings that count the texts and the time spent in the wrapped ones."""
 
     def __init__(self, inner: Embeddings) -> None:

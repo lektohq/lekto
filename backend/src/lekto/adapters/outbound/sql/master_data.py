@@ -21,6 +21,12 @@ from lekto.core.domain.master_data import (
     TagScope,
 )
 from lekto.core.domain.validation import name_key
+from lekto.core.ports.repository import (
+    ContactRepository,
+    DocumentTypeRepository,
+    FieldDefinitionRepository,
+    TagRepository,
+)
 
 
 class SqlNamedRepository[K: UUID, E: MasterData](SqlRepository[K, E]):
@@ -38,7 +44,7 @@ class SqlNamedRepository[K: UUID, E: MasterData](SqlRepository[K, E]):
         }
 
 
-class SqlContactRepository(SqlNamedRepository[ContactId, Contact]):
+class SqlContactRepository(SqlNamedRepository[ContactId, Contact], ContactRepository):
     kind = "contact"
     table = t.contacts
 
@@ -136,7 +142,9 @@ class SqlContactRepository(SqlNamedRepository[ContactId, Contact]):
             await self._tx.write(delete(table).where(table.c.contact_id.in_(ids)))
 
 
-class SqlDocumentTypeRepository(SqlNamedRepository[DocumentTypeId, DocumentType]):
+class SqlDocumentTypeRepository(
+    SqlNamedRepository[DocumentTypeId, DocumentType], DocumentTypeRepository
+):
     kind = "document type"
     table = t.document_types
 
@@ -178,7 +186,7 @@ class SqlDocumentTypeRepository(SqlNamedRepository[DocumentTypeId, DocumentType]
         await self._tx.write(delete(table).where(table.c.document_type_id.in_(ids)))
 
 
-class SqlTagRepository(SqlNamedRepository[TagId, Tag]):
+class SqlTagRepository(SqlNamedRepository[TagId, Tag], TagRepository):
     kind = "tag"
     table = t.tags
 
@@ -222,7 +230,7 @@ def _logo(row: Row[Any]) -> ContactLogo | None:
     )
 
 
-class SqlFieldRepository(SqlNamedRepository[FieldId, FieldDefinition]):
+class SqlFieldRepository(SqlNamedRepository[FieldId, FieldDefinition], FieldDefinitionRepository):
     kind = "field"
     table = t.field_definitions
 

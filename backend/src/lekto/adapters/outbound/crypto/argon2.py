@@ -8,11 +8,14 @@ reports them, so they are replaced at the next sign-in. Hashing runs in a worker
 
 import asyncio
 
-from argon2 import PasswordHasher, profiles
+import argon2
+from argon2 import profiles
 from argon2.exceptions import InvalidHashError, VerificationError
 
+from lekto.core.ports.identity import PasswordHasher
 
-class Argon2PasswordHasher:
+
+class Argon2PasswordHasher(PasswordHasher):
     def __init__(
         self,
         *,
@@ -21,7 +24,7 @@ class Argon2PasswordHasher:
         parallelism: int = profiles.RFC_9106_LOW_MEMORY.parallelism,
         max_concurrency: int = 4,
     ) -> None:
-        self._hasher = PasswordHasher(
+        self._hasher = argon2.PasswordHasher(
             time_cost=time_cost, memory_cost=memory_cost, parallelism=parallelism
         )
         self._slots = asyncio.Semaphore(max_concurrency)

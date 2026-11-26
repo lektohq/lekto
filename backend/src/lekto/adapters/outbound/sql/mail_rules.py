@@ -18,9 +18,10 @@ from lekto.core.domain.mail_rules import (
     steps_to_json,
 )
 from lekto.core.domain.reasons import Reason, ReasonCode, because
+from lekto.core.ports.repository import MailRuleRepository
 
 
-class SqlMailRuleRepository(SqlRepository[MailRuleId, MailRule]):
+class SqlMailRuleRepository(SqlRepository[MailRuleId, MailRule], MailRuleRepository):
     kind = "mail rule"
     table = t.mail_rules
 

@@ -54,6 +54,7 @@ from lekto.core.ports.search_index import (
     IndexBuild,
     IndexStats,
     SearchHit,
+    SearchIndex,
     SearchQuery,
     SearchResult,
     SimilarQuery,
@@ -131,7 +132,7 @@ READY_FOR = 30.0  # seconds an index counts as set up before its settings are lo
 _UNORDERED = {"filterableAttributes", "sortableAttributes", "stopWords"}
 
 
-class MeilisearchIndex:
+class MeilisearchIndex(SearchIndex):
     def __init__(
         self,
         *,
@@ -636,7 +637,7 @@ class _TaskFailedError(SearchIndexError):
         self.code = code
 
 
-class _MeilisearchBuild:
+class _MeilisearchBuild(IndexBuild):
     def __init__(self, index: MeilisearchIndex) -> None:
         self._index = index
 

@@ -13,9 +13,10 @@ from lekto.core.domain.ids import SpaceId, UserId
 from lekto.core.domain.pipeline import Lane
 from lekto.core.domain.spaces import Space, SpaceRole
 from lekto.core.domain.validation import name_key
+from lekto.core.ports.repository import SpaceRepository
 
 
-class SqlSpaceRepository(SqlRepository[SpaceId, Space]):
+class SqlSpaceRepository(SqlRepository[SpaceId, Space], SpaceRepository):
     kind = "space"
     table = t.spaces
 

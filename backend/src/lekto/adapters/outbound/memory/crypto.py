@@ -6,10 +6,17 @@ import secrets
 from datetime import datetime
 
 from lekto.core.domain.encoding import base64url, from_base64url
-from lekto.core.ports.identity import TOTP_STEP, DecryptionError
+from lekto.core.ports.identity import (
+    TOTP_STEP,
+    DecryptionError,
+    PasswordHasher,
+    RefCipher,
+    SecretCipher,
+    Totp,
+)
 
 
-class FakePasswordHasher:
+class FakePasswordHasher(PasswordHasher):
     """`fake$<round>$<salt>$<sha256>`. Hashes of an older `round` need a rehash."""
 
     def __init__(self, round: int = 1) -> None:
@@ -38,7 +45,7 @@ def _digest(salt: str, password: str) -> str:
     return hashlib.sha256(f"{salt}:{password}".encode()).hexdigest()
 
 
-class FakeCipher:
+class FakeCipher(SecretCipher):
     """XOR with a key stream from the context and a MAC; good enough to tell contexts apart."""
 
     def __init__(self, key: bytes = b"fake key") -> None:
@@ -68,7 +75,7 @@ class FakeCipher:
         return hmac.new(self._key, context + b"\0" + body, hashlib.sha256).digest()
 
 
-class FakeRefCipher:
+class FakeRefCipher(RefCipher):
     """The value with a short MAC over context and value, in base64url: readable for anyone who
     decodes it, but bound to its context."""
 
@@ -96,7 +103,7 @@ class FakeRefCipher:
         return hmac.new(self._key, context.encode() + b"\0" + data, hashlib.sha256).digest()[:8]
 
 
-class FakeTotp:
+class FakeTotp(Totp):
     """Codes are derived from secret and time step with SHA-256; same interface as RFC 6238."""
 
     def __init__(self) -> None:

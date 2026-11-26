@@ -24,13 +24,14 @@ from lekto.core.domain.json_value import JsonObject
 from lekto.core.domain.locations import Box, Location
 from lekto.core.domain.reading import PageReading, PageWords
 from lekto.core.domain.reasons import ReasonCode, because
-from lekto.core.ports.codes import CodeReading
-from lekto.core.ports.composer import PageSource
-from lekto.core.ports.mail_renderer import RenderedMail
-from lekto.core.ports.metadata import FileMetadata, MetadataEntry, MetadataSource
-from lekto.core.ports.ocr import OcrResult, VisionModel, VisionReading
-from lekto.core.ports.pages import PREVIEW_FILE, RenderedPages
-from lekto.core.ports.parser import ParseResult
+from lekto.core.ports.codes import CodeReader, CodeReading
+from lekto.core.ports.composer import PageComposer, PageSource
+from lekto.core.ports.locator import TextLocator
+from lekto.core.ports.mail_renderer import MailRenderer, RenderedMail
+from lekto.core.ports.metadata import FileMetadata, MetadataEntry, MetadataReader, MetadataSource
+from lekto.core.ports.ocr import Ocr, OcrResult, VisionModel, VisionReading
+from lekto.core.ports.pages import PREVIEW_FILE, PageRenderer, RenderedPages
+from lekto.core.ports.parser import DocumentParser, ParseResult
 
 FAKE_PDF = b"%PDF-1.7\n% lekto fake archive\n%%EOF\n"
 FAKE_WEBP = b"RIFF\x0c\x00\x00\x00WEBPVP8 "
@@ -42,7 +43,7 @@ FAKE_READING = PageReading(page=1, words=20, unsure=0)
 FAKE_VISION = VisionModel(model="fake-vlm", endpoint="vlm.example:443")
 
 
-class FakeOcr:
+class FakeOcr(Ocr):
     """`readings`: what it says it read of a scan or an image, instead of `FAKE_READING`, and
     `words` the words it read there (none unless given). `vision`: the vision model it reads
     with when asked to; it reads the page well then, with one call per page (`vision_calls`
@@ -112,7 +113,7 @@ FAKE_GIRO_CODE = Code(
 )
 
 
-class FakeMailRenderer:
+class FakeMailRenderer(MailRenderer):
     """Sets any mail as the fake archive of one page."""
 
     def __init__(self) -> None:
@@ -127,7 +128,7 @@ class FakeMailRenderer:
         return RenderedMail(pages=1, renderer="fake-mail 1", pdfa=True)
 
 
-class FakeCodeReader:
+class FakeCodeReader(CodeReader):
     """Finds `codes` on every PDF it can read (none unless given)."""
 
     def __init__(self, codes: Sequence[Code] = ()) -> None:
@@ -140,7 +141,7 @@ class FakeCodeReader:
         return CodeReading(codes=self.codes, reader="fake-codes 1", pages=1)
 
 
-class FakeMetadataReader:
+class FakeMetadataReader(MetadataReader):
     """The metadata of any file it can read: a PDF of one page from the fake producer, an
     image of its kind, one pixel square."""
 
@@ -157,7 +158,7 @@ class FakeMetadataReader:
         return FileMetadata(format=name.get(kind or "", "image"), pages=1, width=1, height=1)
 
 
-class FakeParser:
+class FakeParser(DocumentParser):
     """Writes `text`, and `structure` as its structure (one without words if none is given)."""
 
     def __init__(self, text: str = "Fake text", structure: JsonObject | None = None) -> None:
@@ -173,7 +174,7 @@ class FakeParser:
         return ParseResult(pages=1, parser="fake-parser 1")
 
 
-class FakePageRenderer:
+class FakePageRenderer(PageRenderer):
     """`pages` images per document."""
 
     def __init__(self, pages: int = 1) -> None:
@@ -199,7 +200,7 @@ def fake_pdf(pages: int, label: str = "") -> bytes:
     return b"\n".join(lines) + b"\n"
 
 
-class FakePageComposer:
+class FakePageComposer(PageComposer):
     """Counts the pages a fake PDF marks (`FAKE_PAGE`; any other file it can read has one), and
     writes a fake PDF with a page line for every page picked: the source's hash, the page and the
     turn. A random line makes every file new."""
@@ -232,7 +233,7 @@ def _fake_pages(data: bytes) -> int:
     return max(1, sum(line.startswith(FAKE_PAGE) for line in data.splitlines()))
 
 
-class FakeTextLocator:
+class FakeTextLocator(TextLocator):
     """Looks for texts in `pages` (one string per page, lines split by line breaks) on their
     letters and digits, case ignored; a box per line, as wide as the matched characters and
     as high as a line. The PDF is only checked to be one."""

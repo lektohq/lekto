@@ -16,10 +16,10 @@ from lekto.core.domain.mail_intake import (
     MailOutcome,
     MailRecord,
 )
-from lekto.core.ports.repository import PAGE_SIZE
+from lekto.core.ports.repository import PAGE_SIZE, MailOriginRepository, MailRecordRepository
 
 
-class MemoryMailRecordRepository(MemoryRows[MailRecordId, MailRecord]):
+class MemoryMailRecordRepository(MemoryRows[MailRecordId, MailRecord], MailRecordRepository):
     async def add(self, record: MailRecord) -> None:
         if self._uow._row(MAILBOXES, record.mailbox_id) is None:
             raise self._uow._violated("mail record: no such mailbox")  # as the foreign key
@@ -97,7 +97,7 @@ class MemoryMailRecordRepository(MemoryRows[MailRecordId, MailRecord]):
         return forgotten
 
 
-class MemoryMailOriginRepository(MemoryRows[DocumentId, MailOrigin]):
+class MemoryMailOriginRepository(MemoryRows[DocumentId, MailOrigin], MailOriginRepository):
     """An origin goes with its document, as the foreign key's cascade does."""
 
     async def add(self, origin: MailOrigin) -> None:

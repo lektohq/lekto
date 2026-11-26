@@ -5,7 +5,13 @@ from collections.abc import Callable, Collection
 from lekto.adapters.outbound.memory.rows import MemoryRepository, _copy
 from lekto.core.domain.ids import ApiTokenId, PushDeviceId, UserId
 from lekto.core.domain.push import PushDevice, PushMessage, PushPreferences
-from lekto.core.ports.push import PushOutcome, PushResult
+from lekto.core.ports.push import (
+    PushDeviceRepository,
+    PushOutcome,
+    PushPreferencesRepository,
+    PushResult,
+    PushSender,
+)
 
 # A valid P-256 point, base64url, as a stand-in for Lekto's VAPID public key.
 FAKE_PUBLIC_KEY = (
@@ -13,7 +19,7 @@ FAKE_PUBLIC_KEY = (
 )
 
 
-class MemoryPushDeviceRepository(MemoryRepository[PushDeviceId, PushDevice]):
+class MemoryPushDeviceRepository(MemoryRepository[PushDeviceId, PushDevice], PushDeviceRepository):
     async def find_by_endpoint(self, endpoint: str) -> PushDevice | None:
         return next((_copy(row) for row in self._all() if row.endpoint == endpoint), None)
 
@@ -29,7 +35,9 @@ class MemoryPushDeviceRepository(MemoryRepository[PushDeviceId, PushDevice]):
         return self._remove_rows([row for row in self._all() if row.api_token_id in chosen])
 
 
-class MemoryPushPreferencesRepository(MemoryRepository[UserId, PushPreferences]):
+class MemoryPushPreferencesRepository(
+    MemoryRepository[UserId, PushPreferences], PushPreferencesRepository
+):
     async def save(self, preferences: PushPreferences) -> None:
         if self._uow._row(self._table, preferences.id) is None:
             await self.add(preferences)
@@ -37,7 +45,7 @@ class MemoryPushPreferencesRepository(MemoryRepository[UserId, PushPreferences])
             await self.update(preferences)
 
 
-class FakePushSender:
+class FakePushSender(PushSender):
     """Records what it was asked to send. Delivers unless `answers` maps a device's address to
     another outcome, or is a function of device and message."""
 

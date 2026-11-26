@@ -23,12 +23,12 @@ from lekto.core.domain.mail_intake import (
 from lekto.core.domain.mail_message import Address
 from lekto.core.domain.mail_traits import FlagColor, Importance, MailMarks
 from lekto.core.domain.reasons import Reason
-from lekto.core.ports.repository import PAGE_SIZE
+from lekto.core.ports.repository import PAGE_SIZE, MailOriginRepository, MailRecordRepository
 
 _records, _origins = t.mail_records, t.mail_origins
 
 
-class SqlMailRecordRepository:
+class SqlMailRecordRepository(MailRecordRepository):
     def __init__(self, transaction: Transaction) -> None:
         self._tx = transaction
 
@@ -237,7 +237,7 @@ def _settled(record: MailRecord) -> dict[str, Any]:
     }
 
 
-class SqlMailOriginRepository:
+class SqlMailOriginRepository(MailOriginRepository):
     def __init__(self, transaction: Transaction) -> None:
         self._tx = transaction
 

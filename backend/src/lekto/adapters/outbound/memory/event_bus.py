@@ -12,12 +12,12 @@ from datetime import UTC, datetime, timedelta
 from lekto.adapters.outbound.memory.database import MemoryDatabase, Retry, SubscriptionState
 from lekto.core.domain.jobs import RetryPolicy
 from lekto.core.ports.clock import Clock
-from lekto.core.ports.event_bus import DISPATCH_BATCH, EventHandler
+from lekto.core.ports.event_bus import DISPATCH_BATCH, EventBus, EventHandler
 
 log = logging.getLogger(__name__)
 
 
-class MemoryEventBus:
+class MemoryEventBus(EventBus):
     def __init__(
         self,
         database: MemoryDatabase,

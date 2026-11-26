@@ -26,7 +26,7 @@ import asyncpg
 from lekto.adapters.outbound.signals import InProcessSignal
 from lekto.adapters.outbound.sql.database import Database
 from lekto.adapters.outbound.sql.transaction import NOTIFY_CHANNELS
-from lekto.core.ports.wakeup import Channel
+from lekto.core.ports.wakeup import Channel, Wakeup
 
 log = logging.getLogger(__name__)
 
@@ -38,7 +38,7 @@ RECONNECT_MAX_DELAY = timedelta(seconds=30)
 _CHANNELS = {name: channel for channel, name in NOTIFY_CHANNELS.items()}
 
 
-class SqlWakeup:
+class SqlWakeup(Wakeup):
     def __init__(self, database: Database) -> None:
         self._db = database
         self._signals: list[InProcessSignal] = []

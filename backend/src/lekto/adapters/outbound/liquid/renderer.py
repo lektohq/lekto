@@ -31,6 +31,7 @@ from lekto.core.domain.errors import MissingValueError, ValidationError
 from lekto.core.domain.fields import Money, Writing
 from lekto.core.domain.periods import Period
 from lekto.core.domain.templates import TemplateValue
+from lekto.core.ports.templates import TemplateRenderer
 
 _UNDEFINED = re.compile(r"^'?(?P<path>.+?)'? is undefined$")
 _LOCATION = re.compile(r"' (?P<line>\d+):(?P<column>\d+)\n")
@@ -185,7 +186,7 @@ def _plain(value: object) -> object:
     raise TypeError(f"not a template value: {type(value).__name__}")
 
 
-class LiquidTemplateRenderer:
+class LiquidTemplateRenderer(TemplateRenderer):
     def __init__(self, *, locale: str, currency: str) -> None:
         """`locale` writes dates and amounts (`LEKTO_TEMPLATE_LOCALE`); `currency` is that
         of the `currency` filter where a template names none (`LEKTO_DEFAULT_CURRENCY`)."""

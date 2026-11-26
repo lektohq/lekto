@@ -44,6 +44,7 @@ from lekto.core.domain.jobs import FinishedJob, Job, JobCount, JobOverview, JobS
 from lekto.core.domain.json_value import JsonObject, JsonValue
 from lekto.core.domain.reasons import ReasonCode, because
 from lekto.core.domain.validation import require_utc
+from lekto.core.ports.job_queue import JobQueue
 from lekto.core.ports.wakeup import Channel
 
 _jobs = t.jobs
@@ -54,7 +55,7 @@ _jobs = t.jobs
 _ACTIVE = text("status IN (" + ", ".join(f"'{status}'" for status in t.ACTIVE_JOB_STATUSES) + ")")
 
 
-class SqlJobQueue:
+class SqlJobQueue(JobQueue):
     def __init__(self, transaction: Transaction) -> None:
         self._tx = transaction
 

@@ -4,10 +4,10 @@ from collections.abc import Collection
 
 from lekto.adapters.outbound.memory.database import MemoryDatabase
 from lekto.adapters.outbound.signals import InProcessSignal
-from lekto.core.ports.wakeup import Channel
+from lekto.core.ports.wakeup import Channel, Wakeup
 
 
-class MemoryWakeup:
+class MemoryWakeup(Wakeup):
     """Signals of one in-memory database. Every process has its own database, so its signals
     reach every receiver there is: the subscriptions are `live`."""
 

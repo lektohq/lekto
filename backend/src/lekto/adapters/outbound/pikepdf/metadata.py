@@ -21,7 +21,7 @@ from lekto.adapters.outbound.imaging import DOCUMENT_FORMATS
 from lekto.core.domain import media_types
 from lekto.core.domain.errors import UnprocessableDocumentError
 from lekto.core.domain.reasons import ReasonCode, because
-from lekto.core.ports.metadata import FileMetadata, MetadataEntry, MetadataSource
+from lekto.core.ports.metadata import FileMetadata, MetadataEntry, MetadataReader, MetadataSource
 
 MAX_VALUE = 2000
 # How the pixels are stored, and pointers to other directories: nothing a person reads.
@@ -39,7 +39,7 @@ _QUALIFIED = re.compile(r"\{(.*)\}(.*)")
 _CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]")
 
 
-class FileMetadataReader:
+class FileMetadataReader(MetadataReader):
     async def read_metadata(self, source: Path) -> FileMetadata:
         return await asyncio.to_thread(_read, source)
 

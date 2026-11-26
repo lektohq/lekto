@@ -11,9 +11,10 @@ from lekto.adapters.outbound.sql.transaction import Transaction
 from lekto.core.domain.identity import ViaToken
 from lekto.core.domain.ids import DocumentId, UserId
 from lekto.core.domain.relations import Relation, RelationOrigin, RelationState
+from lekto.core.ports.repository import DocumentRelationRepository
 
 
-class SqlDocumentRelationRepository:
+class SqlDocumentRelationRepository(DocumentRelationRepository):
     def __init__(self, transaction: Transaction) -> None:
         self._tx = transaction
 

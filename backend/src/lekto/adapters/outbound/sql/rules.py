@@ -42,9 +42,10 @@ from lekto.core.domain.rules import (
     RuleVersion,
 )
 from lekto.core.domain.rules_json import definition_from_json, definition_to_json
+from lekto.core.ports.repository import RuleApplicationRepository, RuleRepository
 
 
-class SqlRuleRepository(SqlRepository[RuleId, Rule]):
+class SqlRuleRepository(SqlRepository[RuleId, Rule], RuleRepository):
     kind = "rule"
     table = t.rules
 
@@ -217,7 +218,9 @@ def _version(row: Row[Any]) -> RuleVersion:
     )
 
 
-class SqlRuleApplicationRepository(SqlRepository[RuleApplicationId, RuleApplication]):
+class SqlRuleApplicationRepository(
+    SqlRepository[RuleApplicationId, RuleApplication], RuleApplicationRepository
+):
     kind = "rule application"
     table = t.rule_applications
 

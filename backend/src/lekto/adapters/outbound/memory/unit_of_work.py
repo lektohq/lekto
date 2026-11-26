@@ -134,19 +134,34 @@ from lekto.core.domain.users import User
 from lekto.core.domain.validation import name_key, require_utc
 from lekto.core.domain.verdict import KnownLabels, known_space
 from lekto.core.domain.versions import DocumentVersion
+from lekto.core.ports.event_bus import Outbox
+from lekto.core.ports.job_queue import JobQueue
 from lekto.core.ports.repository import (
     NEWEST_FIRST,
+    ContactRepository,
     CountBy,
+    DocumentFactRepository,
     DocumentFilter,
     DocumentOrder,
     DocumentPosition,
+    DocumentRelationRepository,
+    DocumentRepository,
+    DocumentTypeRepository,
+    DocumentVersionRepository,
     FacetBy,
+    FieldDefinitionRepository,
     FilterView,
+    ProcessingLog,
+    ProfileRepository,
+    SpaceRepository,
+    TagRepository,
+    UserRepository,
 )
+from lekto.core.ports.unit_of_work import UnitOfWork
 from lekto.core.ports.wakeup import Channel
 
 
-class MemoryUnitOfWork:
+class MemoryUnitOfWork(UnitOfWork):
     def __init__(self, database: MemoryDatabase) -> None:
         self._db = database
         self._closed = False
@@ -171,14 +186,12 @@ class MemoryUnitOfWork:
         self._verdicts: dict[VerdictKey, FieldVerdict] = {}
 
         self.users = MemoryUserRepository(self, USERS)
-        self.profiles = MemoryRepository[UserId, Profile](self, PROFILES)
+        self.profiles = MemoryProfileRepository(self, PROFILES)
         self.spaces = MemorySpaceRepository(self, SPACES)
-        self.contacts = MemoryNamedRepository[ContactId, Contact](self, CONTACTS)
-        self.document_types = MemoryNamedRepository[DocumentTypeId, DocumentType](
-            self, DOCUMENT_TYPES
-        )
+        self.contacts = MemoryContactRepository(self, CONTACTS)
+        self.document_types = MemoryDocumentTypeRepository(self, DOCUMENT_TYPES)
         self.tags = MemoryTagRepository(self, TAGS)
-        self.fields = MemoryNamedRepository[FieldId, FieldDefinition](self, FIELDS)
+        self.fields = MemoryFieldDefinitionRepository(self, FIELDS)
         self.documents = MemoryDocumentRepository(self, DOCUMENTS)
         self.processing_log = MemoryProcessingLog(self)
         self.processing_facts = MemoryProcessingFacts(self)
@@ -502,7 +515,27 @@ class MemoryNamedRepository[K: UUID, E: MasterData](MemoryRepository[K, E]):
         return next((_copy(row) for row in self._all() if name_key(row.name) == key), None)
 
 
-class MemoryTagRepository(MemoryNamedRepository[TagId, Tag]):
+class MemoryContactRepository(MemoryNamedRepository[ContactId, Contact], ContactRepository):
+    pass
+
+
+class MemoryDocumentTypeRepository(
+    MemoryNamedRepository[DocumentTypeId, DocumentType], DocumentTypeRepository
+):
+    pass
+
+
+class MemoryFieldDefinitionRepository(
+    MemoryNamedRepository[FieldId, FieldDefinition], FieldDefinitionRepository
+):
+    pass
+
+
+class MemoryProfileRepository(MemoryRepository[UserId, Profile], ProfileRepository):
+    pass
+
+
+class MemoryTagRepository(MemoryNamedRepository[TagId, Tag], TagRepository):
     async def find_by_name(self, name: str, scope: TagScope = TagScope.DOCUMENT) -> Tag | None:
         key = name_key(name)
         return next(
@@ -511,7 +544,7 @@ class MemoryTagRepository(MemoryNamedRepository[TagId, Tag]):
         )
 
 
-class MemoryUserRepository(MemoryRepository[UserId, User]):
+class MemoryUserRepository(MemoryRepository[UserId, User], UserRepository):
     async def find_by_username(self, username: str) -> User | None:
         key = name_key(username)
         return next((_copy(row) for row in self._all() if name_key(row.username) == key), None)
@@ -555,7 +588,7 @@ class MemoryUserRepository(MemoryRepository[UserId, User]):
         self._uow._write(self._table, id, _REMOVED)
 
 
-class MemorySpaceRepository(MemoryRepository[SpaceId, Space]):
+class MemorySpaceRepository(MemoryRepository[SpaceId, Space], SpaceRepository):
     async def get_personal(self, user: UserId) -> Space:
         for row in self._all():
             if row.personal_of == user:
@@ -587,7 +620,7 @@ class MemorySpaceRepository(MemoryRepository[SpaceId, Space]):
         self._uow._write(self._table, id, _REMOVED)
 
 
-class MemoryDocumentRepository(MemoryRepository[DocumentId, Document]):
+class MemoryDocumentRepository(MemoryRepository[DocumentId, Document], DocumentRepository):
     async def remove(self, id: DocumentId) -> None:
         """With its versions, as the SQL schema's ON DELETE CASCADE."""
         await super().remove(id)
@@ -784,7 +817,7 @@ class MemoryDocumentRepository(MemoryRepository[DocumentId, Document]):
         )
 
 
-class MemoryProcessingLog:
+class MemoryProcessingLog(ProcessingLog):
     def __init__(self, uow: MemoryUnitOfWork) -> None:
         self._uow = uow
 
@@ -800,7 +833,7 @@ class MemoryProcessingLog:
         return [copy.deepcopy(entry) for entry in entries if entry.document_id == document]
 
 
-class MemoryDocumentVersionRepository:
+class MemoryDocumentVersionRepository(DocumentVersionRepository):
     def __init__(self, uow: MemoryUnitOfWork) -> None:
         self._uow = uow
 
@@ -840,7 +873,7 @@ class MemoryDocumentVersionRepository:
         await self.add(to)
 
 
-class MemoryDocumentRelationRepository:
+class MemoryDocumentRelationRepository(DocumentRelationRepository):
     def __init__(self, uow: MemoryUnitOfWork) -> None:
         self._uow = uow
 
@@ -880,7 +913,7 @@ class MemoryDocumentRelationRepository:
             self._uow._write(DOCUMENT_RELATIONS, id, _REMOVED)
 
 
-class MemoryDocumentFactRepository:
+class MemoryDocumentFactRepository(DocumentFactRepository):
     def __init__(self, uow: MemoryUnitOfWork) -> None:
         self._uow = uow
 
@@ -975,7 +1008,7 @@ class MemoryDocumentFactRepository:
         return seen
 
 
-class MemoryOutbox:
+class MemoryOutbox(Outbox):
     def __init__(self, uow: MemoryUnitOfWork) -> None:
         self._uow = uow
 
@@ -987,7 +1020,7 @@ class MemoryOutbox:
             self._uow._signals.add((Channel.EVENTS, None))
 
 
-class MemoryJobQueue:
+class MemoryJobQueue(JobQueue):
     def __init__(self, uow: MemoryUnitOfWork) -> None:
         self._uow = uow
 

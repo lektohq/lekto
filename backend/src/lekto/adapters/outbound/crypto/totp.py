@@ -5,10 +5,10 @@ from datetime import datetime
 
 import pyotp
 
-from lekto.core.ports.identity import TOTP_STEP
+from lekto.core.ports.identity import TOTP_STEP, Totp
 
 
-class PyotpTotp:
+class PyotpTotp(Totp):
     def new_secret(self) -> str:
         return pyotp.random_base32()
 

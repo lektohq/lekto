@@ -41,7 +41,7 @@ from lekto.adapters.outbound.sql.database import Database
 from lekto.adapters.outbound.sql.purging import delete_in_batches
 from lekto.core.domain.jobs import RetryPolicy
 from lekto.core.ports.clock import Clock
-from lekto.core.ports.event_bus import DISPATCH_BATCH, EventHandler
+from lekto.core.ports.event_bus import DISPATCH_BATCH, EventBus, EventHandler
 
 log = logging.getLogger(__name__)
 
@@ -62,7 +62,7 @@ class _Failure:
     retry_at: datetime | None  # None: given up
 
 
-class SqlEventBus:
+class SqlEventBus(EventBus):
     def __init__(
         self,
         database: Database,

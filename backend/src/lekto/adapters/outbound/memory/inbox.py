@@ -15,7 +15,7 @@ from lekto.core.domain.ids import DocumentId, UserId
 from lekto.core.domain.inbox import Confirmation, InboxState, InboxTab, inbox_state, open_tab
 from lekto.core.domain.spaces import SpaceRole
 from lekto.core.domain.validation import require_utc
-from lekto.core.ports.repository import InboxCriterion, InboxEntry, InboxPosition
+from lekto.core.ports.repository import InboxCriterion, InboxEntry, InboxPosition, InboxRepository
 
 if TYPE_CHECKING:
     from lekto.adapters.outbound.memory.unit_of_work import MemoryUnitOfWork
@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 type SeenKey = tuple[UserId, DocumentId]
 
 
-class MemoryInboxRepository:
+class MemoryInboxRepository(InboxRepository):
     def __init__(self, uow: MemoryUnitOfWork) -> None:
         self._uow = uow
 

@@ -11,7 +11,7 @@ import os
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
-from lekto.core.ports.identity import DecryptionError
+from lekto.core.ports.identity import DecryptionError, SecretCipher
 
 KEY_BYTES = 32
 _VERSION = b"\x01"
@@ -32,7 +32,7 @@ def decode_key(text: str) -> bytes:
     return key
 
 
-class AesGcmCipher:
+class AesGcmCipher(SecretCipher):
     def __init__(self, key: bytes) -> None:
         if len(key) != KEY_BYTES:
             raise ValueError(f"the key must have {KEY_BYTES} bytes")

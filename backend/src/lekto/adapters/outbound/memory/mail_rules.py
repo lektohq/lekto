@@ -3,9 +3,10 @@
 from lekto.adapters.outbound.memory.rows import MemoryRepository, _copy
 from lekto.core.domain.ids import MailboxId, MailRuleId
 from lekto.core.domain.mail_rules import MailRule, rule_order
+from lekto.core.ports.repository import MailRuleRepository
 
 
-class MemoryMailRuleRepository(MemoryRepository[MailRuleId, MailRule]):
+class MemoryMailRuleRepository(MemoryRepository[MailRuleId, MailRule], MailRuleRepository):
     async def of_mailbox(self, mailbox: MailboxId) -> list[MailRule]:
         return [rule for rule in await self.list_all() if rule.mailbox_id == mailbox]
 

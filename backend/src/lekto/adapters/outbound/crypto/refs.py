@@ -15,13 +15,13 @@ from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
 from lekto.adapters.outbound.crypto.cipher import KEY_BYTES
 from lekto.core.domain.encoding import base64url, from_base64url
-from lekto.core.ports.identity import DecryptionError
+from lekto.core.ports.identity import DecryptionError, RefCipher
 
 _VERSION = b"\x01"
 _INFO = b"lekto refs v1"
 
 
-class AesSivRefCipher:
+class AesSivRefCipher(RefCipher):
     def __init__(self, secret_key: bytes) -> None:
         if len(secret_key) != KEY_BYTES:
             raise ValueError(f"the key must have {KEY_BYTES} bytes")

@@ -3,6 +3,7 @@
 from lekto.core.domain import media_types
 from lekto.core.domain.errors import ImageError, UnsupportedMediaTypeError
 from lekto.core.domain.reasons import ReasonCode, because
+from lekto.core.ports.images import ImageNormaliser
 
 FAKE_LOGO = (
     b"RIFF\x1e\x00\x00\x00WEBPVP8L\x11\x00\x00\x00/\x00\x00\x00\x10\x07\xd0\xb56t\xad\x80"
@@ -12,7 +13,7 @@ FAKE_LOGO = (
 _DAMAGED = 64  # bytes: an image no longer than this counts as cut off
 
 
-class FakeImageNormaliser:
+class FakeImageNormaliser(ImageNormaliser):
     """Any image of a kind a logo is made from becomes `FAKE_LOGO`; one of at most 64 bytes
     counts as damaged. `calls` counts the images it was given."""
 

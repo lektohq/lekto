@@ -47,7 +47,7 @@ from lekto.adapters.outbound.pdfium.library import LOCK, MODULE
 from lekto.core.domain.errors import UnprocessableDocumentError
 from lekto.core.domain.json_value import JsonValue
 from lekto.core.domain.reasons import ReasonCode, because
-from lekto.core.ports.parser import ParseResult
+from lekto.core.ports.parser import DocumentParser, ParseResult
 
 VERSION = 1
 """The version of the rules above, in the processing log: a change of them shows."""
@@ -70,7 +70,7 @@ class Page:
     lines: list[dict[str, Any]]
 
 
-class LayoutParser:
+class LayoutParser(DocumentParser):
     """The text as it is set, read in a child with `timeout` and `memory` (`child.run_child`)."""
 
     def __init__(self, *, timeout: timedelta = DEFAULT_TIMEOUT, memory: int | None = None) -> None:

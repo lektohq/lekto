@@ -8,6 +8,7 @@ from urllib.parse import urlencode
 from lekto.core.domain.encoding import pkce_challenge, query_parameters
 from lekto.core.domain.errors import AuthenticationError
 from lekto.core.domain.identity import OidcIdentity
+from lekto.core.ports.identity import OidcProvider
 
 
 @dataclass(frozen=True)
@@ -17,7 +18,7 @@ class _Grant:
     identity: OidcIdentity
 
 
-class FakeOidcProvider:
+class FakeOidcProvider(OidcProvider):
     """`authorization_url` points to an imaginary provider; `consent` plays the user signing in
     there and returns the code the browser would bring back."""
 
