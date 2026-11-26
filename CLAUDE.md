@@ -102,7 +102,11 @@ changes in `migration/` its checks, with changes to YAML files yamllint.
 
 - `core` is plain Python: no framework imports (no FastAPI, SQLAlchemy, Pydantic settings, structlog,
   S3 or HTTP clients). It logs through the standard library `logging`.
-- Ports are Python protocols defined in `core/ports`; adapters implement them.
+- Ports are Python protocols defined in `core/ports`; adapters implement them and name their port
+  among their bases (`class S3ObjectStore(ObjectStore)`), so "Go to Implementations" finds them.
+  A port declares plain attributes, not properties, for what an adapter sets in `__init__`.
+  `adapters/outbound/README.md` lists every port with its adapters; a test builds the table
+  from the classes and fails when it differs.
 - Only `composition` knows which adapter implements which port. Inbound and outbound adapters never
   import each other, and neither do the inbound adapters (REST, MCP, worker, evaluation) among
   themselves: what more than one of them needs lives directly in `adapters/inbound`. `lint-imports`
