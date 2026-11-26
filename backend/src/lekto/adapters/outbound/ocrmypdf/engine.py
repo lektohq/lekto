@@ -91,7 +91,7 @@ from lekto.core.domain import media_types
 from lekto.core.domain.errors import LanguageModelError, UnprocessableDocumentError
 from lekto.core.domain.reading import PageReading, PageWords
 from lekto.core.domain.reasons import Reason, ReasonCode, because
-from lekto.core.ports.ocr import OcrResult, VisionModel, VisionReading
+from lekto.core.ports.ocr import Ocr, OcrResult, VisionModel, VisionReading
 
 log = logging.getLogger(__name__)
 
@@ -137,7 +137,7 @@ _NOTE_MAX = 300
 OUTPUT_KEPT = 256_000
 
 
-class OcrmypdfEngine:
+class OcrmypdfEngine(Ocr):
     def __init__(
         self,
         *,

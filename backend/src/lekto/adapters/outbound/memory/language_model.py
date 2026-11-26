@@ -14,15 +14,15 @@ import re
 from collections.abc import Callable, Sequence
 
 from lekto.core.domain.json_value import JsonObject, JsonValue
-from lekto.core.ports.embeddings import EmbeddingResult
-from lekto.core.ports.llm import StructuredAnswer, StructuredRequest
+from lekto.core.ports.embeddings import EmbeddingResult, Embeddings
+from lekto.core.ports.llm import LanguageModel, StructuredAnswer, StructuredRequest
 
 type Responder = Callable[[StructuredRequest], str | JsonObject]
 """Returns the answer to a request: text as is, or an object that is sent as JSON. May raise
 LanguageModelError to simulate a failing endpoint."""
 
 
-class FakeLanguageModel:
+class FakeLanguageModel(LanguageModel):
     def __init__(self, responder: Responder | None = None, *, model: str = "fake-llm 1") -> None:
         self._responder = responder or _nothing_recognised
         self._model = model
@@ -78,7 +78,7 @@ def minimal_instance(schema: JsonValue) -> JsonValue:
     return ""
 
 
-class FakeEmbeddings:
+class FakeEmbeddings(Embeddings):
     DIMENSIONS = 16
 
     def __init__(self, *, model: str = "fake-embeddings 1") -> None:
@@ -95,7 +95,7 @@ class FakeEmbeddings:
         return EmbeddingResult(vectors=[_vector(text) for text in texts], model=self._model)
 
 
-class BagOfWordsEmbeddings:
+class BagOfWordsEmbeddings(Embeddings):
     """Each word, and each three letters in a word of four or more, adds to a few of
     `dimensions` slots chosen by its hash (the hashing trick); the vector has length 1."""
 

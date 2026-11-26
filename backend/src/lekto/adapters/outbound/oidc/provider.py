@@ -27,6 +27,7 @@ from joserfc.jwk import KeySet
 
 from lekto.core.domain.errors import AuthenticationError, IdentityProviderError
 from lekto.core.domain.identity import OidcIdentity
+from lekto.core.ports.identity import OidcProvider
 
 log = logging.getLogger(__name__)
 
@@ -38,7 +39,7 @@ LEEWAY = 60  # seconds
 TIMEOUT = 10.0  # seconds per request to the provider
 
 
-class AuthlibOidcProvider:
+class AuthlibOidcProvider(OidcProvider):
     def __init__(
         self,
         *,

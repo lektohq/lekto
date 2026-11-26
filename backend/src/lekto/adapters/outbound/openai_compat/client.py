@@ -39,8 +39,8 @@ from lekto.adapters.outbound.http_client.openai import (
     response_object,
 )
 from lekto.core.domain.errors import EmbeddingsError, LanguageModelError
-from lekto.core.ports.embeddings import EmbeddingResult
-from lekto.core.ports.llm import StructuredAnswer, StructuredRequest
+from lekto.core.ports.embeddings import EmbeddingResult, Embeddings
+from lekto.core.ports.llm import LanguageModel, StructuredAnswer, StructuredRequest
 
 log = logging.getLogger(__name__)
 
@@ -50,7 +50,7 @@ SCHEMA_MESSAGE = "The answer is one JSON object with this JSON Schema:\n"
 """Before the schema, in a message of its own, where the endpoint only promises JSON."""
 
 
-class OpenAiCompatLanguageModel:
+class OpenAiCompatLanguageModel(LanguageModel):
     def __init__(
         self,
         *,
@@ -131,7 +131,7 @@ class OpenAiCompatLanguageModel:
         }
 
 
-class OpenAiCompatEmbeddings:
+class OpenAiCompatEmbeddings(Embeddings):
     def __init__(
         self,
         *,

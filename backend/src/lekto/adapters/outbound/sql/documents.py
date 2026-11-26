@@ -65,13 +65,15 @@ from lekto.core.ports.repository import (
     DocumentFilter,
     DocumentOrder,
     DocumentPosition,
+    DocumentRepository,
     FacetBy,
     InboxCriterion,
+    ProcessingLog,
     SortKey,
 )
 
 
-class SqlDocumentRepository(SqlRepository[DocumentId, Document]):
+class SqlDocumentRepository(SqlRepository[DocumentId, Document], DocumentRepository):
     kind = "document"
     table = t.documents
 
@@ -506,7 +508,7 @@ def _field_value(row: Row[Any]) -> FieldValue:
     raise ValueError(f"unknown field value kind {row.kind!r}")
 
 
-class SqlProcessingLog:
+class SqlProcessingLog(ProcessingLog):
     def __init__(self, transaction: Transaction) -> None:
         self._tx = transaction
 

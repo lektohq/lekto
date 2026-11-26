@@ -29,7 +29,7 @@ from sklearn.linear_model import LogisticRegression
 from lekto.core.domain.errors import ClassifierError
 from lekto.core.domain.ids import ContactId, DocumentTypeId, TagId
 from lekto.core.domain.json_value import JsonObject
-from lekto.core.ports.classifier import Prediction, TrainedModel, TrainingExample
+from lekto.core.ports.classifier import Classifier, Prediction, TrainedModel, TrainingExample
 
 FORMAT = "lekto-tfidf-logreg/1"
 MAX_TERMS = 20_000
@@ -50,7 +50,7 @@ def analyze(text: str) -> list[str]:
     return words + [f"{left} {right}" for left, right in itertools.pairwise(words)]
 
 
-class SklearnClassifier:
+class SklearnClassifier(Classifier):
     def __init__(self) -> None:
         self._models: OrderedDict[str, _Model] = OrderedDict()
 

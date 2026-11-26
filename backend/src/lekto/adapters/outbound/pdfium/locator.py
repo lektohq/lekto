@@ -34,6 +34,7 @@ from lekto.core.domain.errors import UnprocessableDocumentError, ValidationError
 from lekto.core.domain.json_value import JsonValue
 from lekto.core.domain.locations import Box, Location, line_boxes
 from lekto.core.domain.reasons import ReasonCode, because
+from lekto.core.ports.locator import TextLocator
 
 log = logging.getLogger(__name__)
 
@@ -46,7 +47,7 @@ _SOFT_HYPHEN = "\u00ad"
 _LINE_BREAKS = "\r\n"
 
 
-class PdfiumTextLocator:
+class PdfiumTextLocator(TextLocator):
     """Reads the PDF in a child with `timeout` and `memory` (`child.run_child`)."""
 
     def __init__(self, *, timeout: timedelta = DEFAULT_TIMEOUT, memory: int | None = None) -> None:

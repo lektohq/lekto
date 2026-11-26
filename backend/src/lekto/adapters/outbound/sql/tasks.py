@@ -12,9 +12,10 @@ from lekto.core.domain.ids import DocumentId, TaskId, UserId, WebhookId
 from lekto.core.domain.pipeline import Node
 from lekto.core.domain.reasons import Reason
 from lekto.core.domain.tasks import Task, TaskKind, TaskStatus, TaskStep
+from lekto.core.ports.repository import TaskRepository
 
 
-class SqlTaskRepository(SqlRepository[TaskId, Task]):
+class SqlTaskRepository(SqlRepository[TaskId, Task], TaskRepository):
     kind = "task"
     table = t.tasks
 

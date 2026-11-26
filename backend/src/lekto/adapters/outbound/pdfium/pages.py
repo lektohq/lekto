@@ -19,7 +19,7 @@ from lekto.core.domain import media_types
 from lekto.core.domain.errors import UnprocessableDocumentError
 from lekto.core.domain.json_value import JsonValue
 from lekto.core.domain.reasons import ReasonCode, because
-from lekto.core.ports.pages import PREVIEW_FILE, RenderedPages
+from lekto.core.ports.pages import PREVIEW_FILE, PageRenderer, RenderedPages
 
 DEFAULT_WIDTH = 1200
 DEFAULT_PREVIEW_WIDTH = 400
@@ -36,7 +36,7 @@ _SCRATCH = ".rendering"
 """Everything goes to this directory in `target` first, so `target` stays empty on an error."""
 
 
-class PdfiumPageRenderer:
+class PdfiumPageRenderer(PageRenderer):
     """Pages `width` pixels wide (an image narrower than that keeps its size), the preview
     `preview_width` wide. A PDF is rendered in a child with `timeout` and `memory`
     (`child.run_child`)."""

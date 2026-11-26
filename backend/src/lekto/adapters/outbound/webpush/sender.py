@@ -27,7 +27,7 @@ from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from lekto.adapters.outbound.http_client import CONNECT_TIMEOUT, describe_failure
 from lekto.core.domain.encoding import base64url, from_base64url
 from lekto.core.domain.push import PushDevice, PushMessage
-from lekto.core.ports.push import PushOutcome, PushResult
+from lekto.core.ports.push import PushOutcome, PushResult, PushSender
 
 log = logging.getLogger(__name__)
 
@@ -102,7 +102,7 @@ def vapid_header(endpoint: str, key: ec.EllipticCurvePrivateKey, subject: str, n
     return f"vapid t={head}.{body}.{signature}, k={base64url(public_bytes(key))}"
 
 
-class WebPushSender:
+class WebPushSender(PushSender):
     def __init__(
         self,
         *,

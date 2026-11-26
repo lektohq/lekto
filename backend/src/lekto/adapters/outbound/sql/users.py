@@ -13,9 +13,10 @@ from lekto.core.domain.ids import UserId
 from lekto.core.domain.profiles import Profile
 from lekto.core.domain.users import Role, User
 from lekto.core.domain.validation import name_key
+from lekto.core.ports.repository import ProfileRepository, UserRepository
 
 
-class SqlUserRepository(SqlRepository[UserId, User]):
+class SqlUserRepository(SqlRepository[UserId, User], UserRepository):
     kind = "user"
     table = t.users
 
@@ -50,7 +51,7 @@ class SqlUserRepository(SqlRepository[UserId, User]):
         )
 
 
-class SqlProfileRepository(SqlRepository[UserId, Profile]):
+class SqlProfileRepository(SqlRepository[UserId, Profile], ProfileRepository):
     kind = "profile"
     table = t.user_profiles
     key = "user_id"

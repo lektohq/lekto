@@ -20,10 +20,10 @@ from lekto.core.domain.webhooks import (
     Webhook,
     WebhookDelivery,
 )
-from lekto.core.ports.repository import PAGE_SIZE
+from lekto.core.ports.repository import PAGE_SIZE, WebhookRepository
 
 
-class SqlWebhookRepository(SqlRepository[WebhookId, Webhook]):
+class SqlWebhookRepository(SqlRepository[WebhookId, Webhook], WebhookRepository):
     kind = "webhook"
     table = t.webhooks
 

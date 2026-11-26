@@ -15,7 +15,9 @@ from lekto.core.ports.mail_server import (
     MailAccount,
     MailInfo,
     MailSearch,
+    MailServer,
     MailServerError,
+    MailSession,
 )
 
 
@@ -74,7 +76,7 @@ class MemoryMailAccount:
         return shown_keywords(self.known) if folder in self.boxes else ()
 
 
-class MemoryMailServer:
+class MemoryMailServer(MailServer):
     """Servers by host and port; each holds accounts by user name. A host it does not know cannot
     be reached; a login whose security is not the server's gets no secure connection."""
 
@@ -116,7 +118,7 @@ class MemoryMailServer:
         return account
 
 
-class MemoryMailSession:
+class MemoryMailSession(MailSession):
     def __init__(self, account: MemoryMailAccount) -> None:
         self._account = account
 

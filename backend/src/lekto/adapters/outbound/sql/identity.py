@@ -48,9 +48,17 @@ from lekto.core.domain.ids import (
     SessionId,
     UserId,
 )
+from lekto.core.ports.identity import (
+    ApiTokenRepository,
+    CredentialRepository,
+    ExternalIdentityRepository,
+    KnownDeviceRepository,
+    LoginFailureRepository,
+    SessionRepository,
+)
 
 
-class SqlCredentialRepository(SqlRepository[UserId, Credential]):
+class SqlCredentialRepository(SqlRepository[UserId, Credential], CredentialRepository):
     """One credential per user, keyed by the user's id; its recovery codes as child rows."""
 
     kind = "credential"
@@ -112,7 +120,7 @@ def _credential_values(credential: Credential) -> dict[str, Any]:
     }
 
 
-class SqlSessionRepository:
+class SqlSessionRepository(SessionRepository):
     def __init__(self, transaction: Transaction) -> None:
         self._tx = transaction
 
@@ -173,7 +181,7 @@ def _session(row: Row[Any]) -> Session:
     )
 
 
-class SqlApiTokenRepository:
+class SqlApiTokenRepository(ApiTokenRepository):
     def __init__(self, transaction: Transaction) -> None:
         self._tx = transaction
 
@@ -240,7 +248,7 @@ def _api_token(row: Row[Any]) -> ApiToken:
     )
 
 
-class SqlKnownDeviceRepository:
+class SqlKnownDeviceRepository(KnownDeviceRepository):
     def __init__(self, transaction: Transaction) -> None:
         self._tx = transaction
 
@@ -299,7 +307,7 @@ def _known_device(row: Row[Any]) -> KnownDevice:
     )
 
 
-class SqlExternalIdentityRepository:
+class SqlExternalIdentityRepository(ExternalIdentityRepository):
     def __init__(self, transaction: Transaction) -> None:
         self._tx = transaction
 
@@ -345,7 +353,7 @@ def _external_identity(row: Row[Any]) -> ExternalIdentity:
     )
 
 
-class SqlLoginFailureRepository:
+class SqlLoginFailureRepository(LoginFailureRepository):
     def __init__(self, transaction: Transaction) -> None:
         self._tx = transaction
 

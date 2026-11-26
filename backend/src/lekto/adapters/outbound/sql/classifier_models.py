@@ -8,9 +8,12 @@ from lekto.adapters.outbound.sql import tables as t
 from lekto.adapters.outbound.sql.repositories import SqlRepository, Values
 from lekto.core.domain.classifier import ClassifierModel
 from lekto.core.domain.ids import ClassifierModelId
+from lekto.core.ports.repository import ClassifierModelRepository
 
 
-class SqlClassifierModelRepository(SqlRepository[ClassifierModelId, ClassifierModel]):
+class SqlClassifierModelRepository(
+    SqlRepository[ClassifierModelId, ClassifierModel], ClassifierModelRepository
+):
     kind = "classifier model"
     table = t.classifier_models
 

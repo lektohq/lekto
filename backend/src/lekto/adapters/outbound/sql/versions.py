@@ -10,9 +10,10 @@ from lekto.core.domain.documents import Sha256
 from lekto.core.domain.errors import NotFoundError
 from lekto.core.domain.ids import DocumentId, UserId
 from lekto.core.domain.versions import DocumentVersion, VersionKind
+from lekto.core.ports.repository import DocumentVersionRepository
 
 
-class SqlDocumentVersionRepository:
+class SqlDocumentVersionRepository(DocumentVersionRepository):
     def __init__(self, transaction: Transaction) -> None:
         self._tx = transaction
 

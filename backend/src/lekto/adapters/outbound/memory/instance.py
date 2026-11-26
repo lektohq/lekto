@@ -7,6 +7,7 @@ from uuid import UUID
 
 from lekto.adapters.outbound.memory.database import Table
 from lekto.core.domain.releases import UpdateCheck
+from lekto.core.ports.instance import InstanceRepository
 
 if TYPE_CHECKING:
     from lekto.adapters.outbound.memory.unit_of_work import MemoryUnitOfWork
@@ -23,7 +24,7 @@ class InstanceRow:
 INSTANCE: Table[InstanceRow] = Table("instance", lambda _: ["the instance"])
 
 
-class MemoryInstanceRepository:
+class MemoryInstanceRepository(InstanceRepository):
     def __init__(self, uow: MemoryUnitOfWork) -> None:
         self._uow = uow
 

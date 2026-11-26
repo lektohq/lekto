@@ -11,6 +11,11 @@ from lekto.core.domain.errors import NotFoundError
 from lekto.core.domain.ids import BulkOperationId, RuleApplicationId, RuleId, SpaceId, UserId
 from lekto.core.domain.reasons import ReasonCode, because
 from lekto.core.domain.rules import Rule, RuleApplication, RuleScope, RuleVersion
+from lekto.core.ports.repository import (
+    BulkOperationRepository,
+    RuleApplicationRepository,
+    RuleRepository,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Collection
@@ -31,7 +36,7 @@ def version_row_id(rule: RuleId, number: int) -> UUID:
     return uuid5(rule, str(number))
 
 
-class MemoryRuleRepository(MemoryRepository[RuleId, Rule]):
+class MemoryRuleRepository(MemoryRepository[RuleId, Rule], RuleRepository):
     def __init__(self, uow: MemoryUnitOfWork, table: Table[Rule]) -> None:
         super().__init__(uow, table)
         self._versions = MemoryRepository[UUID, VersionRow](uow, RULE_VERSIONS)
@@ -101,9 +106,13 @@ class MemoryRuleRepository(MemoryRepository[RuleId, Rule]):
             await self._versions.add(VersionRow(id, version))
 
 
-class MemoryRuleApplicationRepository(MemoryRepository[RuleApplicationId, RuleApplication]):
+class MemoryRuleApplicationRepository(
+    MemoryRepository[RuleApplicationId, RuleApplication], RuleApplicationRepository
+):
     pass
 
 
-class MemoryBulkOperationRepository(MemoryRepository[BulkOperationId, BulkOperation]):
+class MemoryBulkOperationRepository(
+    MemoryRepository[BulkOperationId, BulkOperation], BulkOperationRepository
+):
     pass

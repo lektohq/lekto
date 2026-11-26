@@ -4,13 +4,13 @@ from collections.abc import Callable
 from urllib.parse import urlsplit
 
 from lekto.core.domain.addresses import is_public, literal
-from lekto.core.ports.webhook_sender import REFUSED, WebhookRequest, WebhookResponse
+from lekto.core.ports.webhook_sender import REFUSED, WebhookRequest, WebhookResponse, WebhookSender
 
 type Answer = int | str | Exception
 """A status code, or an error text (no answer), or an exception that is turned into an error."""
 
 
-class FakeWebhookSender:
+class FakeWebhookSender(WebhookSender):
     """Records the requests it sends. Answers with 200 unless `answers` is given: a list used
     in turn (the last one stays), or a function of the request. Without `private`, it refuses
     `localhost` and an address that is not public, and sends nothing; it asks no name server,

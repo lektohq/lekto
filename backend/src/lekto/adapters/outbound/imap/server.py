@@ -13,7 +13,7 @@ from lekto.adapters.outbound.imap.names import listed
 from lekto.adapters.outbound.imap.session import ImapMailSession, folder_keywords
 from lekto.core.domain.mail import MailLogin, MailSecurity
 from lekto.core.domain.reasons import Reason, ReasonCode, because
-from lekto.core.ports.mail_server import MailAccount, MailServerError
+from lekto.core.ports.mail_server import MailAccount, MailServer, MailServerError
 
 MAX_DETAIL = 200
 INBOX = "INBOX"
@@ -23,7 +23,7 @@ INBOX = "INBOX"
 NO_IMAP = "no IMAP server answered"
 
 
-class ImapMailServer:
+class ImapMailServer(MailServer):
     """`timeout` holds for connecting and for every answer. `ssl_context` checks the server's
     certificate (the system's trusted ones unless given)."""
 

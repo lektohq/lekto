@@ -2,10 +2,10 @@ import asyncio
 from pathlib import Path
 
 from lekto.core.domain.errors import NotFoundError
-from lekto.core.ports.object_store import check_key
+from lekto.core.ports.object_store import ObjectStore, check_key
 
 
-class MemoryObjectStore:
+class MemoryObjectStore(ObjectStore):
     def __init__(self) -> None:
         self._objects: dict[str, tuple[bytes, str]] = {}
 

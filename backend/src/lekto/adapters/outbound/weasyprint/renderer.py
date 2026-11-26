@@ -14,7 +14,7 @@ from lekto.core.domain.errors import UnprocessableDocumentError
 from lekto.core.domain.mail_intake import Letter
 from lekto.core.domain.mail_message import MailMessage, MailPart, address_line, read_mail
 from lekto.core.domain.reasons import ReasonCode, because
-from lekto.core.ports.mail_renderer import RenderedMail
+from lekto.core.ports.mail_renderer import MailRenderer, RenderedMail
 
 CHILD = "lekto.adapters.outbound.weasyprint"
 """The module the child process runs (`__main__`)."""
@@ -78,7 +78,7 @@ _HEAD = re.compile(r"<head\b[^>]*>.*?</head>", re.IGNORECASE | re.DOTALL)
 _SCRIPT = re.compile(r"<script\b[^>]*>.*?</script>", re.IGNORECASE | re.DOTALL)
 
 
-class WeasyPrintMailRenderer:
+class WeasyPrintMailRenderer(MailRenderer):
     """Sets each mail in a child process (`python -m lekto.adapters.outbound.weasyprint`) with a
     time limit: a mail's HTML comes from anyone, and WeasyPrint has no limit of its own, so a
     page built to take forever would hold the worker. `language`: the language of the head

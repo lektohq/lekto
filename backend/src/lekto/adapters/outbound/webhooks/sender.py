@@ -29,12 +29,12 @@ from lekto.adapters.outbound.http_client.resolver import (
     pinned,
     system_resolver,
 )
-from lekto.core.ports.webhook_sender import REFUSED, WebhookRequest, WebhookResponse
+from lekto.core.ports.webhook_sender import REFUSED, WebhookRequest, WebhookResponse, WebhookSender
 
 log = logging.getLogger(__name__)
 
 
-class HttpWebhookSender:
+class HttpWebhookSender(WebhookSender):
     def __init__(
         self,
         *,

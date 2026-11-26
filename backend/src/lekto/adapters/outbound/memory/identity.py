@@ -23,17 +23,25 @@ from lekto.core.domain.ids import (
     SessionId,
     UserId,
 )
+from lekto.core.ports.identity import (
+    ApiTokenRepository,
+    CredentialRepository,
+    ExternalIdentityRepository,
+    KnownDeviceRepository,
+    LoginFailureRepository,
+    SessionRepository,
+)
 
 if TYPE_CHECKING:
     from lekto.adapters.outbound.memory.unit_of_work import MemoryUnitOfWork
 
 
-class MemoryCredentialRepository(MemoryRepository[UserId, Credential]):
+class MemoryCredentialRepository(MemoryRepository[UserId, Credential], CredentialRepository):
     async def remove(self, user: UserId) -> None:
         self._remove_rows([row for row in self._all() if row.user_id == user])
 
 
-class MemorySessionRepository(MemoryRows[SessionId, Session]):
+class MemorySessionRepository(MemoryRows[SessionId, Session], SessionRepository):
     async def find_by_token(self, token_hash: str) -> Session | None:
         return next((_copy(row) for row in self._all() if row.token_hash == token_hash), None)
 
@@ -54,7 +62,7 @@ class MemorySessionRepository(MemoryRows[SessionId, Session]):
         )
 
 
-class MemoryApiTokenRepository(MemoryRows[ApiTokenId, ApiToken]):
+class MemoryApiTokenRepository(MemoryRows[ApiTokenId, ApiToken], ApiTokenRepository):
     async def find_by_token(self, token_hash: str) -> ApiToken | None:
         return next((_copy(row) for row in self._all() if row.token_hash == token_hash), None)
 
@@ -72,7 +80,7 @@ class MemoryApiTokenRepository(MemoryRows[ApiTokenId, ApiToken]):
         return self._remove_rows([row for row in self._all() if row.user_id == user])
 
 
-class MemoryKnownDeviceRepository(MemoryRows[KnownDeviceId, KnownDevice]):
+class MemoryKnownDeviceRepository(MemoryRows[KnownDeviceId, KnownDevice], KnownDeviceRepository):
     async def find_by_token(self, token_hash: str) -> KnownDevice | None:
         return next((_copy(row) for row in self._all() if row.token_hash == token_hash), None)
 
@@ -94,7 +102,7 @@ class MemoryKnownDeviceRepository(MemoryRows[KnownDeviceId, KnownDevice]):
         return self._remove_rows([row for row in self._all() if row.expires_at <= now])
 
 
-class MemoryExternalIdentityRepository:
+class MemoryExternalIdentityRepository(ExternalIdentityRepository):
     def __init__(self, uow: MemoryUnitOfWork, table: Table[ExternalIdentity]) -> None:
         self._rows = MemoryRows[ExternalIdentityId, ExternalIdentity](uow, table)
 
@@ -119,7 +127,7 @@ class MemoryExternalIdentityRepository:
         return self._rows._remove_rows([row for row in self._rows._all() if row.user_id == user])
 
 
-class MemoryLoginFailureRepository:
+class MemoryLoginFailureRepository(LoginFailureRepository):
     """Atomic, since nothing in a call waits for anything else."""
 
     def __init__(self, uow: MemoryUnitOfWork, table: Table[LoginFailures]) -> None:

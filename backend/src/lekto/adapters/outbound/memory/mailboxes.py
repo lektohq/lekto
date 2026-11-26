@@ -4,9 +4,10 @@ from lekto.adapters.outbound.memory.database import MAIL_RECORDS, MAIL_RULES
 from lekto.adapters.outbound.memory.rows import _REMOVED, MemoryRepository, _copy
 from lekto.core.domain.ids import MailboxId
 from lekto.core.domain.mail import Mailbox
+from lekto.core.ports.repository import MailboxRepository
 
 
-class MemoryMailboxRepository(MemoryRepository[MailboxId, Mailbox]):
+class MemoryMailboxRepository(MemoryRepository[MailboxId, Mailbox], MailboxRepository):
     async def list_all(self) -> list[Mailbox]:
         return [_copy(row) for row in self._all()]
 

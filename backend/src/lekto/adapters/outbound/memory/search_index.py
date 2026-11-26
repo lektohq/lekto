@@ -30,6 +30,7 @@ from lekto.core.ports.search_index import (
     IndexBuild,
     IndexStats,
     SearchHit,
+    SearchIndex,
     SearchQuery,
     SearchResult,
     SimilarQuery,
@@ -42,7 +43,7 @@ _SNIPPET_LENGTH = 160
 _FIELD_WEIGHTS = (1.0, 0.9, 0.8, 0.7, 0.6, 0.55, 0.5, 0.4)
 
 
-class MemorySearchIndex:
+class MemorySearchIndex(SearchIndex):
     def __init__(self, *, dimensions: int | None = None, locales: Collection[str] = ()) -> None:
         """`dimensions`: refuse vectors of another length, as a real index does; `locales`: the
         languages whose stop words it leaves out (`LEKTO_SEARCH_LOCALES`)."""
@@ -197,7 +198,7 @@ class MemorySearchIndex:
         return dict(self._documents)
 
 
-class _MemoryBuild:
+class _MemoryBuild(IndexBuild):
     def __init__(self, index: MemorySearchIndex) -> None:
         self._index = index
         self._documents: dict[DocumentId, IndexDocument] = {}

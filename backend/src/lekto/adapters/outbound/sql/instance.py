@@ -8,11 +8,12 @@ from sqlalchemy import select, update
 from lekto.adapters.outbound.sql import tables as t
 from lekto.adapters.outbound.sql.transaction import Transaction
 from lekto.core.domain.releases import Release, UpdateCheck
+from lekto.core.ports.instance import InstanceRepository
 
 _KEY = 1
 
 
-class SqlInstanceRepository:
+class SqlInstanceRepository(InstanceRepository):
     def __init__(self, transaction: Transaction) -> None:
         self._tx = transaction
 

@@ -10,9 +10,10 @@ from lekto.adapters.outbound.sql import tables as t
 from lekto.adapters.outbound.sql.repositories import SqlRepository, Values
 from lekto.core.domain.ids import ApiTokenId, DocumentId, PushDeviceId, UserId
 from lekto.core.domain.push import PushDevice, PushKind, PushPreferences
+from lekto.core.ports.push import PushDeviceRepository, PushPreferencesRepository
 
 
-class SqlPushDeviceRepository(SqlRepository[PushDeviceId, PushDevice]):
+class SqlPushDeviceRepository(SqlRepository[PushDeviceId, PushDevice], PushDeviceRepository):
     kind = "push device"
     table = t.push_devices
 
@@ -73,7 +74,9 @@ class SqlPushDeviceRepository(SqlRepository[PushDeviceId, PushDevice]):
         )
 
 
-class SqlPushPreferencesRepository(SqlRepository[UserId, PushPreferences]):
+class SqlPushPreferencesRepository(
+    SqlRepository[UserId, PushPreferences], PushPreferencesRepository
+):
     kind = "push preferences"
     table = t.push_preferences
     key = "user_id"

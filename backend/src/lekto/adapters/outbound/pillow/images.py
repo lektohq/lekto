@@ -26,7 +26,7 @@ from PIL import BmpImagePlugin, Image, ImageOps
 from lekto.core.domain import media_types
 from lekto.core.domain.errors import ImageError, UnsupportedMediaTypeError
 from lekto.core.domain.reasons import ReasonCode, because
-from lekto.core.ports.images import LOGO_SIZE, MAX_ICON_ENTRIES, MAX_PIXELS
+from lekto.core.ports.images import LOGO_SIZE, MAX_ICON_ENTRIES, MAX_PIXELS, ImageNormaliser
 
 MAX_JPEG_SCANS = 64
 """Scans of a progressive JPEG (an encoder writes about ten)."""
@@ -36,7 +36,7 @@ _PNG = b"\x89PNG\r\n\x1a\n"
 _QUALITY = 90
 
 
-class PillowImageNormaliser:
+class PillowImageNormaliser(ImageNormaliser):
     def __init__(self, *, max_pixels: int = MAX_PIXELS) -> None:
         self._max_pixels = max_pixels
 

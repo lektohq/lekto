@@ -19,9 +19,12 @@ from lekto.core.domain.ids import BulkOperationId, DocumentId, UserId
 from lekto.core.domain.json_value import JsonValue
 from lekto.core.domain.progress import ProgressStatus
 from lekto.core.domain.reasons import Reason
+from lekto.core.ports.repository import BulkOperationRepository
 
 
-class SqlBulkOperationRepository(SqlRepository[BulkOperationId, BulkOperation]):
+class SqlBulkOperationRepository(
+    SqlRepository[BulkOperationId, BulkOperation], BulkOperationRepository
+):
     kind = "bulk operation"
     table = t.bulk_operations
 

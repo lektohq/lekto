@@ -16,6 +16,7 @@ from lekto.core.ports.mail_server import (
     MailInfo,
     MailSearch,
     MailServerError,
+    MailSession,
 )
 
 log = logging.getLogger(__name__)
@@ -30,7 +31,7 @@ _FLAGS = re.compile(rb"FLAGS \(([^)]*)\)")
 _LIST = re.compile(rb"\(([^)]*)\)")
 
 
-class ImapMailSession:
+class ImapMailSession(MailSession):
     def __init__(self, imap: imaplib.IMAP4, run: Callable[..., object]) -> None:
         self._imap = imap
         self._run = run

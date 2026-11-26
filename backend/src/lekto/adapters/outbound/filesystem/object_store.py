@@ -20,12 +20,12 @@ from pathlib import Path
 from typing import BinaryIO
 
 from lekto.core.domain.errors import NotFoundError
-from lekto.core.ports.object_store import check_key, check_readable
+from lekto.core.ports.object_store import ObjectStore, check_key, check_readable
 
 _CHUNK = 1024 * 1024
 
 
-class FilesystemObjectStore:
+class FilesystemObjectStore(ObjectStore):
     def __init__(self, root: Path) -> None:
         self._root = root
 

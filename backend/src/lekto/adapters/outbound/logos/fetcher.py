@@ -46,7 +46,7 @@ from lekto.adapters.outbound.logos.icons import Candidate, manifest_icons, page_
 from lekto.core.domain import media_types
 from lekto.core.domain.errors import LogoFetchError
 from lekto.core.ports.images import LOGO_SIZE, MAX_ICON_ENTRIES, MAX_PIXELS
-from lekto.core.ports.logos import MIN_LOGO_SIZE, FetchedLogo
+from lekto.core.ports.logos import MIN_LOGO_SIZE, FetchedLogo, LogoFetcher
 
 log = logging.getLogger(__name__)
 
@@ -75,7 +75,7 @@ class Answer:
         return self.body.decode("utf-8", "replace")
 
 
-class HttpLogoFetcher:
+class HttpLogoFetcher(LogoFetcher):
     def __init__(
         self,
         *,

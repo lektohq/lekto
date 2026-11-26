@@ -26,7 +26,7 @@ from lekto.core.domain.errors import UnprocessableDocumentError, ValidationError
 from lekto.core.domain.json_value import JsonValue
 from lekto.core.domain.locations import Box
 from lekto.core.domain.reasons import ReasonCode, because
-from lekto.core.ports.codes import CodeReading
+from lekto.core.ports.codes import CodeReader, CodeReading
 
 DPI = 300
 POINTS_PER_INCH = 72  # the unit of a PDF page's size
@@ -38,7 +38,7 @@ MODULE = "lekto.adapters.outbound.zxing"
 """The module a child runs (`__main__`)."""
 
 
-class ZxingCodeReader:
+class ZxingCodeReader(CodeReader):
     """Reads the PDF in a child with `timeout` and `memory` (`pdfium.child.run_child`)."""
 
     def __init__(

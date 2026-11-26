@@ -29,9 +29,10 @@ from lekto.core.domain.lenses import (
     RelativePeriod,
 )
 from lekto.core.domain.validation import name_key
+from lekto.core.ports.repository import LensRepository
 
 
-class SqlLensRepository(SqlRepository[LensId, Lens]):
+class SqlLensRepository(SqlRepository[LensId, Lens], LensRepository):
     kind = "lens"
     table = t.lenses
 

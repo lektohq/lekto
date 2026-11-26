@@ -3,10 +3,10 @@
 from collections.abc import Mapping
 
 from lekto.core.domain.errors import LogoFetchError
-from lekto.core.ports.logos import FetchedLogo
+from lekto.core.ports.logos import FetchedLogo, LogoFetcher
 
 
-class FakeLogoFetcher:
+class FakeLogoFetcher(LogoFetcher):
     """The websites it knows (`sites`: domain to the image it serves as its icon); any other
     has none. `calls` lists the domains it was asked for."""
 

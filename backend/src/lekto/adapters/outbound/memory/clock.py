@@ -1,9 +1,10 @@
 from datetime import UTC, datetime, timedelta
 
 from lekto.core.domain.validation import require_utc
+from lekto.core.ports.clock import Clock
 
 
-class ManualClock:
+class ManualClock(Clock):
     """A clock that only moves when told to; starts at the given time or now."""
 
     def __init__(self, now: datetime | None = None) -> None:

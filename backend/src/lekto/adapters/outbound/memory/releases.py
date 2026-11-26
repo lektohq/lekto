@@ -1,10 +1,10 @@
 """Releases from a list, for tests and the memory container."""
 
 from lekto.core.domain.releases import Release
-from lekto.core.ports.releases import ReleaseFeedError
+from lekto.core.ports.releases import ReleaseFeed, ReleaseFeedError
 
 
-class FakeReleaseFeed:
+class FakeReleaseFeed(ReleaseFeed):
     """Answers with `releases`, or raises `error` while it is set; counts the questions."""
 
     def __init__(self, releases: list[Release] | None = None) -> None:

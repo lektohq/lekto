@@ -6,10 +6,10 @@ import contextlib
 from collections.abc import Callable, Collection
 from datetime import timedelta
 
-from lekto.core.ports.wakeup import Channel
+from lekto.core.ports.wakeup import Channel, Signal
 
 
-class InProcessSignal:
+class InProcessSignal(Signal):
     """A flag that a signal of `channel` (of one of the job `kinds` on `JOBS`; None: all) sets,
     cleared by the wait that saw it. `live` asks the wakeup whether signals of other processes
     reach it at the moment."""

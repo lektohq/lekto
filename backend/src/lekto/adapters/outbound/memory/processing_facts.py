@@ -13,7 +13,14 @@ from lekto.core.domain.documents import Document
 from lekto.core.domain.first_runs import FieldVerdict, FirstRun, Verdict
 from lekto.core.domain.ids import DocumentId
 from lekto.core.domain.pipeline import Lane, Node
-from lekto.core.ports.repository import MICROSECOND, FactsScope, LaneCount, RunTimes, SignalCount
+from lekto.core.ports.repository import (
+    MICROSECOND,
+    FactsScope,
+    LaneCount,
+    ProcessingFacts,
+    RunTimes,
+    SignalCount,
+)
 
 if TYPE_CHECKING:
     from lekto.adapters.outbound.memory.unit_of_work import MemoryUnitOfWork
@@ -21,7 +28,7 @@ if TYPE_CHECKING:
 type VerdictKey = tuple[DocumentId, str]
 
 
-class MemoryProcessingFacts:
+class MemoryProcessingFacts(ProcessingFacts):
     def __init__(self, uow: MemoryUnitOfWork) -> None:
         self._uow = uow
 
